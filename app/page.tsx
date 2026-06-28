@@ -9,9 +9,6 @@ export default function HomePage() {
           <span className="font-display text-xl font-bold text-white">
             WebVibe
           </span>
-          <span className="text-sm text-muted">
-            Press <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-xs text-white">/</kbd> to search
-          </span>
         </div>
       </header>
 
