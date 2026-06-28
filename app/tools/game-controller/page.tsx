@@ -8,6 +8,7 @@ import { joinRoom, InputMessage } from '@/lib/webrtc'
 import { parseInf, ControllerConfig } from '@/lib/inf-parser'
 
 const MAX_PLAYERS = 8
+const AGENT_WS_URL = 'ws://localhost:9999'
 
 const PLAYER_COLORS = [
   { badge: 'border-violet-500 bg-violet-500/20 text-violet-300', dot: 'bg-violet-400' },
@@ -20,37 +21,79 @@ const PLAYER_COLORS = [
   { badge: 'border-cyan-500 bg-cyan-500/20 text-cyan-300', dot: 'bg-cyan-400' },
 ]
 
+type HostMode = 'browser' | 'agent'
+
 function generateRoomId() {
   return Math.random().toString(36).slice(2, 8).toUpperCase()
 }
 
 // ── Host View ────────────────────────────────────────────────────
 function HostView({ roomId }: { roomId: string }) {
-  const { players, playerInputs } = useGameController(roomId)
+  const { players, playerInputs, kickPlayer } = useGameController(roomId)
   const [showQR, setShowQR] = useState(true)
+  const [mode, setMode] = useState<HostMode>('browser')
+  const [agentStatus, setAgentStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected')
   const [log, setLog] = useState<{ player: number; keys: string }[]>([])
   const prevRef = useRef<Record<string, Record<string, boolean>>>({})
+  const wsRef = useRef<WebSocket | null>(null)
 
   const url =
     typeof window !== 'undefined'
       ? `${window.location.origin}/tools/game-controller?room=${roomId}`
       : ''
 
+  // ── Local Agent WebSocket ──────────────────────────────────────
+  useEffect(() => {
+    if (mode !== 'agent') {
+      wsRef.current?.close()
+      wsRef.current = null
+      setAgentStatus('disconnected')
+      return
+    }
+
+    const connect = () => {
+      setAgentStatus('connecting')
+      const ws = new WebSocket(AGENT_WS_URL)
+      wsRef.current = ws
+      ws.onopen = () => setAgentStatus('connected')
+      ws.onclose = () => {
+        setAgentStatus('disconnected')
+        wsRef.current = null
+      }
+      ws.onerror = () => {
+        ws.close()
+      }
+    }
+
+    connect()
+    return () => {
+      wsRef.current?.close()
+      wsRef.current = null
+    }
+  }, [mode])
+
+  // ── Input handler — log + forward to agent ───────────────────
   useEffect(() => {
     const prev = prevRef.current
     for (const [peerId, btns] of Object.entries(playerInputs)) {
       const prevBtns = prev[peerId] ?? {}
-      const newPresses = Object.entries(btns)
-        .filter(([k, v]) => v && !prevBtns[k])
-        .map(([k]) => k)
-      if (newPresses.length > 0) {
-        const info = players.find((p) => p.peerId === peerId)
-        const playerNum = info ? info.playerIndex + 1 : 0
-        setLog((old) => [{ player: playerNum, keys: newPresses.join('+') }, ...old].slice(0, 10))
+      for (const [key, pressed] of Object.entries(btns)) {
+        if (pressed !== prevBtns[key]) {
+          // Forward to local agent
+          if (mode === 'agent' && wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'button', key, state: pressed ? 'pressed' : 'released', peerId }))
+          }
+          // Log new presses only
+          if (pressed && !prevBtns[key]) {
+            const info = players.find((p) => p.peerId === peerId)
+            const playerNum = info ? info.playerIndex + 1 : 0
+            setLog((old) => [{ player: playerNum, keys: key }, ...old].slice(0, 12))
+          }
+        }
       }
     }
     prevRef.current = playerInputs
-  }, [playerInputs, players])
+  }, [playerInputs, players, mode])
 
   const copy = () => navigator.clipboard?.writeText(url)
 
@@ -86,6 +129,62 @@ function HostView({ roomId }: { roomId: string }) {
         </div>
       )}
 
+      {/* Mode selector */}
+      <div className="rounded-xl border border-border bg-surface p-4 space-y-3">
+        <p className="text-xs uppercase tracking-widest text-muted">Input Mode</p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setMode('browser')}
+            className={`flex-1 rounded-xl border px-4 py-3 text-sm font-bold transition-colors ${
+              mode === 'browser'
+                ? 'border-[#7C3AED] bg-[#7C3AED]/20 text-[#A78BFA]'
+                : 'border-border bg-[#08080E] text-muted hover:text-white'
+            }`}
+          >
+            <span className="block text-base">🌐</span>
+            Browser Mode
+            <span className="mt-0.5 block text-xs font-normal opacity-70">Events in-page only</span>
+          </button>
+          <button
+            onClick={() => setMode('agent')}
+            className={`flex-1 rounded-xl border px-4 py-3 text-sm font-bold transition-colors ${
+              mode === 'agent'
+                ? 'border-[#7C3AED] bg-[#7C3AED]/20 text-[#A78BFA]'
+                : 'border-border bg-[#08080E] text-muted hover:text-white'
+            }`}
+          >
+            <span className="block text-base">🖥️</span>
+            Local Agent
+            <span className="mt-0.5 block text-xs font-normal opacity-70">Injects OS keypresses</span>
+          </button>
+        </div>
+
+        {/* Agent status + instructions */}
+        {mode === 'agent' && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className={`h-2 w-2 rounded-full ${
+                agentStatus === 'connected' ? 'bg-green-400' :
+                agentStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
+              }`} />
+              <span className="text-sm text-muted">
+                {agentStatus === 'connected' ? 'Agent connected — keypresses active' :
+                 agentStatus === 'connecting' ? `Connecting to ${AGENT_WS_URL}...` :
+                 `Agent not running on ${AGENT_WS_URL}`}
+              </span>
+            </div>
+            {agentStatus !== 'connected' && (
+              <div className="rounded-lg border border-border bg-[#08080E] p-3 font-mono text-xs text-muted space-y-1">
+                <p className="text-white">Start the local agent:</p>
+                <p className="text-[#A78BFA]">cd local-agent</p>
+                <p className="text-[#A78BFA]">npm install</p>
+                <p className="text-[#A78BFA]">npm start</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Player slots */}
       <div>
         <p className="mb-3 text-xs uppercase tracking-widest text-muted">
@@ -104,10 +203,20 @@ function HostView({ roomId }: { roomId: string }) {
             return (
               <div
                 key={i}
-                className={`rounded-xl border p-3 text-center transition-all duration-200 ${
+                className={`group relative rounded-xl border p-3 text-center transition-all duration-200 ${
                   player ? color.badge : 'border-border bg-surface opacity-40'
                 }`}
               >
+                {/* Kick button */}
+                {player && (
+                  <button
+                    onClick={() => kickPlayer(player.peerId)}
+                    title="Remove player"
+                    className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 items-center justify-center rounded-full border border-border bg-[#08080E] text-xs text-muted hover:border-red-500 hover:text-red-400 group-hover:flex"
+                  >
+                    ✕
+                  </button>
+                )}
                 <div className="flex items-center justify-center gap-1.5">
                   <span className={`h-1.5 w-1.5 rounded-full ${player ? color.dot : 'bg-muted'}`} />
                   <span className="text-xs font-bold">P{i + 1}</span>
@@ -189,7 +298,6 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
           <p className="mt-1 text-sm text-[#52525B]">Pick a preset or import your own .inf</p>
         </div>
 
-        {/* Preset buttons — hidden when custom layout loaded */}
         {!customName && (
           <div className="flex gap-3">
             {(['nes', 'snes'] as const).map((p) => (
@@ -208,7 +316,6 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
           </div>
         )}
 
-        {/* Custom layout badge */}
         {customName && (
           <div className="flex items-center justify-between rounded-xl border border-[#1A1A2E] bg-[#0F0F1A] px-4 py-3">
             <div>
@@ -224,7 +331,6 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
           </div>
         )}
 
-        {/* Import .inf */}
         <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-[#1A1A2E] bg-[#0F0F1A] px-4 py-3 text-sm text-[#52525B] transition-colors hover:text-white">
           Import custom .inf
           <input type="file" accept=".inf" onChange={handleImport} className="hidden" />
@@ -285,20 +391,16 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
   const color = PLAYER_COLORS[(playerIndex ?? 0) % MAX_PLAYERS]
 
   const badgeText =
-    status === 'connecting'
-      ? 'Connecting...'
-      : status === 'disconnected'
-      ? 'Disconnected'
-      : `Player ${(playerIndex ?? 0) + 1}`
+    status === 'connecting' ? 'Connecting...' :
+    status === 'disconnected' ? 'Disconnected' :
+    `Player ${(playerIndex ?? 0) + 1}`
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-[#08080E]">
-      {/* Player badge */}
       <div className={`absolute left-2 top-2 z-10 rounded-full border px-3 py-1 text-xs font-bold ${color.badge}`}>
         {badgeText}
       </div>
 
-      {/* Buttons */}
       {Object.entries(config.buttons).map(([id, btn]) => (
         <button
           key={id}

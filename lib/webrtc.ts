@@ -26,12 +26,17 @@ export type PlayerInfo = {
   connected: boolean
 }
 
+export type RoomHandle = {
+  cleanup: () => void
+  kickPlayer: (peerId: string) => void
+}
+
 // ── Host side ────────────────────────────────────────────────────
 export async function createRoom(
   roomId: string,
   onInput: (msg: InputMessage) => void,
   onPlayersChange: (players: PlayerInfo[]) => void
-): Promise<() => void> {
+): Promise<RoomHandle> {
   const peers = new Map<string, { pc: RTCPeerConnection; playerIndex: number; connected: boolean }>()
 
   const notify = () =>
@@ -112,10 +117,17 @@ export async function createRoom(
     })
   )
 
-  return () => {
-    peers.forEach(({ pc }) => pc.close())
-    peers.clear()
-    getSupabase().removeChannel(sigChannel)
+  return {
+    cleanup: () => {
+      peers.forEach(({ pc }) => pc.close())
+      peers.clear()
+      getSupabase().removeChannel(sigChannel)
+    },
+    kickPlayer: (peerId: string) => {
+      const peer = peers.get(peerId)
+      if (peer) peer.pc.close()
+      // dc.onclose fires automatically → peers.delete + notify
+    },
   }
 }
 

@@ -1,13 +1,13 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
-import { createRoom, InputMessage, PlayerInfo } from '@/lib/webrtc'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createRoom, InputMessage, PlayerInfo, RoomHandle } from '@/lib/webrtc'
 
 export type ButtonState = Record<string, boolean>
 
 export function useGameController(roomId: string) {
   const [players, setPlayers] = useState<PlayerInfo[]>([])
   const [playerInputs, setPlayerInputs] = useState<Record<string, ButtonState>>({})
-  const cleanupRef = useRef<(() => void) | null>(null)
+  const handleRef = useRef<RoomHandle | null>(null)
 
   useEffect(() => {
     if (!roomId) return
@@ -28,19 +28,23 @@ export function useGameController(roomId: string) {
       (newPlayers: PlayerInfo[]) => {
         if (!cancelled) setPlayers(newPlayers)
       }
-    ).then((cleanup) => {
-      if (cancelled) cleanup()
-      else cleanupRef.current = cleanup
+    ).then((handle) => {
+      if (cancelled) handle.cleanup()
+      else handleRef.current = handle
     })
 
     return () => {
       cancelled = true
-      cleanupRef.current?.()
-      cleanupRef.current = null
+      handleRef.current?.cleanup()
+      handleRef.current = null
       setPlayers([])
       setPlayerInputs({})
     }
   }, [roomId])
 
-  return { players, playerInputs }
+  const kickPlayer = useCallback((peerId: string) => {
+    handleRef.current?.kickPlayer(peerId)
+  }, [])
+
+  return { players, playerInputs, kickPlayer }
 }
