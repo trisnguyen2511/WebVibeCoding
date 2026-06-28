@@ -39,6 +39,24 @@ text: #FAFAFA  |  text-muted: #52525B
 
 Fonts: Space Grotesk (headings), Inter (body), JetBrains Mono (data)
 
+## Branch & deploy workflow
+
+```
+feature/xxx  →  staging  →  master (prod)
+```
+
+- **`master`**: production, auto-deploy to Vercel prod
+- **`staging`**: integration branch, auto-deploy to Vercel Preview URL for testing
+- **`feature/*` / `claude/*`**: individual feature branches
+
+### Steps for every new feature
+1. Develop on `claude/<feature>` branch
+2. Open PR: `claude/<feature>` → `staging`
+3. Test on Vercel staging Preview URL (Lighthouse PWA, mobile, etc.)
+4. When OK: merge `staging` → `master` to go live
+
+Never merge a feature branch directly into `master`.
+
 ## Commit format
 
 ```
