@@ -382,7 +382,7 @@ function HostView({ roomId }: { roomId: string }) {
 
 // ── Phone: Layout Setup ──────────────────────────────────────────
 function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }) {
-  const [preset, setPreset] = useState<'nes' | 'snes'>('nes')
+  const [preset, setPreset] = useState<'nes' | 'snes' | 'wasd'>('nes')
   const [config, setConfig] = useState<ControllerConfig | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
   const [customName, setCustomName] = useState<string | null>(null)
@@ -426,7 +426,7 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
 
         {!customName && (
           <div className="flex gap-3">
-            {(['nes', 'snes'] as const).map((p) => (
+            {(['nes', 'snes', 'wasd'] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => setPreset(p)}

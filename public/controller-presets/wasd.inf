@@ -1,0 +1,72 @@
+[controller]
+name = WASD Layout
+orientation = landscape
+
+; ── Movement ────────────────────────────────────────────────────
+; 8-way diagonal: top-left = w+a, top-right = w+d, etc.
+
+[dpad:MOVE]
+x = 2
+y = 25
+size = 40
+up = w
+down = s
+left = a
+right = d
+diagonal = true
+hold_interval = 50
+
+; ── Action buttons ──────────────────────────────────────────────
+
+[button:SPACE]
+label = Jump
+key = Space
+x = 75
+y = 45
+w = 14
+h = 16
+
+[button:SHIFT]
+label = Run
+key = Shift
+x = 75
+y = 68
+w = 14
+h = 12
+hold = true
+hold_delay = 0
+hold_interval = 50
+
+[button:E]
+label = E
+key = e
+x = 62
+y = 55
+w = 11
+h = 13
+
+[button:R]
+label = R
+key = r
+x = 62
+y = 38
+w = 11
+h = 13
+
+[button:ESC]
+label = ESC
+key = Escape
+x = 88
+y = 80
+w = 10
+h = 8
+
+; ── Combos ──────────────────────────────────────────────────────
+
+[combo:SPRINT_JUMP]
+label = Sprint+Jump
+x = 75
+y = 28
+w = 14
+h = 12
+chord = Shift+Space
