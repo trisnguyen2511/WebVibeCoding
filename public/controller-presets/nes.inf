@@ -9,6 +9,9 @@ x = 15
 y = 38
 w = 10
 h = 12
+hold = true
+hold_delay = 300
+hold_interval = 80
 
 [button:DOWN]
 label = ↓
@@ -17,6 +20,9 @@ x = 15
 y = 62
 w = 10
 h = 12
+hold = true
+hold_delay = 300
+hold_interval = 80
 
 [button:LEFT]
 label = ←
@@ -25,6 +31,9 @@ x = 5
 y = 50
 w = 10
 h = 12
+hold = true
+hold_delay = 300
+hold_interval = 80
 
 [button:RIGHT]
 label = →
@@ -33,6 +42,9 @@ x = 25
 y = 50
 w = 10
 h = 12
+hold = true
+hold_delay = 300
+hold_interval = 80
 
 [button:A]
 label = A
@@ -65,3 +77,16 @@ x = 58
 y = 80
 w = 16
 h = 8
+
+; ── Combos ─────────────────────────────────────────────────────
+; Hold both buttons simultaneously to trigger
+
+[combo:TURBO_A]
+label = Turbo A
+keys = SELECT+A
+action = z
+
+[combo:DIAGONAL_UL]
+label = ↖
+keys = UP+LEFT
+action = ArrowUp
