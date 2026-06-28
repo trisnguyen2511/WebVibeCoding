@@ -63,13 +63,21 @@ export async function joinRoom(roomId: string): Promise<{
   }
 
   channel.on('broadcast', { event: 'offer' }, async ({ payload }) => {
-    await pc.setRemoteDescription(new RTCSessionDescription(payload as RTCSessionDescriptionInit))
-    const answer = await pc.createAnswer()
-    await pc.setLocalDescription(answer)
-    channel.send({ type: 'broadcast', event: 'answer', payload: { type: answer.type, sdp: answer.sdp } })
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(payload as RTCSessionDescriptionInit))
+      const answer = await pc.createAnswer()
+      await pc.setLocalDescription(answer)
+      channel.send({ type: 'broadcast', event: 'answer', payload: { type: answer.type, sdp: answer.sdp } })
+    } catch (err) {
+      console.error('[webrtc] offer handling failed:', err)
+    }
   })
   channel.on('broadcast', { event: 'ice-pc' }, async ({ payload }) => {
-    await pc.addIceCandidate(new RTCIceCandidate(payload as RTCIceCandidateInit))
+    try {
+      await pc.addIceCandidate(new RTCIceCandidate(payload as RTCIceCandidateInit))
+    } catch (err) {
+      console.error('[webrtc] ice-pc failed:', err)
+    }
   })
 
   await new Promise<void>(resolve => channel.subscribe(status => { if (status === 'SUBSCRIBED') resolve() }))

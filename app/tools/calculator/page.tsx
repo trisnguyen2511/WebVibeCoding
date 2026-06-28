@@ -22,6 +22,7 @@ export default function CalculatorPage() {
   }
 
   const setOperator = (nextOp: Op) => {
+    if (display === 'Error') { clear(); return }
     const current = parseFloat(display)
     if (prevValue !== null && op && !shouldReset) {
       const result = calculate(prevValue, current, op)

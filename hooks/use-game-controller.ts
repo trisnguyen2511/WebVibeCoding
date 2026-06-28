@@ -19,16 +19,27 @@ export function useGameController(roomId: string) {
 
   useEffect(() => {
     if (!roomId) return
+    let cancelled = false
 
     const handleInput = (msg: InputMessage) => {
       if (msg.type !== 'button') return
       setButtons(prev => ({ ...prev, [msg.key]: msg.state === 'pressed' }))
     }
 
-    createRoom(roomId, handleInput, () => setConnected(true))
-      .then(cleanup => { cleanupRef.current = cleanup })
+    createRoom(roomId, handleInput, () => {
+      if (!cancelled) setConnected(true)
+    }).then(cleanup => {
+      if (cancelled) cleanup()
+      else cleanupRef.current = cleanup
+    })
 
-    return () => { cleanupRef.current?.(); setConnected(false); setButtons(INITIAL) }
+    return () => {
+      cancelled = true
+      cleanupRef.current?.()
+      cleanupRef.current = null
+      setConnected(false)
+      setButtons(INITIAL)
+    }
   }, [roomId])
 
   return { buttons, connected }

@@ -52,7 +52,9 @@ function PhoneController({ roomId, config }: { roomId: string; config: Controlle
   const connectionRef = useRef<{ sendInput: (m: InputMessage) => void; disconnect: () => void } | null>(null)
 
   useEffect(() => {
-    joinRoom(roomId).then(conn => { connectionRef.current = conn })
+    joinRoom(roomId)
+      .then(conn => { connectionRef.current = conn })
+      .catch(err => console.error('[game-controller] joinRoom failed:', err))
     return () => connectionRef.current?.disconnect()
   }, [roomId])
 
@@ -91,20 +93,28 @@ function GameControllerInner() {
   const incomingRoom = searchParams.get('room')
   const isPhone = !!incomingRoom
 
-  const [roomId] = useState(incomingRoom ?? generateRoomId)
+  const [roomId] = useState(() => incomingRoom ?? generateRoomId())
   const [config, setConfig] = useState<ControllerConfig | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
   const [preset, setPreset] = useState<'nes' | 'snes'>('nes')
 
   // Load default preset
   useEffect(() => {
-    fetch(`/controller-presets/${preset}.inf`)
-      .then(r => r.text())
+    const controller = new AbortController()
+    fetch(`/controller-presets/${preset}.inf`, { signal: controller.signal })
+      .then(r => {
+        if (!r.ok) throw new Error(`Failed to load preset: ${r.status}`)
+        return r.text()
+      })
       .then(text => {
         const { config: parsed, error } = parseInf(text)
         if (error) setParseError(error)
-        else setConfig(parsed)
+        else { setParseError(null); setConfig(parsed) }
       })
+      .catch(err => {
+        if (err.name !== 'AbortError') setParseError(err.message)
+      })
+    return () => controller.abort()
   }, [preset])
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,6 +133,9 @@ function GameControllerInner() {
   }
 
   // Phone view — no shell, fullscreen controller
+  if (isPhone && !config) {
+    return <div className="min-h-screen bg-background" />
+  }
   if (isPhone && config) {
     return <PhoneController roomId={roomId} config={config} />
   }

@@ -1,16 +1,23 @@
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto'
+import { createCipheriv, createDecipheriv, randomBytes, scrypt } from 'crypto'
+import { promisify } from 'util'
 import { NextRequest, NextResponse } from 'next/server'
 
 const ALGORITHM = 'aes-256-cbc'
 const SALT = 'webvibe-static-salt'
+const scryptAsync = promisify(scrypt)
 
-function deriveKey(password: string): Buffer {
-  return scryptSync(password, SALT, 32)
+async function deriveKey(password: string): Promise<Buffer> {
+  return scryptAsync(password, SALT, 32) as Promise<Buffer>
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json()
-  const { action, text, password } = body
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ result: null, error: 'invalid request body' }, { status: 400 })
+  }
+  const { action, text, password } = body as { action?: string; text?: string; password?: string }
 
   if (!text || typeof text !== 'string') {
     return NextResponse.json({ result: null, error: 'text is required' }, { status: 400 })
@@ -19,7 +26,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ result: null, error: 'password is required' }, { status: 400 })
   }
 
-  const key = deriveKey(password)
+  const key = await deriveKey(password)
 
   if (action === 'encrypt') {
     const iv = randomBytes(16)

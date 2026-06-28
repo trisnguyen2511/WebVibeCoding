@@ -84,6 +84,15 @@ export function parseInf(content: string): { config: ControllerConfig | null; er
   if (!controller.name) return { config: null, error: 'missing required field: name' }
   if (!controller.orientation) return { config: null, error: 'missing required field: orientation' }
 
+  for (const [id, btn] of Object.entries(controller.buttons)) {
+    const missing = (['label', 'key', 'x', 'y', 'w', 'h'] as const).filter(
+      f => btn[f] === undefined
+    )
+    if (missing.length > 0) {
+      return { config: null, error: `button [${id}] is missing required fields: ${missing.join(', ')}` }
+    }
+  }
+
   return {
     config: {
       name: controller.name,
