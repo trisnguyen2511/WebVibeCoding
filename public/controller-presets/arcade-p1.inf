@@ -1,0 +1,75 @@
+[controller]
+name = Arcade P1
+orientation = landscape
+
+; P1 keys — Arrow keys + Z/X/C/V + 1/5
+; Non-overlapping: P2=WASD+JKLU, P3=TFGH+YREQ, P4=IBNO+PM
+
+[dpad:MOVE]
+x = 3
+y = 20
+size = 40
+up = ArrowUp
+down = ArrowDown
+left = ArrowLeft
+right = ArrowRight
+diagonal = true
+hold_interval = 50
+
+[button:ATK]
+label = ATK
+key = z
+x = 58
+y = 28
+w = 14
+h = 18
+
+[button:JMP]
+label = JMP
+key = x
+x = 74
+y = 28
+w = 14
+h = 18
+
+[button:SPL]
+label = SPL
+key = c
+x = 58
+y = 50
+w = 14
+h = 18
+
+[button:STR]
+label = STR
+key = v
+x = 74
+y = 50
+w = 14
+h = 18
+
+[button:COIN]
+label = COIN
+key = 5
+x = 43
+y = 35
+w = 12
+h = 9
+
+[button:START]
+label = START
+key = 1
+x = 43
+y = 50
+w = 12
+h = 9
+
+; ── Combos ──────────────────────────────────────────────────────
+
+[combo:SUPER]
+label = SUPER
+x = 86
+y = 72
+w = 12
+h = 10
+chord = z+x+c

@@ -1,0 +1,74 @@
+[controller]
+name = Arcade P2
+orientation = landscape
+
+; P2 keys — WASD + J/K/L/U + 2/6
+
+[dpad:MOVE]
+x = 3
+y = 20
+size = 40
+up = w
+down = s
+left = a
+right = d
+diagonal = true
+hold_interval = 50
+
+[button:ATK]
+label = ATK
+key = j
+x = 58
+y = 28
+w = 14
+h = 18
+
+[button:JMP]
+label = JMP
+key = k
+x = 74
+y = 28
+w = 14
+h = 18
+
+[button:SPL]
+label = SPL
+key = l
+x = 58
+y = 50
+w = 14
+h = 18
+
+[button:STR]
+label = STR
+key = u
+x = 74
+y = 50
+w = 14
+h = 18
+
+[button:COIN]
+label = COIN
+key = 6
+x = 43
+y = 35
+w = 12
+h = 9
+
+[button:START]
+label = START
+key = 2
+x = 43
+y = 50
+w = 12
+h = 9
+
+; ── Combos ──────────────────────────────────────────────────────
+
+[combo:SUPER]
+label = SUPER
+x = 86
+y = 72
+w = 12
+h = 10
+chord = j+k+l

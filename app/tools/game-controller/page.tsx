@@ -382,7 +382,8 @@ function HostView({ roomId }: { roomId: string }) {
 
 // ── Phone: Layout Setup ──────────────────────────────────────────
 function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }) {
-  const [preset, setPreset] = useState<'nes' | 'snes' | 'wasd'>('nes')
+  type Preset = 'nes' | 'snes' | 'wasd' | 'arcade-p1' | 'arcade-p2' | 'arcade-p3' | 'arcade-p4'
+  const [preset, setPreset] = useState<Preset>('nes')
   const [config, setConfig] = useState<ControllerConfig | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
   const [customName, setCustomName] = useState<string | null>(null)
@@ -425,16 +426,27 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
         </div>
 
         {!customName && (
-          <div className="flex gap-3">
-            {(['nes', 'snes', 'wasd'] as const).map((p) => (
-              <button
-                key={p}
-                onClick={() => setPreset(p)}
-                className={`flex-1 rounded-xl border px-4 py-3 font-mono text-sm font-bold transition-colors ${preset === p ? 'border-[#7C3AED] bg-[#7C3AED]/20 text-[#A78BFA]' : 'border-[#1A1A2E] bg-[#0F0F1A] text-[#52525B] hover:text-white'}`}
-              >
-                {p.toUpperCase()}
-              </button>
-            ))}
+          <div className="space-y-1">
+            <p className="text-xs text-[#52525B]">Preset</p>
+            <select
+              value={preset}
+              onChange={(e) => setPreset(e.target.value as Preset)}
+              className="w-full rounded-xl border border-[#1A1A2E] bg-[#0F0F1A] px-4 py-3 font-mono text-sm text-white outline-none focus:border-[#7C3AED]"
+            >
+              <optgroup label="── Classic ──">
+                <option value="nes">NES</option>
+                <option value="snes">SNES</option>
+              </optgroup>
+              <optgroup label="── PC ──">
+                <option value="wasd">WASD</option>
+              </optgroup>
+              <optgroup label="── Arcade 4P ──">
+                <option value="arcade-p1">Arcade P1 (Arrows + Z/X/C/V)</option>
+                <option value="arcade-p2">Arcade P2 (WASD + J/K/L/U)</option>
+                <option value="arcade-p3">Arcade P3 (TFGH + Y/R/E/Q)</option>
+                <option value="arcade-p4">Arcade P4 (IBNO + P/M/,/.)</option>
+              </optgroup>
+            </select>
           </div>
         )}
 
