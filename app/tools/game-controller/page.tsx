@@ -136,8 +136,8 @@ function DpadControl({
         position: 'absolute',
         left: `${config.x}%`,
         top: `${config.y}%`,
-        width: `${config.size}%`,
-        height: `${config.size}%`,
+        width: `${config.size}vmin`,
+        height: `${config.size}vmin`,
         borderRadius: '50%',
         touchAction: 'none',
       }}
