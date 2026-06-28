@@ -358,10 +358,18 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
 function PhoneControllerActive({ roomId, config }: { roomId: string; config: ControllerConfig }) {
   const [playerIndex, setPlayerIndex] = useState<number | null>(null)
   const [status, setStatus] = useState<'connecting' | 'ready' | 'disconnected'>('connecting')
+  const [activeCombo, setActiveCombo] = useState<string | null>(null)
   const connRef = useRef<{
     sendInput: (m: Omit<InputMessage, 'peerId'>) => void
     disconnect: () => void
   } | null>(null)
+
+  // Hold & combo state (refs — no re-render needed)
+  const heldRef = useRef<Set<string>>(new Set())
+  const holdTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const holdIntervalsRef = useRef<Record<string, ReturnType<typeof setInterval>>>({})
+  const firedCombosRef = useRef<Set<string>>(new Set())
+  const comboFlashRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -380,15 +388,67 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
       cancelled = true
       connRef.current?.disconnect()
       connRef.current = null
+      // Clear all timers on unmount
+      Object.values(holdTimersRef.current).forEach(clearTimeout)
+      Object.values(holdIntervalsRef.current).forEach(clearInterval)
     }
   }, [roomId])
 
-  const send = (key: string, state: 'pressed' | 'released') => {
+  const sendKey = (key: string, state: 'pressed' | 'released') => {
     connRef.current?.sendInput({ type: 'button', key, state, ts: Date.now() })
-    if (state === 'pressed' && navigator.vibrate) navigator.vibrate(20)
+  }
+
+  const checkCombos = (held: Set<string>) => {
+    for (const [cid, combo] of Object.entries(config.combos)) {
+      const allHeld = combo.keys.every((k) => held.has(k))
+      if (allHeld && !firedCombosRef.current.has(cid)) {
+        firedCombosRef.current.add(cid)
+        sendKey(combo.action, 'pressed')
+        setTimeout(() => sendKey(combo.action, 'released'), 80)
+        if (navigator.vibrate) navigator.vibrate([30, 15, 30])
+        // Flash combo label
+        if (comboFlashRef.current) clearTimeout(comboFlashRef.current)
+        setActiveCombo(combo.label)
+        comboFlashRef.current = setTimeout(() => setActiveCombo(null), 800)
+      } else if (!allHeld) {
+        firedCombosRef.current.delete(cid)
+      }
+    }
+  }
+
+  const onDown = (id: string) => {
+    const btn = config.buttons[id]
+    heldRef.current.add(id)
+    sendKey(btn.key, 'pressed')
+    if (navigator.vibrate) navigator.vibrate(20)
+
+    // Hold auto-repeat
+    if (btn.hold) {
+      holdTimersRef.current[id] = setTimeout(() => {
+        holdIntervalsRef.current[id] = setInterval(() => {
+          sendKey(btn.key, 'pressed')
+        }, btn.holdInterval)
+      }, btn.holdDelay)
+    }
+
+    checkCombos(heldRef.current)
+  }
+
+  const onUp = (id: string) => {
+    const btn = config.buttons[id]
+    heldRef.current.delete(id)
+    sendKey(btn.key, 'released')
+
+    clearTimeout(holdTimersRef.current[id])
+    clearInterval(holdIntervalsRef.current[id])
+    delete holdTimersRef.current[id]
+    delete holdIntervalsRef.current[id]
+
+    checkCombos(heldRef.current)
   }
 
   const color = PLAYER_COLORS[(playerIndex ?? 0) % MAX_PLAYERS]
+  const hasCombo = Object.keys(config.combos).length > 0
 
   const badgeText =
     status === 'connecting' ? 'Connecting...' :
@@ -397,9 +457,28 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-[#08080E]">
+      {/* Player badge */}
       <div className={`absolute left-2 top-2 z-10 rounded-full border px-3 py-1 text-xs font-bold ${color.badge}`}>
         {badgeText}
       </div>
+
+      {/* Combo flash */}
+      {activeCombo && (
+        <div className="absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full border border-[#7C3AED] bg-[#7C3AED]/30 px-4 py-1.5 font-mono text-sm font-bold text-[#A78BFA] animate-pulse pointer-events-none">
+          ✦ {activeCombo}
+        </div>
+      )}
+
+      {/* Combo list hint (bottom) */}
+      {hasCombo && (
+        <div className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 gap-2 pointer-events-none">
+          {Object.entries(config.combos).map(([cid, combo]) => (
+            <span key={cid} className="rounded-full border border-[#1A1A2E] bg-[#0F0F1A]/80 px-2 py-0.5 font-mono text-xs text-[#52525B]">
+              {combo.keys.join('+')} → {combo.label}
+            </span>
+          ))}
+        </div>
+      )}
 
       {Object.entries(config.buttons).map(([id, btn]) => (
         <button
@@ -413,13 +492,16 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
           }}
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId)
-            send(id, 'pressed')
+            onDown(id)
           }}
-          onPointerUp={() => send(id, 'released')}
-          onPointerCancel={() => send(id, 'released')}
-          className="flex items-center justify-center rounded-xl border border-[#1A1A2E] bg-[#0F0F1A] font-display text-sm font-bold text-white select-none touch-none active:bg-[#7C3AED]/30 active:border-[#7C3AED]"
+          onPointerUp={() => onUp(id)}
+          onPointerCancel={() => onUp(id)}
+          className="relative flex flex-col items-center justify-center rounded-xl border border-[#1A1A2E] bg-[#0F0F1A] font-display text-sm font-bold text-white select-none touch-none active:bg-[#7C3AED]/30 active:border-[#7C3AED]"
         >
           {btn.label}
+          {btn.hold && (
+            <span className="absolute bottom-0.5 right-1 text-[8px] text-[#52525B]">↻</span>
+          )}
         </button>
       ))}
     </div>

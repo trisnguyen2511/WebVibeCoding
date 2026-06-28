@@ -9,6 +9,9 @@ x = 13
 y = 38
 w = 10
 h = 11
+hold = true
+hold_delay = 300
+hold_interval = 80
 
 [button:DOWN]
 label = ↓
@@ -17,6 +20,9 @@ x = 13
 y = 60
 w = 10
 h = 11
+hold = true
+hold_delay = 300
+hold_interval = 80
 
 [button:LEFT]
 label = ←
@@ -25,6 +31,9 @@ x = 4
 y = 49
 w = 10
 h = 11
+hold = true
+hold_delay = 300
+hold_interval = 80
 
 [button:RIGHT]
 label = →
@@ -33,6 +42,9 @@ x = 22
 y = 49
 w = 10
 h = 11
+hold = true
+hold_delay = 300
+hold_interval = 80
 
 [button:A]
 label = A
@@ -81,3 +93,21 @@ x = 55
 y = 78
 w = 14
 h = 8
+
+; ── Combos ─────────────────────────────────────────────────────
+; Hold both buttons simultaneously to trigger
+
+[combo:SUPER_JUMP]
+label = Super Jump
+keys = UP+A
+action = a
+
+[combo:DASH]
+label = Dash
+keys = B+RIGHT
+action = s
+
+[combo:SPECIAL]
+label = Special
+keys = Y+B
+action = f
