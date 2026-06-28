@@ -51,11 +51,13 @@ feature/xxx  →  staging  →  master (prod)
 
 ### Steps for every new feature
 1. Develop on `claude/<feature>` branch
-2. Open PR: `claude/<feature>` → `staging`
-3. Test on Vercel staging Preview URL (Lighthouse PWA, mobile, etc.)
-4. When OK: merge `staging` → `master` to go live
+2. Merge `claude/<feature>` → `staging` (auto-deploy to Vercel Preview)
+3. Notify the user that the feature is on staging and ready for review
+4. **Wait for user approval** — do NOT merge to `master` without explicit user confirmation
+5. After user approves: merge `staging` → `master` to go live
 
 Never merge a feature branch directly into `master`.
+Never merge `staging` → `master` without the user explicitly saying so.
 
 ## Commit format
 
