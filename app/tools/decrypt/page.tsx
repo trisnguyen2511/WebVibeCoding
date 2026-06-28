@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { ToolShell } from '@/components/tool-shell'
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 
 export default function DecryptPage() {
   const [text, setText] = useState('')
@@ -8,29 +9,27 @@ export default function DecryptPage() {
   const [result, setResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const { copied, copy } = useCopyToClipboard()
 
   const run = async (action: 'encrypt' | 'decrypt') => {
     if (!text.trim() || !password.trim()) return
     setLoading(true)
     setResult(null)
     setError(null)
-    const res = await fetch('/api/encrypt', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, text, password }),
-    })
-    const data = await res.json()
-    if (data.error) setError(data.error)
-    else setResult(data.result)
-    setLoading(false)
-  }
-
-  const copy = () => {
-    if (!result) return
-    navigator.clipboard.writeText(result)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    try {
+      const res = await fetch('/api/encrypt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, text, password }),
+      })
+      const data = await res.json()
+      if (data.error) setError(data.error)
+      else setResult(data.result)
+    } catch {
+      setError('Network error — please try again')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -74,7 +73,7 @@ export default function DecryptPage() {
         {result && (
           <div className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface p-4">
             <p className="break-all font-mono text-sm text-white">{result}</p>
-            <button onClick={copy} className="shrink-0 text-xs text-muted hover:text-accent-soft">
+            <button onClick={() => result && copy(result)} className="shrink-0 text-xs text-muted hover:text-accent-soft">
               {copied ? '✓' : 'Copy'}
             </button>
           </div>
