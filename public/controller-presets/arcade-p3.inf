@@ -1,0 +1,74 @@
+[controller]
+name = Arcade P3
+orientation = landscape
+
+; P3 keys — T/G/F/H (up/down/left/right) + Y/R/E/Q + 3/7
+
+[dpad:MOVE]
+x = 3
+y = 20
+size = 40
+up = t
+down = g
+left = f
+right = h
+diagonal = true
+hold_interval = 50
+
+[button:ATK]
+label = ATK
+key = y
+x = 58
+y = 28
+w = 14
+h = 18
+
+[button:JMP]
+label = JMP
+key = r
+x = 74
+y = 28
+w = 14
+h = 18
+
+[button:SPL]
+label = SPL
+key = e
+x = 58
+y = 50
+w = 14
+h = 18
+
+[button:STR]
+label = STR
+key = q
+x = 74
+y = 50
+w = 14
+h = 18
+
+[button:COIN]
+label = COIN
+key = 7
+x = 43
+y = 35
+w = 12
+h = 9
+
+[button:START]
+label = START
+key = 3
+x = 43
+y = 50
+w = 12
+h = 9
+
+; ── Combos ──────────────────────────────────────────────────────
+
+[combo:SUPER]
+label = SUPER
+x = 86
+y = 72
+w = 12
+h = 10
+chord = y+r+e
