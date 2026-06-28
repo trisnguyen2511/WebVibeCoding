@@ -79,14 +79,20 @@ w = 16
 h = 8
 
 ; ── Combos ─────────────────────────────────────────────────────
-; Hold both buttons simultaneously to trigger
+; Each combo is a dedicated button that sends all chord keys simultaneously
 
-[combo:TURBO_A]
-label = Turbo A
-keys = SELECT+A
-action = z
+[combo:TURBO_AB]
+label = A+B
+x = 82
+y = 30
+w = 12
+h = 10
+chord = z+x
 
 [combo:DIAGONAL_UL]
 label = ↖
-keys = UP+LEFT
-action = ArrowUp
+x = 5
+y = 38
+w = 10
+h = 12
+chord = ArrowUp+ArrowLeft

@@ -12,8 +12,11 @@ export interface ButtonConfig {
 
 export interface ComboConfig {
   label: string
-  keys: string[]  // button IDs that must be held simultaneously
-  action: string  // key to emit when combo fires
+  x: number
+  y: number
+  w: number
+  h: number
+  chord: string[]  // keys to send simultaneously when this button is pressed
 }
 
 export interface ControllerConfig {
@@ -106,12 +109,15 @@ export function parseInf(content: string): { config: ControllerConfig | null; er
       const combo = controller.combos[comboId]
       if (key === 'label') {
         combo.label = value
-      } else if (key === 'keys') {
-        const parts = value.split('+').map((k) => k.trim().toUpperCase()).filter(Boolean)
-        if (parts.length < 2) return { config: null, error: `line ${lineNum}: combo "keys" must list at least 2 button IDs separated by +, got "${value}"` }
-        combo.keys = parts
-      } else if (key === 'action') {
-        combo.action = value
+      } else if (key === 'chord') {
+        const parts = value.split('+').map((k) => k.trim()).filter(Boolean)
+        if (parts.length < 2) return { config: null, error: `line ${lineNum}: combo "chord" must list at least 2 keys separated by +, got "${value}"` }
+        combo.chord = parts
+      } else if (['x', 'y', 'w', 'h'].includes(key)) {
+        const num = Number(value)
+        if (isNaN(num)) return { config: null, error: `line ${lineNum}: "${key}" must be a number, got "${value}"` }
+        if (num < 0 || num > 100) return { config: null, error: `line ${lineNum}: "${key}" must be in range 0–100 (percent), got ${num}` }
+        combo[key as 'x' | 'y' | 'w' | 'h'] = num
       }
     }
   }
@@ -125,12 +131,8 @@ export function parseInf(content: string): { config: ControllerConfig | null; er
   }
 
   for (const [id, combo] of Object.entries(controller.combos)) {
-    const missing = (['label', 'keys', 'action'] as const).filter((f) => combo[f] === undefined)
+    const missing = (['label', 'chord', 'x', 'y', 'w', 'h'] as const).filter((f) => combo[f] === undefined)
     if (missing.length > 0) return { config: null, error: `combo [${id}] is missing required fields: ${missing.join(', ')}` }
-    // Validate combo keys reference real buttons
-    for (const btnId of combo.keys!) {
-      if (!controller.buttons[btnId]) return { config: null, error: `combo [${id}] references unknown button "${btnId}"` }
-    }
   }
 
   // Apply defaults for optional button fields

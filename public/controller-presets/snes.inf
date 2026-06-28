@@ -95,19 +95,28 @@ w = 14
 h = 8
 
 ; ── Combos ─────────────────────────────────────────────────────
-; Hold both buttons simultaneously to trigger
+; Each combo is a dedicated button that sends all chord keys simultaneously
 
 [combo:SUPER_JUMP]
-label = Super Jump
-keys = UP+A
-action = a
+label = Super
+x = 86
+y = 30
+w = 11
+h = 10
+chord = ArrowUp+z
 
 [combo:DASH]
 label = Dash
-keys = B+RIGHT
-action = s
+x = 65
+y = 30
+w = 11
+h = 10
+chord = x+ArrowRight
 
 [combo:SPECIAL]
-label = Special
-keys = Y+B
-action = f
+label = Spec
+x = 36
+y = 62
+w = 14
+h = 10
+chord = s+x+z
