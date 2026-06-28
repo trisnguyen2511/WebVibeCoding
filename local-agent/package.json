@@ -1,0 +1,21 @@
+{
+  "name": "webvibe-local-agent",
+  "version": "1.0.0",
+  "description": "Local agent that receives WebVibe Game Controller events and injects OS keypresses",
+  "private": true,
+  "scripts": {
+    "start": "ts-node agent.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "robotjs": "^0.6.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/robotjs": "^0.6.4",
+    "@types/ws": "^8.5.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}
