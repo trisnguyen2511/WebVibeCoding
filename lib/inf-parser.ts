@@ -18,7 +18,11 @@ export function parseInf(content: string): { config: ControllerConfig | null; er
   let section: string | null = null
   let buttonId: string | null = null
 
-  const controller: Partial<ControllerConfig> & { buttons: Record<string, Partial<ButtonConfig>> } = { buttons: {} }
+  const controller: {
+    name?: string
+    orientation?: 'landscape' | 'portrait'
+    buttons: Record<string, Partial<ButtonConfig>>
+  } = { buttons: {} }
 
   for (let i = 0; i < lines.length; i++) {
     const lineNum = i + 1
