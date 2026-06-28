@@ -39,6 +39,26 @@ text: #FAFAFA  |  text-muted: #52525B
 
 Fonts: Space Grotesk (headings), Inter (body), JetBrains Mono (data)
 
+## Branch & deploy workflow
+
+```
+feature/xxx  →  staging  →  master (prod)
+```
+
+- **`master`**: production, auto-deploy to Vercel prod
+- **`staging`**: integration branch, auto-deploy to Vercel Preview URL for testing
+- **`feature/*` / `claude/*`**: individual feature branches
+
+### Steps for every new feature
+1. Develop on `claude/<feature>` branch
+2. Merge `claude/<feature>` → `staging` (auto-deploy to Vercel Preview)
+3. Notify the user that the feature is on staging and ready for review
+4. **Wait for user approval** — do NOT merge to `master` without explicit user confirmation
+5. After user approves: merge `staging` → `master` to go live
+
+Never merge a feature branch directly into `master`.
+Never merge `staging` → `master` without the user explicitly saying so.
+
 ## Commit format
 
 ```
