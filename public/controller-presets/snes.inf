@@ -2,49 +2,16 @@
 name = SNES Layout
 orientation = landscape
 
-[button:UP]
-label = ↑
-key = ArrowUp
-x = 13
-y = 38
-w = 10
-h = 11
-hold = true
-hold_delay = 300
-hold_interval = 80
-
-[button:DOWN]
-label = ↓
-key = ArrowDown
-x = 13
-y = 60
-w = 10
-h = 11
-hold = true
-hold_delay = 300
-hold_interval = 80
-
-[button:LEFT]
-label = ←
-key = ArrowLeft
-x = 4
-y = 49
-w = 10
-h = 11
-hold = true
-hold_delay = 300
-hold_interval = 80
-
-[button:RIGHT]
-label = →
-key = ArrowRight
-x = 22
-y = 49
-w = 10
-h = 11
-hold = true
-hold_delay = 300
-hold_interval = 80
+[dpad:MOVE]
+x = 2
+y = 28
+size = 38
+up = ArrowUp
+down = ArrowDown
+left = ArrowLeft
+right = ArrowRight
+diagonal = true
+hold_interval = 60
 
 [button:A]
 label = A

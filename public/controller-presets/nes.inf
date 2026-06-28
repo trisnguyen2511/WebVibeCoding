@@ -2,49 +2,16 @@
 name = NES Layout
 orientation = landscape
 
-[button:UP]
-label = ↑
-key = ArrowUp
-x = 15
-y = 38
-w = 10
-h = 12
-hold = true
-hold_delay = 300
-hold_interval = 80
-
-[button:DOWN]
-label = ↓
-key = ArrowDown
-x = 15
-y = 62
-w = 10
-h = 12
-hold = true
-hold_delay = 300
-hold_interval = 80
-
-[button:LEFT]
-label = ←
-key = ArrowLeft
-x = 5
-y = 50
-w = 10
-h = 12
-hold = true
-hold_delay = 300
-hold_interval = 80
-
-[button:RIGHT]
-label = →
-key = ArrowRight
-x = 25
-y = 50
-w = 10
-h = 12
-hold = true
-hold_delay = 300
-hold_interval = 80
+[dpad:MOVE]
+x = 3
+y = 30
+size = 36
+up = ArrowUp
+down = ArrowDown
+left = ArrowLeft
+right = ArrowRight
+diagonal = true
+hold_interval = 60
 
 [button:A]
 label = A
@@ -88,11 +55,3 @@ y = 30
 w = 12
 h = 10
 chord = z+x
-
-[combo:DIAGONAL_UL]
-label = ↖
-x = 5
-y = 38
-w = 10
-h = 12
-chord = ArrowUp+ArrowLeft
