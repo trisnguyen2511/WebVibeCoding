@@ -19,11 +19,24 @@ export interface ComboConfig {
   chord: string[]  // keys to send simultaneously when this button is pressed
 }
 
+export interface DpadConfig {
+  x: number           // % from left
+  y: number           // % from top
+  size: number        // width AND height in % (square bounding box)
+  up: string          // key for up direction
+  down: string        // key for down direction
+  left: string        // key for left direction
+  right: string       // key for right direction
+  diagonal: boolean   // enable 8-way input (default true)
+  holdInterval: number // ms between repeat sends while held (default 60)
+}
+
 export interface ControllerConfig {
   name: string
   orientation: 'landscape' | 'portrait'
   buttons: Record<string, ButtonConfig>
   combos: Record<string, ComboConfig>
+  dpads: Record<string, DpadConfig>
 }
 
 export function parseInf(content: string): { config: ControllerConfig | null; error: string | null } {
@@ -31,13 +44,15 @@ export function parseInf(content: string): { config: ControllerConfig | null; er
   let section: string | null = null
   let buttonId: string | null = null
   let comboId: string | null = null
+  let dpadId: string | null = null
 
   const controller: {
     name?: string
     orientation?: 'landscape' | 'portrait'
     buttons: Record<string, Partial<ButtonConfig>>
     combos: Record<string, Partial<ComboConfig>>
-  } = { buttons: {}, combos: {} }
+    dpads: Record<string, Partial<DpadConfig>>
+  } = { buttons: {}, combos: {}, dpads: {} }
 
   for (let i = 0; i < lines.length; i++) {
     const lineNum = i + 1
@@ -50,16 +65,25 @@ export function parseInf(content: string): { config: ControllerConfig | null; er
         section = 'controller'
         buttonId = null
         comboId = null
+        dpadId = null
       } else if (header.startsWith('button:')) {
         buttonId = header.slice(7).trim().toUpperCase()
         comboId = null
+        dpadId = null
         section = 'button'
         controller.buttons[buttonId] = {}
       } else if (header.startsWith('combo:')) {
         comboId = header.slice(6).trim().toUpperCase()
         buttonId = null
+        dpadId = null
         section = 'combo'
         controller.combos[comboId] = {}
+      } else if (header.startsWith('dpad:')) {
+        dpadId = header.slice(5).trim().toUpperCase()
+        buttonId = null
+        comboId = null
+        section = 'dpad'
+        controller.dpads[dpadId] = {}
       } else {
         return { config: null, error: `line ${lineNum}: unknown section [${header}]` }
       }
@@ -119,6 +143,22 @@ export function parseInf(content: string): { config: ControllerConfig | null; er
         if (num < 0 || num > 100) return { config: null, error: `line ${lineNum}: "${key}" must be in range 0–100 (percent), got ${num}` }
         combo[key as 'x' | 'y' | 'w' | 'h'] = num
       }
+    } else if (section === 'dpad' && dpadId) {
+      const dpad = controller.dpads[dpadId]
+      if (['up', 'down', 'left', 'right'].includes(key)) {
+        dpad[key as 'up' | 'down' | 'left' | 'right'] = value
+      } else if (key === 'diagonal') {
+        dpad.diagonal = value === 'true'
+      } else if (key === 'hold_interval') {
+        const num = Number(value)
+        if (isNaN(num) || num < 16) return { config: null, error: `line ${lineNum}: hold_interval must be >= 16ms` }
+        dpad.holdInterval = num
+      } else if (['x', 'y', 'size'].includes(key)) {
+        const num = Number(value)
+        if (isNaN(num)) return { config: null, error: `line ${lineNum}: "${key}" must be a number, got "${value}"` }
+        if (num < 0 || num > 100) return { config: null, error: `line ${lineNum}: "${key}" must be in range 0–100 (percent), got ${num}` }
+        dpad[key as 'x' | 'y' | 'size'] = num
+      }
     }
   }
 
@@ -135,7 +175,12 @@ export function parseInf(content: string): { config: ControllerConfig | null; er
     if (missing.length > 0) return { config: null, error: `combo [${id}] is missing required fields: ${missing.join(', ')}` }
   }
 
-  // Apply defaults for optional button fields
+  for (const [id, dpad] of Object.entries(controller.dpads)) {
+    const missing = (['x', 'y', 'size', 'up', 'down', 'left', 'right'] as const).filter((f) => dpad[f] === undefined)
+    if (missing.length > 0) return { config: null, error: `dpad [${id}] is missing required fields: ${missing.join(', ')}` }
+  }
+
+  // Apply defaults
   const buttons = Object.fromEntries(
     Object.entries(controller.buttons).map(([id, btn]) => [
       id,
@@ -148,12 +193,24 @@ export function parseInf(content: string): { config: ControllerConfig | null; er
     ])
   )
 
+  const dpads = Object.fromEntries(
+    Object.entries(controller.dpads).map(([id, dpad]) => [
+      id,
+      {
+        ...dpad,
+        diagonal: dpad.diagonal ?? true,
+        holdInterval: dpad.holdInterval ?? 60,
+      } as DpadConfig,
+    ])
+  )
+
   return {
     config: {
       name: controller.name,
       orientation: controller.orientation,
       buttons,
       combos: controller.combos as Record<string, ComboConfig>,
+      dpads,
     },
     error: null,
   }
