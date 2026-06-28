@@ -1,0 +1,83 @@
+[controller]
+name = SNES Layout
+orientation = landscape
+
+[button:UP]
+label = ↑
+key = ArrowUp
+x = 13
+y = 38
+w = 10
+h = 11
+
+[button:DOWN]
+label = ↓
+key = ArrowDown
+x = 13
+y = 60
+w = 10
+h = 11
+
+[button:LEFT]
+label = ←
+key = ArrowLeft
+x = 4
+y = 49
+w = 10
+h = 11
+
+[button:RIGHT]
+label = →
+key = ArrowRight
+x = 22
+y = 49
+w = 10
+h = 11
+
+[button:A]
+label = A
+key = z
+x = 86
+y = 50
+w = 11
+h = 13
+
+[button:B]
+label = B
+key = x
+x = 76
+y = 58
+w = 11
+h = 13
+
+[button:X]
+label = X
+key = a
+x = 76
+y = 42
+w = 11
+h = 13
+
+[button:Y]
+label = Y
+key = s
+x = 65
+y = 50
+w = 11
+h = 13
+
+[button:SELECT]
+label = SELECT
+key = Shift
+x = 36
+y = 78
+w = 14
+h = 8
+
+[button:START]
+label = START
+key = Enter
+x = 55
+y = 78
+w = 14
+h = 8

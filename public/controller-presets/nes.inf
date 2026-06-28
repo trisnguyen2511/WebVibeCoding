@@ -1,0 +1,67 @@
+[controller]
+name = NES Layout
+orientation = landscape
+
+[button:UP]
+label = ↑
+key = ArrowUp
+x = 15
+y = 38
+w = 10
+h = 12
+
+[button:DOWN]
+label = ↓
+key = ArrowDown
+x = 15
+y = 62
+w = 10
+h = 12
+
+[button:LEFT]
+label = ←
+key = ArrowLeft
+x = 5
+y = 50
+w = 10
+h = 12
+
+[button:RIGHT]
+label = →
+key = ArrowRight
+x = 25
+y = 50
+w = 10
+h = 12
+
+[button:A]
+label = A
+key = z
+x = 82
+y = 50
+w = 12
+h = 14
+
+[button:B]
+label = B
+key = x
+x = 70
+y = 55
+w = 12
+h = 14
+
+[button:SELECT]
+label = SELECT
+key = Shift
+x = 38
+y = 80
+w = 16
+h = 8
+
+[button:START]
+label = START
+key = Enter
+x = 58
+y = 80
+w = 16
+h = 8
