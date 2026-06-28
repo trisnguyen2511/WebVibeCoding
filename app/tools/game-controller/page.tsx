@@ -121,11 +121,21 @@ function HostView({ roomId }: { roomId: string }) {
         </div>
       </div>
 
-      {/* QR Code */}
+      {/* QR Code — clickable link */}
       {showQR && (
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-6">
-          <QRCodeSVG value={url} size={180} bgColor="#0F0F1A" fgColor="#FAFAFA" />
+          <a href={url} target="_blank" rel="noopener noreferrer" className="block rounded-xl overflow-hidden">
+            <QRCodeSVG value={url} size={180} bgColor="#0F0F1A" fgColor="#FAFAFA" />
+          </a>
           <p className="text-xs text-muted">Scan with phone to join as controller</p>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-xs text-accent-soft underline underline-offset-2 hover:text-white transition-colors break-all text-center"
+          >
+            {url}
+          </a>
         </div>
       )}
 
@@ -364,11 +374,9 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
     disconnect: () => void
   } | null>(null)
 
-  // Hold & combo state (refs — no re-render needed)
-  const heldRef = useRef<Set<string>>(new Set())
+  // Hold state (refs — no re-render needed)
   const holdTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const holdIntervalsRef = useRef<Record<string, ReturnType<typeof setInterval>>>({})
-  const firedCombosRef = useRef<Set<string>>(new Set())
   const comboFlashRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -388,7 +396,6 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
       cancelled = true
       connRef.current?.disconnect()
       connRef.current = null
-      // Clear all timers on unmount
       Object.values(holdTimersRef.current).forEach(clearTimeout)
       Object.values(holdIntervalsRef.current).forEach(clearInterval)
     }
@@ -398,31 +405,12 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
     connRef.current?.sendInput({ type: 'button', key, state, ts: Date.now() })
   }
 
-  const checkCombos = (held: Set<string>) => {
-    for (const [cid, combo] of Object.entries(config.combos)) {
-      const allHeld = combo.keys.every((k) => held.has(k))
-      if (allHeld && !firedCombosRef.current.has(cid)) {
-        firedCombosRef.current.add(cid)
-        sendKey(combo.action, 'pressed')
-        setTimeout(() => sendKey(combo.action, 'released'), 80)
-        if (navigator.vibrate) navigator.vibrate([30, 15, 30])
-        // Flash combo label
-        if (comboFlashRef.current) clearTimeout(comboFlashRef.current)
-        setActiveCombo(combo.label)
-        comboFlashRef.current = setTimeout(() => setActiveCombo(null), 800)
-      } else if (!allHeld) {
-        firedCombosRef.current.delete(cid)
-      }
-    }
-  }
-
+  // Regular button down — supports simultaneous multi-touch via pointer capture
   const onDown = (id: string) => {
     const btn = config.buttons[id]
-    heldRef.current.add(id)
     sendKey(btn.key, 'pressed')
     if (navigator.vibrate) navigator.vibrate(20)
 
-    // Hold auto-repeat
     if (btn.hold) {
       holdTimersRef.current[id] = setTimeout(() => {
         holdIntervalsRef.current[id] = setInterval(() => {
@@ -430,21 +418,30 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
         }, btn.holdInterval)
       }, btn.holdDelay)
     }
-
-    checkCombos(heldRef.current)
   }
 
   const onUp = (id: string) => {
     const btn = config.buttons[id]
-    heldRef.current.delete(id)
     sendKey(btn.key, 'released')
-
     clearTimeout(holdTimersRef.current[id])
     clearInterval(holdIntervalsRef.current[id])
     delete holdTimersRef.current[id]
     delete holdIntervalsRef.current[id]
+  }
 
-    checkCombos(heldRef.current)
+  // Combo button — sends all chord keys simultaneously
+  const onComboDown = (comboId: string) => {
+    const combo = config.combos[comboId]
+    for (const key of combo.chord) sendKey(key, 'pressed')
+    if (navigator.vibrate) navigator.vibrate([30, 15, 30])
+    if (comboFlashRef.current) clearTimeout(comboFlashRef.current)
+    setActiveCombo(combo.label)
+    comboFlashRef.current = setTimeout(() => setActiveCombo(null), 800)
+  }
+
+  const onComboUp = (comboId: string) => {
+    const combo = config.combos[comboId]
+    for (const key of combo.chord) sendKey(key, 'released')
   }
 
   const color = PLAYER_COLORS[(playerIndex ?? 0) % MAX_PLAYERS]
@@ -456,7 +453,8 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
     `Player ${(playerIndex ?? 0) + 1}`
 
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-[#08080E]">
+    // touch-action: none on the container prevents scroll interference during multi-touch
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-[#08080E]" style={{ touchAction: 'none' }}>
       {/* Player badge */}
       <div className={`absolute left-2 top-2 z-10 rounded-full border px-3 py-1 text-xs font-bold ${color.badge}`}>
         {badgeText}
@@ -469,17 +467,18 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
         </div>
       )}
 
-      {/* Combo list hint (bottom) */}
+      {/* Combo hint bar (bottom) */}
       {hasCombo && (
         <div className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 gap-2 pointer-events-none">
           {Object.entries(config.combos).map(([cid, combo]) => (
-            <span key={cid} className="rounded-full border border-[#1A1A2E] bg-[#0F0F1A]/80 px-2 py-0.5 font-mono text-xs text-[#52525B]">
-              {combo.keys.join('+')} → {combo.label}
+            <span key={cid} className="rounded-full border border-[#7C3AED]/40 bg-[#0F0F1A]/80 px-2 py-0.5 font-mono text-xs text-[#A78BFA]">
+              {combo.label}: {combo.chord.join('+')}
             </span>
           ))}
         </div>
       )}
 
+      {/* Regular buttons */}
       {Object.entries(config.buttons).map(([id, btn]) => (
         <button
           key={id}
@@ -494,14 +493,50 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
             e.currentTarget.setPointerCapture(e.pointerId)
             onDown(id)
           }}
-          onPointerUp={() => onUp(id)}
-          onPointerCancel={() => onUp(id)}
+          onPointerUp={(e) => {
+            e.currentTarget.releasePointerCapture(e.pointerId)
+            onUp(id)
+          }}
+          onPointerCancel={(e) => {
+            e.currentTarget.releasePointerCapture(e.pointerId)
+            onUp(id)
+          }}
           className="relative flex flex-col items-center justify-center rounded-xl border border-[#1A1A2E] bg-[#0F0F1A] font-display text-sm font-bold text-white select-none touch-none active:bg-[#7C3AED]/30 active:border-[#7C3AED]"
         >
           {btn.label}
           {btn.hold && (
             <span className="absolute bottom-0.5 right-1 text-[8px] text-[#52525B]">↻</span>
           )}
+        </button>
+      ))}
+
+      {/* Combo buttons — distinct style (purple tint) */}
+      {Object.entries(config.combos).map(([cid, combo]) => (
+        <button
+          key={cid}
+          style={{
+            position: 'absolute',
+            left: `${combo.x}%`,
+            top: `${combo.y}%`,
+            width: `${combo.w}%`,
+            height: `${combo.h}%`,
+          }}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId)
+            onComboDown(cid)
+          }}
+          onPointerUp={(e) => {
+            e.currentTarget.releasePointerCapture(e.pointerId)
+            onComboUp(cid)
+          }}
+          onPointerCancel={(e) => {
+            e.currentTarget.releasePointerCapture(e.pointerId)
+            onComboUp(cid)
+          }}
+          className="relative flex flex-col items-center justify-center rounded-xl border border-[#7C3AED]/60 bg-[#7C3AED]/10 font-display text-xs font-bold text-[#A78BFA] select-none touch-none active:bg-[#7C3AED]/40 active:border-[#7C3AED]"
+        >
+          {combo.label}
+          <span className="absolute bottom-0.5 text-[7px] text-[#7C3AED]/70">✦</span>
         </button>
       ))}
     </div>
