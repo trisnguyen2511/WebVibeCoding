@@ -52,10 +52,18 @@ function PhoneController({ roomId, config }: { roomId: string; config: Controlle
   const connectionRef = useRef<{ sendInput: (m: InputMessage) => void; disconnect: () => void } | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     joinRoom(roomId)
-      .then(conn => { connectionRef.current = conn })
+      .then(conn => {
+        if (cancelled) conn.disconnect()
+        else connectionRef.current = conn
+      })
       .catch(err => console.error('[game-controller] joinRoom failed:', err))
-    return () => connectionRef.current?.disconnect()
+    return () => {
+      cancelled = true
+      connectionRef.current?.disconnect()
+      connectionRef.current = null
+    }
   }, [roomId])
 
   const send = (key: string, state: 'pressed' | 'released') => {

@@ -36,7 +36,7 @@ export default function CalculatorPage() {
   }
 
   const equals = () => {
-    if (prevValue === null || op === null) return
+    if (prevValue === null || op === null || display === 'Error') return
     const result = calculate(prevValue, parseFloat(display), op)
     setDisplay(result === null ? 'Error' : String(result))
     setPrevValue(null)
