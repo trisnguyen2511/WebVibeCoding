@@ -168,16 +168,17 @@ export default function LuckyWheelPage() {
   const rotRef     = useRef(0)
   const lastSegRef = useRef(-1)
 
-  const [items,        setItems]        = useState(PRESETS[0].options)
-  const [spinning,     setSpinning]     = useState(false)
-  const [result,       setResult]       = useState<string | null>(null)
-  const [history,      setHistory]      = useState<string[]>([])
-  const [editMode,     setEditMode]     = useState(false)
-  const [pasteMode,    setPasteMode]    = useState(false)   // single add vs bulk paste
-  const [newItem,      setNewItem]      = useState('')
-  const [bulkText,     setBulkText]     = useState('')
-  const [activePreset, setActivePreset] = useState(0)
-  const [speedIdx,     setSpeedIdx]     = useState(1)
+  const [items,           setItems]           = useState(PRESETS[0].options)
+  const [spinning,        setSpinning]        = useState(false)
+  const [result,          setResult]          = useState<string | null>(null)
+  const [history,         setHistory]         = useState<string[]>([])
+  const [editMode,        setEditMode]        = useState(false)
+  const [pasteMode,       setPasteMode]       = useState(false)
+  const [newItem,         setNewItem]         = useState('')
+  const [bulkText,        setBulkText]        = useState('')
+  const [activePreset,    setActivePreset]    = useState(0)
+  const [speedIdx,        setSpeedIdx]        = useState(1)
+  const [removeAfterSpin, setRemoveAfterSpin] = useState(false)
 
   // Parse pasted text → array of items
   const parsedBulk = useMemo(() =>
@@ -270,12 +271,16 @@ export default function LuckyWheelPage() {
         const idx = Math.floor(pa / (360 / n)) % n
         const winner = items[idx]
         setResult(winner)
-        setHistory((h) => [winner, ...h].slice(0, 8))
+        setHistory((h) => [winner, ...h].slice(0, 50))
+        if (removeAfterSpin && items.length > 2) {
+          setItems((p) => p.filter((_, j) => j !== idx))
+          rotRef.current = 0
+        }
         playWin()
       }
     }
     animRef.current = requestAnimationFrame(frame)
-  }, [spinning, items, speedIdx, draw, playWin])
+  }, [spinning, items, speedIdx, draw, playWin, removeAfterSpin])
 
   useEffect(() => () => { if (animRef.current) cancelAnimationFrame(animRef.current) }, [])
 
@@ -305,6 +310,9 @@ export default function LuckyWheelPage() {
 
   const updateItem = (i: number, val: string) =>
     setItems((p) => p.map((o, j) => (j === i ? val : o)))
+
+  const deleteHistory = (i: number) =>
+    setHistory((h) => h.filter((_, j) => j !== i))
 
   const loadPreset = (i: number) => {
     setActivePreset(i); setItems([...PRESETS[i].options])
@@ -399,6 +407,28 @@ export default function LuckyWheelPage() {
               </p>
             </div>
 
+            {/* Remove-after-spin toggle */}
+            <label className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 transition-colors hover:border-accent/30">
+              <input
+                type="checkbox"
+                checked={removeAfterSpin}
+                onChange={(e) => setRemoveAfterSpin(e.target.checked)}
+                disabled={spinning}
+                className="sr-only"
+              />
+              <div className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${removeAfterSpin ? 'bg-accent' : 'bg-border'}`}>
+                <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${removeAfterSpin ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-white">Xoá mục trúng sau mỗi lượt</p>
+                <p className="truncate font-mono text-[10px] text-muted">
+                  {removeAfterSpin
+                    ? `Còn ${items.length} mục · mỗi lượt quay sẽ xoá winner`
+                    : 'Hữu ích khi chọn ngẫu nhiên không trùng lặp'}
+                </p>
+              </div>
+            </label>
+
             {/* Spin button */}
             <button
               onClick={spin}
@@ -417,11 +447,17 @@ export default function LuckyWheelPage() {
               <div className="w-full animate-fade-up rounded-2xl border border-accent/40 bg-accent/10 p-5 text-center">
                 <p className="mb-1 font-mono text-xs uppercase tracking-widest text-muted">Kết quả</p>
                 <p className="font-display text-2xl font-bold text-white">{result}</p>
+                {removeAfterSpin && (
+                  <p className="mt-1 font-mono text-xs text-muted">
+                    Đã xoá khỏi bánh xe · còn {items.length} mục
+                  </p>
+                )}
                 <button
                   onClick={spin}
-                  className="mt-3 text-xs text-accent-soft underline underline-offset-2 transition-colors hover:text-white"
+                  disabled={items.length < 2}
+                  className="mt-3 text-xs text-accent-soft underline underline-offset-2 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Quay lại
+                  {items.length < 2 ? 'Hết mục để quay' : 'Quay lại'}
                 </button>
               </div>
             )}
@@ -601,19 +637,28 @@ export default function LuckyWheelPage() {
                     Xoá
                   </button>
                 </div>
-                <div className="space-y-1">
+                <div className="max-h-60 space-y-1 overflow-y-auto">
                   {history.map((h, i) => (
                     <div
                       key={i}
-                      className={`flex items-center gap-2 rounded-lg px-2 py-1 text-sm ${
+                      className={`group flex items-center gap-2 rounded-lg px-2 py-1 text-sm transition-colors hover:bg-background/40 ${
                         i === 0 ? 'bg-accent/10 text-white' : 'text-muted'
                       }`}
                     >
-                      <span className={`w-6 font-mono text-xs ${i === 0 ? 'text-accent-soft' : 'text-muted'}`}>
+                      <span className={`w-6 shrink-0 font-mono text-xs ${i === 0 ? 'text-accent-soft' : 'text-muted'}`}>
                         #{i + 1}
                       </span>
-                      <span className="flex-1">{h}</span>
-                      {i === 0 && <span className="text-xs text-accent-soft">latest</span>}
+                      <span className="flex-1 truncate">{h}</span>
+                      {i === 0 && (
+                        <span className="shrink-0 text-xs text-accent-soft">latest</span>
+                      )}
+                      <button
+                        onClick={() => deleteHistory(i)}
+                        className="shrink-0 text-xs text-muted opacity-0 transition-all group-hover:opacity-100 hover:text-red-400"
+                        title="Xoá record này"
+                      >
+                        ✕
+                      </button>
                     </div>
                   ))}
                 </div>
