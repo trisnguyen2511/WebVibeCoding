@@ -86,4 +86,11 @@ export const tools: Tool[] = [
     description: 'Compress, resize and convert images in the browser',
     category: 'media',
   },
+  {
+    name: 'Lucky Wheel',
+    slug: 'lucky-wheel',
+    icon: '🎡',
+    description: 'Vòng quay may mắn — preset đa dạng, tùy chỉnh lựa chọn, lịch sử kết quả',
+    category: 'utility',
+  },
 ]
