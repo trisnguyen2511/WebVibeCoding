@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { ToolShell } from '@/components/tool-shell'
 
 // ------- palette -------
@@ -10,56 +10,62 @@ const SEG_COLORS = [
 ]
 
 const WHEEL_SIZE = 340
+const MAX_ITEMS  = 100
 
-// ------- speed levels -------
+// ------- speed levels (wording updated) -------
 const SPEED_LEVELS = [
   {
-    label: 'Chậm',
-    icon: '🐢',
-    timeHint: '~2–3s',
+    label:    'Tà tà',
+    icon:     '🐢',
+    timeHint: '~2–3 giây',
+    desc:     'Vài vòng rồi dừng ngay — hợp khi cần quyết định nhanh',
     minSpins: 2,   maxSpins: 3,
-    minDur: 2000,  maxDur: 3000,
-    easePow: 3,
+    minDur:   2000, maxDur:  3000,
+    easePow:  3,
     activeClass: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400',
     barClass:    'bg-emerald-500',
   },
   {
-    label: 'Thường',
-    icon: '😊',
-    timeHint: '~4–5s',
+    label:    'Bình thường',
+    icon:     '🎯',
+    timeHint: '~4–5 giây',
+    desc:     'Cân bằng giữa tốc độ và cảm giác — lựa chọn mặc định',
     minSpins: 5,   maxSpins: 7,
-    minDur: 3500,  maxDur: 5000,
-    easePow: 4,
+    minDur:   3500, maxDur:  5000,
+    easePow:  4,
     activeClass: 'border-blue-500/40 bg-blue-500/10 text-blue-400',
     barClass:    'bg-blue-500',
   },
   {
-    label: 'Hồi hộp',
-    icon: '😬',
-    timeHint: '~5–7s',
+    label:    'Hồi hộp',
+    icon:     '😬',
+    timeHint: '~6–8 giây',
+    desc:     'Nhiều vòng hơn, khó đoán hơn — bắt đầu có cảm giác hồi hộp',
     minSpins: 8,   maxSpins: 12,
-    minDur: 5000,  maxDur: 7000,
-    easePow: 5,
+    minDur:   6000, maxDur:  8000,
+    easePow:  5,
     activeClass: 'border-amber-500/40 bg-amber-500/10 text-amber-400',
     barClass:    'bg-amber-500',
   },
   {
-    label: 'Căng thẳng',
-    icon: '😰',
-    timeHint: '~8–11s',
+    label:    'Nín thở',
+    icon:     '😰',
+    timeHint: '~10–13 giây',
+    desc:     'Rất nhiều vòng, giảm tốc siêu chậm — tim đập mạnh khi gần dừng',
     minSpins: 15,  maxSpins: 20,
-    minDur: 8000,  maxDur: 11000,
-    easePow: 6,
+    minDur:   10000, maxDur: 13000,
+    easePow:  6,
     activeClass: 'border-red-500/40 bg-red-500/10 text-red-400',
     barClass:    'bg-red-500',
   },
   {
-    label: 'Điên cuồng',
-    icon: '🤯',
-    timeHint: '~12–15s',
+    label:    'Cực căng',
+    icon:     '🌀',
+    timeHint: '~15–18 giây',
+    desc:     '⚠️ ~30 vòng, tốc độ giảm cực chậm — không dành cho người yếu tim!',
     minSpins: 28,  maxSpins: 36,
-    minDur: 12000, maxDur: 15000,
-    easePow: 8,
+    minDur:   15000, maxDur: 18000,
+    easePow:  8,
     activeClass: 'border-accent/40 bg-accent/10 text-accent-soft',
     barClass:    'bg-accent',
   },
@@ -81,16 +87,16 @@ function paintWheel(canvas: HTMLCanvasElement, items: string[], rotDeg: number) 
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  const cx = WHEEL_SIZE / 2
-  const cy = WHEEL_SIZE / 2
-  const R  = WHEEL_SIZE / 2 - 8
-  const n  = items.length
+  const cx  = WHEEL_SIZE / 2
+  const cy  = WHEEL_SIZE / 2
+  const R   = WHEEL_SIZE / 2 - 8
+  const n   = items.length
   const seg = (Math.PI * 2) / n
   const rot = (rotDeg * Math.PI) / 180
 
   ctx.clearRect(0, 0, WHEEL_SIZE, WHEEL_SIZE)
 
-  // Outer glow ring
+  // Glow ring
   ctx.save()
   ctx.shadowColor = 'rgba(124,58,237,0.38)'
   ctx.shadowBlur  = 20
@@ -101,8 +107,8 @@ function paintWheel(canvas: HTMLCanvasElement, items: string[], rotDeg: number) 
   ctx.stroke()
   ctx.restore()
 
-  const fontSize  = Math.max(9, Math.min(13, 130 / n))
-  const maxChars  = Math.max(6, Math.floor(72 / n))
+  const fontSize = Math.max(7, Math.min(13, 120 / n))
+  const maxChars = Math.max(4, Math.floor(64 / n))
 
   for (let i = 0; i < n; i++) {
     const a0  = rot - Math.PI / 2 + i * seg
@@ -116,22 +122,25 @@ function paintWheel(canvas: HTMLCanvasElement, items: string[], rotDeg: number) 
     ctx.fillStyle   = SEG_COLORS[i % SEG_COLORS.length]
     ctx.fill()
     ctx.strokeStyle = 'rgba(8,8,14,0.7)'
-    ctx.lineWidth   = 1.5
+    ctx.lineWidth   = n > 30 ? 0.5 : 1.5
     ctx.stroke()
 
-    const raw   = items[i]
-    const label = raw.length > maxChars ? raw.slice(0, maxChars - 1) + '…' : raw
-    ctx.save()
-    ctx.translate(cx, cy)
-    ctx.rotate(mid)
-    ctx.textAlign    = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.font         = `bold ${fontSize}px Inter, system-ui, sans-serif`
-    ctx.fillStyle    = '#fff'
-    ctx.shadowColor  = 'rgba(0,0,0,0.6)'
-    ctx.shadowBlur   = 3
-    ctx.fillText(label, R * 0.62, 0)
-    ctx.restore()
+    // Only draw label if segment is large enough to be readable
+    if (n <= 60) {
+      const raw   = items[i]
+      const label = raw.length > maxChars ? raw.slice(0, maxChars - 1) + '…' : raw
+      ctx.save()
+      ctx.translate(cx, cy)
+      ctx.rotate(mid)
+      ctx.textAlign    = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.font         = `bold ${fontSize}px Inter, system-ui, sans-serif`
+      ctx.fillStyle    = '#fff'
+      ctx.shadowColor  = 'rgba(0,0,0,0.6)'
+      ctx.shadowBlur   = 3
+      ctx.fillText(label, R * 0.62, 0)
+      ctx.restore()
+    }
   }
 
   // Hub
@@ -164,9 +173,20 @@ export default function LuckyWheelPage() {
   const [result,       setResult]       = useState<string | null>(null)
   const [history,      setHistory]      = useState<string[]>([])
   const [editMode,     setEditMode]     = useState(false)
+  const [pasteMode,    setPasteMode]    = useState(false)   // single add vs bulk paste
   const [newItem,      setNewItem]      = useState('')
+  const [bulkText,     setBulkText]     = useState('')
   const [activePreset, setActivePreset] = useState(0)
-  const [speedIdx,     setSpeedIdx]     = useState(1)   // default: Thường
+  const [speedIdx,     setSpeedIdx]     = useState(1)
+
+  // Parse pasted text → array of items
+  const parsedBulk = useMemo(() =>
+    bulkText
+      .split(/[\n,;]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0 && s.length <= 30),
+    [bulkText]
+  )
 
   // audio
   const getAudio = useCallback((): AudioContext | null => {
@@ -220,7 +240,7 @@ export default function LuckyWheelPage() {
 
   useEffect(() => { draw(rotRef.current) }, [draw])
 
-  // spin — uses selected speed level
+  // spin
   const spin = useCallback(() => {
     if (spinning || items.length < 2) return
     setResult(null)
@@ -259,21 +279,37 @@ export default function LuckyWheelPage() {
 
   useEffect(() => () => { if (animRef.current) cancelAnimationFrame(animRef.current) }, [])
 
-  // item management
+  // item management — no hard limit, max 100
   const addItem = () => {
     const v = newItem.trim()
-    if (!v || items.length >= 12) return
+    if (!v || items.length >= MAX_ITEMS) return
     setItems((p) => [...p, v]); setNewItem(''); setResult(null)
   }
+
+  const addBulk = () => {
+    if (!parsedBulk.length) return
+    setItems((p) => [...p, ...parsedBulk].slice(0, MAX_ITEMS))
+    setBulkText(''); setResult(null)
+  }
+
+  const replaceBulk = () => {
+    if (parsedBulk.length < 2) return
+    setItems(parsedBulk.slice(0, MAX_ITEMS))
+    setBulkText(''); setResult(null); rotRef.current = 0
+  }
+
   const removeItem = (i: number) => {
     if (items.length <= 2) return
     setItems((p) => p.filter((_, j) => j !== i)); setResult(null)
   }
+
   const updateItem = (i: number, val: string) =>
     setItems((p) => p.map((o, j) => (j === i ? val : o)))
+
   const loadPreset = (i: number) => {
     setActivePreset(i); setItems([...PRESETS[i].options])
-    setResult(null); setEditMode(false); rotRef.current = 0
+    setResult(null); setEditMode(false); setPasteMode(false)
+    setBulkText(''); rotRef.current = 0
   }
 
   const activeSpeed = SPEED_LEVELS[speedIdx]
@@ -283,7 +319,7 @@ export default function LuckyWheelPage() {
     <ToolShell
       name="Lucky Wheel"
       icon="🎡"
-      description="Vòng quay may mắn — preset đa dạng, 5 mức tốc độ, tùy chỉnh không giới hạn"
+      description="Vòng quay may mắn — không giới hạn lựa chọn, 5 mức độ hồi hộp"
     >
       <div className="mx-auto max-w-4xl">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_1fr]">
@@ -316,7 +352,7 @@ export default function LuckyWheelPage() {
             {/* ── Speed selector ── */}
             <div className="w-full rounded-xl border border-border bg-surface p-3">
               <div className="mb-2.5 flex items-center justify-between">
-                <p className="font-mono text-xs uppercase tracking-widest text-muted">Tốc độ quay</p>
+                <p className="font-mono text-xs uppercase tracking-widest text-muted">Mức độ hồi hộp</p>
                 <span className={`rounded-md border px-2 py-0.5 font-mono text-xs ${activeSpeed.activeClass}`}>
                   {activeSpeed.icon} {activeSpeed.timeHint}
                 </span>
@@ -330,9 +366,9 @@ export default function LuckyWheelPage() {
                       key={lvl.label}
                       onClick={() => setSpeedIdx(i)}
                       disabled={spinning}
-                      title={`${lvl.label} — ${lvl.timeHint}`}
+                      title={lvl.desc}
                       className={`flex flex-col items-center gap-1 rounded-xl border py-2 text-xs transition-all disabled:opacity-40 ${
-                        isActive ? lvl.activeClass : 'border-border bg-background text-muted hover:border-border hover:text-white'
+                        isActive ? lvl.activeClass : 'border-border bg-background text-muted hover:text-white'
                       }`}
                     >
                       <span className="text-base leading-none">{lvl.icon}</span>
@@ -358,13 +394,8 @@ export default function LuckyWheelPage() {
                 })}
               </div>
 
-              {/* Suspense hint */}
-              <p className="mt-2 text-center font-mono text-[10px] text-muted">
-                {speedIdx === 0 && 'Quay nhẹ — phù hợp cho quyết định đơn giản'}
-                {speedIdx === 1 && 'Cân bằng — tốc độ mặc định, thích hợp mọi tình huống'}
-                {speedIdx === 2 && 'Nhiều vòng hơn — khó đoán kết quả hơn 😬'}
-                {speedIdx === 3 && 'Rất nhiều vòng — tim đập nhanh khi chờ kết quả 😰'}
-                {speedIdx === 4 && '⚠️ Kiên nhẫn! Quay tới ~30 vòng, cực kỳ hồi hộp 🤯'}
+              <p className="mt-2 text-center font-mono text-[10px] leading-snug text-muted">
+                {activeSpeed.desc}
               </p>
             </div>
 
@@ -422,11 +453,19 @@ export default function LuckyWheelPage() {
             {/* Options */}
             <div className="rounded-xl border border-border bg-surface p-4">
               <div className="mb-3 flex items-center justify-between">
-                <p className="font-mono text-xs uppercase tracking-widest text-muted">
-                  Lựa chọn ({items.length}/12)
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="font-mono text-xs uppercase tracking-widest text-muted">
+                    Lựa chọn
+                  </p>
+                  <span className="rounded-full border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-muted">
+                    {items.length}
+                  </span>
+                  {items.length > 30 && (
+                    <span className="text-xs text-amber-400">· Nhiều ô → chữ nhỏ</span>
+                  )}
+                </div>
                 <button
-                  onClick={() => setEditMode((v) => !v)}
+                  onClick={() => { setEditMode((v) => !v); setPasteMode(false); setBulkText('') }}
                   className={`rounded-lg border px-2.5 py-1 text-xs transition-colors ${
                     editMode ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border text-muted hover:text-white'
                   }`}
@@ -435,6 +474,7 @@ export default function LuckyWheelPage() {
                 </button>
               </div>
 
+              {/* Item list */}
               <div className="max-h-52 space-y-1.5 overflow-y-auto">
                 {items.map((item, i) => (
                   <div
@@ -459,7 +499,7 @@ export default function LuckyWheelPage() {
                       <button
                         onClick={() => removeItem(i)}
                         disabled={items.length <= 2}
-                        className="text-xs text-muted transition-colors hover:text-red-400 disabled:opacity-25"
+                        className="shrink-0 text-xs text-muted transition-colors hover:text-red-400 disabled:opacity-25"
                       >
                         ✕
                       </button>
@@ -468,23 +508,86 @@ export default function LuckyWheelPage() {
                 ))}
               </div>
 
-              {editMode && items.length < 12 && (
-                <div className="mt-3 flex gap-2 border-t border-border pt-3">
-                  <input
-                    value={newItem}
-                    onChange={(e) => setNewItem(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && addItem()}
-                    placeholder="Thêm lựa chọn mới..."
-                    maxLength={30}
-                    className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-white placeholder-muted outline-none focus:border-accent"
-                  />
-                  <button
-                    onClick={addItem}
-                    disabled={!newItem.trim()}
-                    className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-bold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
-                  >
-                    +
-                  </button>
+              {/* Edit controls */}
+              {editMode && (
+                <div className="mt-3 border-t border-border pt-3">
+                  {/* Toggle: single add / paste list */}
+                  <div className="mb-2.5 flex gap-1 rounded-lg border border-border bg-background p-0.5">
+                    <button
+                      onClick={() => setPasteMode(false)}
+                      className={`flex-1 rounded-md py-1 text-xs font-medium transition-colors ${
+                        !pasteMode ? 'bg-surface text-white' : 'text-muted hover:text-white'
+                      }`}
+                    >
+                      Thêm từng mục
+                    </button>
+                    <button
+                      onClick={() => setPasteMode(true)}
+                      className={`flex-1 rounded-md py-1 text-xs font-medium transition-colors ${
+                        pasteMode ? 'bg-surface text-white' : 'text-muted hover:text-white'
+                      }`}
+                    >
+                      📋 Dán danh sách
+                    </button>
+                  </div>
+
+                  {/* Single add */}
+                  {!pasteMode && items.length < MAX_ITEMS && (
+                    <div className="flex gap-2">
+                      <input
+                        value={newItem}
+                        onChange={(e) => setNewItem(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && addItem()}
+                        placeholder="Nhập lựa chọn rồi Enter..."
+                        maxLength={30}
+                        className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-white placeholder-muted outline-none focus:border-accent"
+                      />
+                      <button
+                        onClick={addItem}
+                        disabled={!newItem.trim()}
+                        className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-bold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Bulk paste */}
+                  {pasteMode && (
+                    <div className="space-y-2">
+                      <textarea
+                        value={bulkText}
+                        onChange={(e) => setBulkText(e.target.value)}
+                        placeholder={'Dán danh sách vào đây...\nMỗi dòng = 1 lựa chọn\nHoặc phân tách bằng dấu phẩy'}
+                        rows={5}
+                        className="w-full resize-none rounded-lg border border-border bg-background p-2.5 font-mono text-sm text-white placeholder-muted outline-none focus:border-accent"
+                      />
+                      {parsedBulk.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="flex-1 font-mono text-xs text-muted">
+                            {parsedBulk.length} mục được nhận diện
+                          </span>
+                          <button
+                            onClick={addBulk}
+                            className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1 text-xs text-accent-soft transition-colors hover:bg-accent/20"
+                          >
+                            + Thêm vào
+                          </button>
+                          <button
+                            onClick={replaceBulk}
+                            disabled={parsedBulk.length < 2}
+                            className="rounded-lg bg-accent px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
+                          >
+                            Thay thế tất cả
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {items.length >= MAX_ITEMS && (
+                    <p className="mt-1.5 text-xs text-amber-400">Đã đạt giới hạn {MAX_ITEMS} lựa chọn</p>
+                  )}
                 </div>
               )}
             </div>
@@ -521,10 +624,10 @@ export default function LuckyWheelPage() {
             <div className="rounded-xl border border-border/50 bg-surface/60 p-4">
               <p className="mb-2 font-mono text-xs uppercase tracking-widest text-muted">Mẹo sử dụng</p>
               <ul className="space-y-1.5 text-xs text-muted">
-                <li className="flex gap-2"><span className="text-accent-soft">→</span> Chọn mức tốc độ để điều chỉnh độ hồi hộp của trò chơi</li>
-                <li className="flex gap-2"><span className="text-accent-soft">→</span> Mức <span className="text-accent-soft font-medium">Điên cuồng</span> quay ~30 vòng, giảm tốc siêu chậm cuối cùng</li>
-                <li className="flex gap-2"><span className="text-accent-soft">→</span> Tối đa 12 lựa chọn, mỗi lựa chọn tối đa 30 ký tự</li>
-                <li className="flex gap-2"><span className="text-accent-soft">→</span> Bật loa để nghe hiệu ứng âm thanh khi quay</li>
+                <li className="flex gap-2"><span className="text-accent-soft">→</span> Không giới hạn số lựa chọn — dán cả danh sách lớp, team, tên thoải mái</li>
+                <li className="flex gap-2"><span className="text-accent-soft">→</span> Chế độ <span className="text-white font-medium">Dán danh sách</span>: mỗi dòng 1 mục hoặc phân tách bằng dấu phẩy</li>
+                <li className="flex gap-2"><span className="text-accent-soft">→</span> Mức <span className="text-accent-soft font-medium">Cực căng 🌀</span> quay ~30 vòng, giảm tốc siêu chậm — đảm bảo hồi hộp tột độ</li>
+                <li className="flex gap-2"><span className="text-accent-soft">→</span> Bật loa để nghe tick-tick và nhạc fanfare khi kết quả hiện ra</li>
               </ul>
             </div>
           </div>
