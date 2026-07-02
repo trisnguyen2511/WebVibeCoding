@@ -12,7 +12,10 @@ const SEG_COLORS = [
 const WHEEL_SIZE = 340
 const MAX_ITEMS  = 100
 
-// ------- speed levels (wording updated) -------
+// ------- speed levels -------
+// slide: 0–1, controls how much sinusoidal easing blends in.
+// sine ease keeps speed uniform longer → "gliding on ice" sensation.
+// Higher suspense = higher slide = smoother, more hypnotic deceleration.
 const SPEED_LEVELS = [
   {
     label:    'Tà tà',
@@ -21,7 +24,7 @@ const SPEED_LEVELS = [
     desc:     'Vài vòng rồi dừng ngay — hợp khi cần quyết định nhanh',
     minSpins: 2,   maxSpins: 3,
     minDur:   2000, maxDur:  3000,
-    easePow:  3,
+    easePow:  3,   slide: 0,
     activeClass: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400',
     barClass:    'bg-emerald-500',
   },
@@ -32,7 +35,7 @@ const SPEED_LEVELS = [
     desc:     'Cân bằng giữa tốc độ và cảm giác — lựa chọn mặc định',
     minSpins: 5,   maxSpins: 7,
     minDur:   3500, maxDur:  5000,
-    easePow:  4,
+    easePow:  4,   slide: 0.15,
     activeClass: 'border-blue-500/40 bg-blue-500/10 text-blue-400',
     barClass:    'bg-blue-500',
   },
@@ -43,7 +46,7 @@ const SPEED_LEVELS = [
     desc:     'Nhiều vòng hơn, khó đoán hơn — bắt đầu có cảm giác hồi hộp',
     minSpins: 8,   maxSpins: 12,
     minDur:   6000, maxDur:  8000,
-    easePow:  5,
+    easePow:  5,   slide: 0.35,
     activeClass: 'border-amber-500/40 bg-amber-500/10 text-amber-400',
     barClass:    'bg-amber-500',
   },
@@ -54,7 +57,7 @@ const SPEED_LEVELS = [
     desc:     'Rất nhiều vòng, giảm tốc siêu chậm — tim đập mạnh khi gần dừng',
     minSpins: 15,  maxSpins: 20,
     minDur:   10000, maxDur: 13000,
-    easePow:  6,
+    easePow:  6,   slide: 0.55,
     activeClass: 'border-red-500/40 bg-red-500/10 text-red-400',
     barClass:    'bg-red-500',
   },
@@ -65,7 +68,7 @@ const SPEED_LEVELS = [
     desc:     '⚠️ ~30 vòng, tốc độ giảm cực chậm — không dành cho người yếu tim!',
     minSpins: 28,  maxSpins: 36,
     minDur:   15000, maxDur: 18000,
-    easePow:  8,
+    easePow:  8,   slide: 0.72,
     activeClass: 'border-accent/40 bg-accent/10 text-accent-soft',
     barClass:    'bg-accent',
   },
@@ -248,14 +251,21 @@ export default function LuckyWheelPage() {
     setSpinning(true)
     lastSegRef.current = -1
 
-    const { minSpins, maxSpins, minDur, maxDur, easePow } = SPEED_LEVELS[speedIdx]
+    const { minSpins, maxSpins, minDur, maxDur, easePow, slide } = SPEED_LEVELS[speedIdx]
     const spins    = minSpins + Math.random() * (maxSpins - minSpins)
     const extra    = spins * 360 + Math.random() * 360
     const startRot = rotRef.current
     const endRot   = startRot + extra
     const dur      = minDur + Math.random() * (maxDur - minDur)
     const t0       = performance.now()
-    const ease     = (t: number) => 1 - Math.pow(1 - t, easePow)
+    // Blend polynomial ease-out with sine ease-out.
+    // Sine maintains higher speed longer then glides smoothly to zero —
+    // higher slide value = more "ice rink" deceleration.
+    const ease = (t: number) => {
+      const poly = 1 - Math.pow(1 - t, easePow)
+      const sine = Math.sin((t * Math.PI) / 2)
+      return poly * (1 - slide) + sine * slide
+    }
 
     const frame = (now: number) => {
       const t   = Math.min((now - t0) / dur, 1)
