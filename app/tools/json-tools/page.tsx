@@ -1,6 +1,7 @@
 'use client'
 import { useState, useMemo } from 'react'
 import { ToolShell } from '@/components/tool-shell'
+import { ResizablePanel } from '@/components/resizable-panel'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 
 type Tab = 'format' | 'diff'
@@ -71,14 +72,14 @@ function FormatTab() {
       )}
       {formatted && (
         <div className="relative rounded-xl border border-border bg-surface p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-green-400 font-medium">✓ Valid JSON</span>
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-xs font-medium text-green-400">✓ Valid JSON</span>
             <button onClick={() => copy(formatted)}
-              className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-muted hover:text-white">
+              className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-muted hover:text-white transition-colors">
               {copied ? '✓ Copied' : 'Copy'}
             </button>
           </div>
-          <pre className="font-mono text-sm overflow-x-auto max-h-96"
+          <pre className="max-h-96 overflow-x-auto font-mono text-sm"
             dangerouslySetInnerHTML={{ __html: syntaxHighlight(formatted) }} />
         </div>
       )}
@@ -103,9 +104,39 @@ function DiffTab() {
 
   const changes = diff?.lines.filter((l) => l.type !== 'same').length ?? 0
 
+  const panelA = (
+    <div className="flex h-full flex-col pr-0">
+      <p className="mb-1.5 text-xs text-muted">JSON A</p>
+      <textarea value={a} onChange={(e) => setA(e.target.value)}
+        placeholder='{"a": 1}'
+        className="flex-1 w-full resize-none rounded-xl border border-border bg-surface p-3 font-mono text-xs text-white outline-none placeholder-muted focus:border-accent"
+        style={{ minHeight: '180px' }} />
+    </div>
+  )
+
+  const panelB = (
+    <div className="flex h-full flex-col">
+      <p className="mb-1.5 text-xs text-muted">JSON B</p>
+      <textarea value={b} onChange={(e) => setB(e.target.value)}
+        placeholder='{"a": 2}'
+        className="flex-1 w-full resize-none rounded-xl border border-border bg-surface p-3 font-mono text-xs text-white outline-none placeholder-muted focus:border-accent"
+        style={{ minHeight: '180px' }} />
+    </div>
+  )
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      {/* Desktop: resizable side-by-side */}
+      <div className="hidden sm:block" style={{ height: '220px' }}>
+        <ResizablePanel
+          storageKey="json-diff"
+          defaultSplit={50}
+          left={panelA}
+          right={panelB}
+        />
+      </div>
+      {/* Mobile: stacked */}
+      <div className="grid grid-cols-1 gap-3 sm:hidden">
         <div>
           <p className="mb-1.5 text-xs text-muted">JSON A</p>
           <textarea value={a} onChange={(e) => setA(e.target.value)} rows={7}
@@ -119,13 +150,14 @@ function DiffTab() {
             className="w-full resize-none rounded-xl border border-border bg-surface p-3 font-mono text-xs text-white outline-none placeholder-muted focus:border-accent" />
         </div>
       </div>
+
       {diff?.error && (
         <p className="font-mono text-xs text-red-400">{diff.error}</p>
       )}
       {diff && !diff.error && (
-        <div className="rounded-xl border border-border bg-surface overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-            <p className="text-xs text-muted uppercase tracking-widest">Diff</p>
+        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+          <div className="flex items-center justify-between border-b border-border px-4 py-2">
+            <p className="text-xs uppercase tracking-widest text-muted">Diff</p>
             {changes === 0
               ? <span className="text-xs text-green-400">✓ Identical</span>
               : <span className="text-xs text-yellow-400">{changes} change{changes !== 1 ? 's' : ''}</span>}
