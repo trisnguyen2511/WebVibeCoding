@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { marked } from 'marked'
 import { ToolShell } from '@/components/tool-shell'
+import { ResizablePanel } from '@/components/resizable-panel'
 
 const LS_KEY = 'wv-markdown-content'
 const DEFAULT = `# Welcome to Markdown Editor
@@ -90,8 +91,26 @@ export default function MarkdownEditorPage() {
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0
 
+  const editorEl = (
+    <textarea
+      ref={textareaRef}
+      value={content}
+      onChange={(e) => setContent(e.target.value)}
+      className="h-full w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-white outline-none placeholder-muted focus:border-accent"
+      style={{ minHeight: '60vh' }}
+    />
+  )
+
+  const previewEl = (
+    <div
+      className="h-full overflow-y-auto rounded-xl border border-border bg-surface p-6 prose prose-invert prose-sm max-w-none"
+      style={{ minHeight: '60vh' }}
+      dangerouslySetInnerHTML={{ __html: preview }}
+    />
+  )
+
   return (
-    <ToolShell name="Markdown Editor" icon="📝" description="Write Markdown with live preview and auto-save">
+    <ToolShell name="Markdown Editor" icon="📝" description="Write Markdown with live preview and auto-save" wide>
       <div className="space-y-3">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2">
@@ -101,12 +120,12 @@ export default function MarkdownEditorPage() {
                 item.wrap as [string, string] | undefined,
                 item.prefix
               )}
-              className="rounded-lg border border-border bg-surface px-2.5 py-1 font-mono text-xs text-muted hover:text-white transition-colors">
+              className="rounded-lg border border-border bg-surface px-2.5 py-1 font-mono text-xs text-muted hover:border-accent/40 hover:text-white transition-colors">
               {item.label}
             </button>
           ))}
           <div className="ml-auto flex gap-2">
-            <span className="text-xs text-muted self-center">{wordCount} words · auto-saved</span>
+            <span className="self-center text-xs text-muted">{wordCount} words · auto-saved</span>
             {(['split', 'write', 'preview'] as const).map((v) => (
               <button key={v} onClick={() => setView(v)}
                 className={`rounded-lg border px-2.5 py-1 text-xs font-medium capitalize transition-colors ${view === v ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-white'}`}>
@@ -121,24 +140,41 @@ export default function MarkdownEditorPage() {
         </div>
 
         {/* Editor / Preview */}
-        <div className={`gap-4 ${view === 'split' ? 'grid grid-cols-2' : 'block'}`} style={{ minHeight: '60vh' }}>
-          {(view === 'split' || view === 'write') && (
-            <textarea
-              ref={textareaRef}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="w-full h-full rounded-xl border border-border bg-surface p-4 font-mono text-sm text-white outline-none resize-none placeholder-muted focus:border-accent"
-              style={{ minHeight: '60vh' }}
-            />
-          )}
-          {(view === 'split' || view === 'preview') && (
-            <div
-              className="rounded-xl border border-border bg-surface p-6 overflow-y-auto prose prose-invert prose-sm max-w-none"
-              style={{ minHeight: '60vh' }}
-              dangerouslySetInnerHTML={{ __html: preview }}
-            />
-          )}
-        </div>
+        {view === 'split' ? (
+          <>
+            {/* Desktop: resizable side-by-side */}
+            <div className="hidden sm:block" style={{ height: '68vh' }}>
+              <ResizablePanel
+                storageKey="markdown-editor"
+                defaultSplit={50}
+                left={
+                  <textarea
+                    ref={textareaRef}
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    className="h-full w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-white outline-none placeholder-muted focus:border-accent"
+                  />
+                }
+                right={
+                  <div
+                    className="h-full overflow-y-auto rounded-xl border border-border bg-surface p-6 prose prose-invert prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: preview }}
+                  />
+                }
+              />
+            </div>
+            {/* Mobile: stacked */}
+            <div className="flex flex-col gap-4 sm:hidden">
+              {editorEl}
+              {previewEl}
+            </div>
+          </>
+        ) : (
+          <div>
+            {view === 'write' && editorEl}
+            {view === 'preview' && previewEl}
+          </div>
+        )}
       </div>
     </ToolShell>
   )
