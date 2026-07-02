@@ -31,13 +31,6 @@ export const tools: Tool[] = [
     category: 'crypto',
   },
   {
-    name: 'Encrypt / Decrypt',
-    slug: 'decrypt',
-    icon: '🔓',
-    description: 'AES-256 text encryption and decryption',
-    category: 'crypto',
-  },
-  {
     name: 'Game Controller',
     slug: 'game-controller',
     icon: '🎮',
@@ -76,7 +69,7 @@ export const tools: Tool[] = [
     name: 'Encode / Decode',
     slug: 'encode-decode',
     icon: '⇄',
-    description: 'Base64, URL encode, and JWT decode',
+    description: 'Base64, URL encode, JWT decode, and AES-256 encryption',
     category: 'dev',
   },
   {
