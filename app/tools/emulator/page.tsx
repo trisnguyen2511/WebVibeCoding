@@ -5,8 +5,8 @@ import { ToolShell } from '@/components/tool-shell'
 import { useGameController } from '@/hooks/use-game-controller'
 
 // ── EmulatorJS CDN ───────────────────────────────────────────────
-const EJS_LOADER = 'https://cdn.jsdelivr.net/npm/emulatorjs@latest/data/loader.js'
-const EJS_DATA   = 'https://cdn.jsdelivr.net/npm/emulatorjs@latest/data/'
+const EJS_LOADER = 'https://cdn.emulatorjs.org/stable/data/loader.js'
+const EJS_DATA   = 'https://cdn.emulatorjs.org/stable/data/'
 
 // ── EJS global types ─────────────────────────────────────────────
 interface EJSManager {
@@ -36,12 +36,12 @@ const BTN_LABEL: Record<number, string> = {
 // ── Supported systems ────────────────────────────────────────────
 type System = 'nes' | 'snes' | 'gba' | 'gbc' | 'n64'
 
-const SYSTEMS: { value: System; label: string; exts: string }[] = [
-  { value: 'nes',  label: 'NES',       exts: '.nes' },
-  { value: 'snes', label: 'SNES',      exts: '.sfc .smc' },
-  { value: 'gba',  label: 'GBA',       exts: '.gba' },
-  { value: 'gbc',  label: 'Game Boy',  exts: '.gbc .gb' },
-  { value: 'n64',  label: 'N64',       exts: '.n64 .z64' },
+const SYSTEMS: { value: System; label: string; exts: string; core: string }[] = [
+  { value: 'nes',  label: 'NES',       exts: '.nes',      core: 'fceumm'           },
+  { value: 'snes', label: 'SNES',      exts: '.sfc .smc', core: 'snes9x'           },
+  { value: 'gba',  label: 'GBA',       exts: '.gba',      core: 'mgba'             },
+  { value: 'gbc',  label: 'Game Boy',  exts: '.gbc .gb',  core: 'gambatte'         },
+  { value: 'n64',  label: 'N64',       exts: '.n64 .z64', core: 'mupen64plus_next' },
 ]
 
 // ── Free legal homebrew ROMs ─────────────────────────────────────
@@ -130,7 +130,7 @@ function EmulatorHost() {
 
     window.EJS_player        = '#ejs-mount'
     window.EJS_gameUrl       = romUrl
-    window.EJS_core          = system
+    window.EJS_core          = SYSTEMS.find((s) => s.value === system)?.core ?? 'fceumm'
     window.EJS_pathtodata    = EJS_DATA
     window.EJS_startOnLoaded = true
     window.EJS_onGameStart   = () => {
