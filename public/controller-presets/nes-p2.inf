@@ -1,0 +1,73 @@
+[controller]
+name = NES Layout - P2
+orientation = landscape
+
+[dpad:MOVE]
+x = 3
+y = 30
+size = 36
+up = i
+down = k
+left = j
+right = l
+diagonal = true
+hold_interval = 60
+
+[button:A]
+label = A
+key = n
+x = 82
+y = 50
+w = 12
+h = 14
+
+[button:B]
+label = B
+key = m
+x = 70
+y = 55
+w = 12
+h = 14
+
+[button:L]
+label = L
+key = y
+x = 2
+y = 2
+w = 18
+h = 10
+
+[button:R]
+label = R
+key = p
+x = 80
+y = 2
+w = 18
+h = 10
+
+[button:SELECT]
+label = SELECT
+key = u
+x = 38
+y = 80
+w = 16
+h = 8
+
+[button:START]
+label = START
+key = o
+x = 58
+y = 80
+w = 16
+h = 8
+
+; ── Combos ─────────────────────────────────────────────────────
+; Each combo is a dedicated button that sends all chord keys simultaneously
+
+[combo:TURBO_AB]
+label = A+B
+x = 82
+y = 30
+w = 12
+h = 10
+chord = n+m

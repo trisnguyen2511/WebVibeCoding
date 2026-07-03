@@ -382,7 +382,7 @@ function HostView({ roomId }: { roomId: string }) {
 
 // ── Phone: Layout Setup ──────────────────────────────────────────
 function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }) {
-  type Preset = 'nes' | 'snes' | 'wasd' | 'arcade-p1' | 'arcade-p2' | 'arcade-p3' | 'arcade-p4'
+  type Preset = 'nes' | 'nes-p2' | 'snes' | 'snes-p2' | 'wasd' | 'arcade-p1' | 'arcade-p2' | 'arcade-p3' | 'arcade-p4'
   const [preset, setPreset] = useState<Preset>('nes')
   const [config, setConfig] = useState<ControllerConfig | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
@@ -434,8 +434,10 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
               className="w-full rounded-xl border border-[#1A1A2E] bg-[#0F0F1A] px-4 py-3 font-mono text-sm text-white outline-none focus:border-[#7C3AED]"
             >
               <optgroup label="── Classic ──">
-                <option value="nes">NES</option>
-                <option value="snes">SNES</option>
+                <option value="nes">NES — Player 1</option>
+                <option value="nes-p2">NES — Player 2</option>
+                <option value="snes">SNES — Player 1</option>
+                <option value="snes-p2">SNES — Player 2</option>
               </optgroup>
               <optgroup label="── PC ──">
                 <option value="wasd">WASD</option>
