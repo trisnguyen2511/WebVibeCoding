@@ -13,8 +13,15 @@ const EJS_DATA   = 'https://cdn.emulatorjs.org/stable/data/'
 // (there is no EJS_GameManager global and no pressButton/releaseButton method —
 // calling those silently no-ops every input, which is why controls never worked)
 interface EJSManager {
-  simulateInput: (player: number, index: number, value: number) => void
+  simulateInput:         (player: number, index: number, value: number) => void
+  setControllerPortDevice: (port: number, device: number) => void
 }
+
+// libretro RETRO_DEVICE_JOYPAD — the "port has a standard gamepad plugged
+// in" device id. Cores auto-connect port 0 but leave port 1+ unconnected
+// until told otherwise, so player 2's input is silently ignored by the
+// core (not by EmulatorJS) unless we connect it explicitly after start.
+const RETRO_DEVICE_JOYPAD = 1
 
 interface EJSEmulator {
   gameManager: EJSManager
@@ -178,7 +185,11 @@ function EmulatorHost() {
     window.EJS_pathtodata    = EJS_DATA
     window.EJS_startOnLoaded = true
     window.EJS_onGameStart   = () => {
-      ejsRef.current = window.EJS_emulator?.gameManager ?? null
+      const gm = window.EJS_emulator?.gameManager ?? null
+      ejsRef.current = gm
+      // Port 0 has a joypad connected by default; port 1 (player 2) needs
+      // to be connected explicitly or the core ignores its input entirely.
+      try { gm?.setControllerPortDevice(1, RETRO_DEVICE_JOYPAD) } catch { /* core doesn't support 2P */ }
       setGameReady(true)
     }
 
