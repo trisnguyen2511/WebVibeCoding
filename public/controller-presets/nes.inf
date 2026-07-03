@@ -39,7 +39,7 @@ h = 10
 
 [button:R]
 label = R
-key = w
+key = e
 x = 80
 y = 2
 w = 18
@@ -47,7 +47,7 @@ h = 10
 
 [button:SELECT]
 label = SELECT
-key = Shift
+key = v
 x = 38
 y = 80
 w = 16

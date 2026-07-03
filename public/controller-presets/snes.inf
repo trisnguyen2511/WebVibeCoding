@@ -31,7 +31,7 @@ h = 13
 
 [button:X]
 label = X
-key = a
+key = c
 x = 76
 y = 42
 w = 11
@@ -39,7 +39,7 @@ h = 13
 
 [button:Y]
 label = Y
-key = s
+key = f
 x = 65
 y = 50
 w = 11
@@ -55,7 +55,7 @@ h = 10
 
 [button:R]
 label = R
-key = w
+key = e
 x = 80
 y = 2
 w = 18
@@ -63,7 +63,7 @@ h = 10
 
 [button:SELECT]
 label = SELECT
-key = Shift
+key = v
 x = 36
 y = 78
 w = 14
@@ -102,4 +102,4 @@ x = 36
 y = 62
 w = 14
 h = 10
-chord = s+x+z
+chord = f+x+z
