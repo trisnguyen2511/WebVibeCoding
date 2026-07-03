@@ -45,6 +45,22 @@ y = 50
 w = 11
 h = 13
 
+[button:L]
+label = L
+key = q
+x = 2
+y = 2
+w = 18
+h = 10
+
+[button:R]
+label = R
+key = w
+x = 80
+y = 2
+w = 18
+h = 10
+
 [button:SELECT]
 label = SELECT
 key = Shift
