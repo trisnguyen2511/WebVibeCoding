@@ -84,10 +84,22 @@ function TouchBtn({
 function ControllerView({ roomId }: { roomId: string }) {
   const [state, setState]         = useState<ConnState>('connecting')
   const [playerIdx, setPlayerIdx] = useState(0)
+  const [isLandscape, setIsLandscape] = useState(false)
   const connRef = useRef<{
     sendInput: (m: Omit<InputMessage, 'peerId'>) => void
     disconnect: () => void
   } | null>(null)
+
+  useEffect(() => {
+    const check = () => setIsLandscape(window.innerWidth > window.innerHeight)
+    check()
+    window.addEventListener('resize', check)
+    window.addEventListener('orientationchange', check)
+    return () => {
+      window.removeEventListener('resize', check)
+      window.removeEventListener('orientationchange', check)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -201,20 +213,22 @@ function ControllerView({ roomId }: { roomId: string }) {
         press={press} release={release} />
 
       {/* ── Landscape hint (portrait mode only) ── */}
-      <div style={{
-        position: 'absolute', inset: 0, zIndex: 30,
-        background: '#08080EEE',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        gap: 12,
-      }} className="portrait:flex landscape:hidden">
-        <span style={{ fontSize: 48 }}>📱</span>
-        <p style={{ color: '#FAFAFA', fontFamily: 'system-ui', fontWeight: 700, fontSize: 16 }}>
-          Xoay ngang điện thoại
-        </p>
-        <p style={{ color: '#52525B', fontFamily: 'monospace', fontSize: 12 }}>
-          Controller cần chế độ landscape
-        </p>
-      </div>
+      {!isLandscape && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 30,
+          background: '#08080EEE',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: 12,
+        }}>
+          <span style={{ fontSize: 48 }}>📱</span>
+          <p style={{ color: '#FAFAFA', fontFamily: 'system-ui', fontWeight: 700, fontSize: 16 }}>
+            Xoay ngang điện thoại
+          </p>
+          <p style={{ color: '#52525B', fontFamily: 'monospace', fontSize: 12 }}>
+            Controller cần chế độ landscape
+          </p>
+        </div>
+      )}
     </div>
   )
 }
