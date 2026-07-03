@@ -27,7 +27,11 @@ declare global {
 }
 
 // ── Key name (from game-controller presets) → RetroPad index ─────
+// P1 preset (nes.inf / snes.inf) + P2 preset (nes-p2.inf / snes-p2.inf)
+// use disjoint key sets so both can be mapped in this one global table —
+// player separation itself comes from peerId, not from the key string.
 const KEY_TO_RETROPAD: Record<string, number> = {
+  // P1
   ArrowUp: 4, ArrowDown: 5, ArrowLeft: 6, ArrowRight: 7,
   z: 8,      // A
   x: 0,      // B
@@ -37,6 +41,16 @@ const KEY_TO_RETROPAD: Record<string, number> = {
   Enter: 3,  // START
   q: 10,     // L (SNES)
   w: 11,     // R (SNES)
+  // P2
+  i: 4, k: 5, j: 6, l: 7,
+  n: 8,      // A
+  m: 0,      // B
+  h: 9,      // X (SNES)
+  g: 1,      // Y (SNES)
+  u: 2,      // SELECT
+  o: 3,      // START
+  y: 10,     // L (SNES)
+  p: 11,     // R (SNES)
 }
 
 const KEY_LABEL: Record<string, string> = {
@@ -44,6 +58,10 @@ const KEY_LABEL: Record<string, string> = {
   z: 'A', x: 'B', a: 'X', s: 'Y',
   Shift: 'SEL', Enter: 'STA',
   q: 'L', w: 'R',
+  i: '↑', k: '↓', j: '←', l: '→',
+  n: 'A', m: 'B', h: 'X', g: 'Y',
+  u: 'SEL', o: 'STA',
+  y: 'L', p: 'R',
 }
 
 function keyToButton(key: string): number | null {
@@ -367,6 +385,7 @@ function EmulatorHost() {
               <p className="font-medium text-white">Multiplayer</p>
               <p>→ Tối đa 4 người chơi. Mỗi người scan QR từ điện thoại riêng.</p>
               <p>→ P1 = người join đầu tiên. P2 = thứ hai, v.v.</p>
+              <p>→ Người join đầu chọn layout &quot;NES/SNES — Player 1&quot;, người join thứ hai chọn &quot;— Player 2&quot; để tránh trùng phím.</p>
               <p>→ Game phải hỗ trợ multiplayer (không phải game nào cũng có).</p>
             </div>
           </div>

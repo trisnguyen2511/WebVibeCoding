@@ -1,0 +1,105 @@
+[controller]
+name = SNES Layout - P2
+orientation = landscape
+
+[dpad:MOVE]
+x = 2
+y = 28
+size = 38
+up = i
+down = k
+left = j
+right = l
+diagonal = true
+hold_interval = 60
+
+[button:A]
+label = A
+key = n
+x = 86
+y = 50
+w = 11
+h = 13
+
+[button:B]
+label = B
+key = m
+x = 76
+y = 58
+w = 11
+h = 13
+
+[button:X]
+label = X
+key = h
+x = 76
+y = 42
+w = 11
+h = 13
+
+[button:Y]
+label = Y
+key = g
+x = 65
+y = 50
+w = 11
+h = 13
+
+[button:L]
+label = L
+key = y
+x = 2
+y = 2
+w = 18
+h = 10
+
+[button:R]
+label = R
+key = p
+x = 80
+y = 2
+w = 18
+h = 10
+
+[button:SELECT]
+label = SELECT
+key = u
+x = 36
+y = 78
+w = 14
+h = 8
+
+[button:START]
+label = START
+key = o
+x = 55
+y = 78
+w = 14
+h = 8
+
+; ── Combos ─────────────────────────────────────────────────────
+; Each combo is a dedicated button that sends all chord keys simultaneously
+
+[combo:SUPER_JUMP]
+label = Super
+x = 86
+y = 30
+w = 11
+h = 10
+chord = i+n
+
+[combo:DASH]
+label = Dash
+x = 65
+y = 30
+w = 11
+h = 10
+chord = m+l
+
+[combo:SPECIAL]
+label = Spec
+x = 36
+y = 62
+w = 14
+h = 10
+chord = g+m+n
