@@ -9,9 +9,15 @@ const EJS_LOADER = 'https://cdn.emulatorjs.org/stable/data/loader.js'
 const EJS_DATA   = 'https://cdn.emulatorjs.org/stable/data/'
 
 // ── EJS global types ─────────────────────────────────────────────
+// Real API: window.EJS_emulator.gameManager.simulateInput(player, index, value)
+// (there is no EJS_GameManager global and no pressButton/releaseButton method —
+// calling those silently no-ops every input, which is why controls never worked)
 interface EJSManager {
-  pressButton:   (player: number, button: number) => void
-  releaseButton: (player: number, button: number) => void
+  simulateInput: (player: number, index: number, value: number) => void
+}
+
+interface EJSEmulator {
+  gameManager: EJSManager
 }
 
 declare global {
@@ -21,7 +27,7 @@ declare global {
     EJS_core?:          string
     EJS_pathtodata?:    string
     EJS_startOnLoaded?: boolean
-    EJS_GameManager?:   EJSManager
+    EJS_emulator?:      EJSEmulator
     EJS_onGameStart?:   () => void
   }
 }
@@ -138,8 +144,7 @@ function EmulatorHost() {
         const btnIdx = keyToButton(key)
         if (btnIdx !== null) {
           try {
-            if (pressed) ejsRef.current?.pressButton(pidx, btnIdx)
-            else         ejsRef.current?.releaseButton(pidx, btnIdx)
+            ejsRef.current?.simulateInput(pidx, btnIdx, pressed ? 1 : 0)
           } catch { /* ejs not ready yet */ }
         }
       }
@@ -173,7 +178,7 @@ function EmulatorHost() {
     window.EJS_pathtodata    = EJS_DATA
     window.EJS_startOnLoaded = true
     window.EJS_onGameStart   = () => {
-      ejsRef.current = window.EJS_GameManager ?? null
+      ejsRef.current = window.EJS_emulator?.gameManager ?? null
       setGameReady(true)
     }
 
