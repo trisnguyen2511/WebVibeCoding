@@ -9,9 +9,22 @@ const EJS_LOADER = 'https://cdn.emulatorjs.org/stable/data/loader.js'
 const EJS_DATA   = 'https://cdn.emulatorjs.org/stable/data/'
 
 // ── EJS global types ─────────────────────────────────────────────
+// Real API: window.EJS_emulator.gameManager.simulateInput(player, index, value)
+// (there is no EJS_GameManager global and no pressButton/releaseButton method —
+// calling those silently no-ops every input, which is why controls never worked)
 interface EJSManager {
-  pressButton:   (player: number, button: number) => void
-  releaseButton: (player: number, button: number) => void
+  simulateInput:         (player: number, index: number, value: number) => void
+  setControllerPortDevice: (port: number, device: number) => void
+}
+
+// libretro RETRO_DEVICE_JOYPAD — the "port has a standard gamepad plugged
+// in" device id. Cores auto-connect port 0 but leave port 1+ unconnected
+// until told otherwise, so player 2's input is silently ignored by the
+// core (not by EmulatorJS) unless we connect it explicitly after start.
+const RETRO_DEVICE_JOYPAD = 1
+
+interface EJSEmulator {
+  gameManager: EJSManager
 }
 
 declare global {
@@ -21,29 +34,49 @@ declare global {
     EJS_core?:          string
     EJS_pathtodata?:    string
     EJS_startOnLoaded?: boolean
-    EJS_GameManager?:   EJSManager
+    EJS_emulator?:      EJSEmulator
     EJS_onGameStart?:   () => void
   }
 }
 
 // ── Key name (from game-controller presets) → RetroPad index ─────
+// P1 preset (nes.inf / snes.inf) + P2 preset (nes-p2.inf / snes-p2.inf)
+// use disjoint key sets so both can be mapped in this one global table —
+// player separation itself comes from peerId, not from the key string.
+// P1 keys mirror EmulatorJS's own defaults: arrows = dpad, z = A, x = B,
+// v = select, Enter = start. P2 uses WASD for the dpad.
 const KEY_TO_RETROPAD: Record<string, number> = {
+  // P1 — arrows + z/x/c/f/v/Enter/q/e
   ArrowUp: 4, ArrowDown: 5, ArrowLeft: 6, ArrowRight: 7,
   z: 8,      // A
   x: 0,      // B
-  a: 9,      // X (SNES)
-  s: 1,      // Y (SNES)
-  Shift: 2,  // SELECT
+  c: 9,      // X (SNES)
+  f: 1,      // Y (SNES)
+  v: 2,      // SELECT
   Enter: 3,  // START
   q: 10,     // L (SNES)
-  w: 11,     // R (SNES)
+  e: 11,     // R (SNES)
+  // P2 — WASD + n/m/h/g/u/o/y/p
+  w: 4, a: 6, s: 5, d: 7,
+  n: 8,      // A
+  m: 0,      // B
+  h: 9,      // X (SNES)
+  g: 1,      // Y (SNES)
+  u: 2,      // SELECT
+  o: 3,      // START
+  y: 10,     // L (SNES)
+  p: 11,     // R (SNES)
 }
 
 const KEY_LABEL: Record<string, string> = {
   ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
-  z: 'A', x: 'B', a: 'X', s: 'Y',
-  Shift: 'SEL', Enter: 'STA',
-  q: 'L', w: 'R',
+  z: 'A', x: 'B', c: 'X', f: 'Y',
+  v: 'SEL', Enter: 'STA',
+  q: 'L', e: 'R',
+  w: '↑', a: '←', s: '↓', d: '→',
+  n: 'A', m: 'B', h: 'X', g: 'Y',
+  u: 'SEL', o: 'STA',
+  y: 'L', p: 'R',
 }
 
 function keyToButton(key: string): number | null {
@@ -118,8 +151,7 @@ function EmulatorHost() {
         const btnIdx = keyToButton(key)
         if (btnIdx !== null) {
           try {
-            if (pressed) ejsRef.current?.pressButton(pidx, btnIdx)
-            else         ejsRef.current?.releaseButton(pidx, btnIdx)
+            ejsRef.current?.simulateInput(pidx, btnIdx, pressed ? 1 : 0)
           } catch { /* ejs not ready yet */ }
         }
       }
@@ -153,7 +185,11 @@ function EmulatorHost() {
     window.EJS_pathtodata    = EJS_DATA
     window.EJS_startOnLoaded = true
     window.EJS_onGameStart   = () => {
-      ejsRef.current = window.EJS_GameManager ?? null
+      const gm = window.EJS_emulator?.gameManager ?? null
+      ejsRef.current = gm
+      // Port 0 has a joypad connected by default; port 1 (player 2) needs
+      // to be connected explicitly or the core ignores its input entirely.
+      try { gm?.setControllerPortDevice(1, RETRO_DEVICE_JOYPAD) } catch { /* core doesn't support 2P */ }
       setGameReady(true)
     }
 
@@ -367,6 +403,7 @@ function EmulatorHost() {
               <p className="font-medium text-white">Multiplayer</p>
               <p>→ Tối đa 4 người chơi. Mỗi người scan QR từ điện thoại riêng.</p>
               <p>→ P1 = người join đầu tiên. P2 = thứ hai, v.v.</p>
+              <p>→ Người join đầu chọn layout &quot;NES/SNES — Player 1&quot;, người join thứ hai chọn &quot;— Player 2&quot; để tránh trùng phím.</p>
               <p>→ Game phải hỗ trợ multiplayer (không phải game nào cũng có).</p>
             </div>
           </div>

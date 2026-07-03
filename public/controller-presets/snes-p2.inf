@@ -1,37 +1,53 @@
 [controller]
-name = NES Layout
+name = SNES Layout - P2
 orientation = landscape
 
 [dpad:MOVE]
-x = 3
-y = 30
-size = 36
-up = ArrowUp
-down = ArrowDown
-left = ArrowLeft
-right = ArrowRight
+x = 2
+y = 28
+size = 38
+up = w
+down = s
+left = a
+right = d
 diagonal = true
 hold_interval = 60
 
 [button:A]
 label = A
-key = z
-x = 82
+key = n
+x = 86
 y = 50
-w = 12
-h = 14
+w = 11
+h = 13
 
 [button:B]
 label = B
-key = x
-x = 70
-y = 55
-w = 12
-h = 14
+key = m
+x = 76
+y = 58
+w = 11
+h = 13
+
+[button:X]
+label = X
+key = h
+x = 76
+y = 42
+w = 11
+h = 13
+
+[button:Y]
+label = Y
+key = g
+x = 65
+y = 50
+w = 11
+h = 13
 
 [button:L]
 label = L
-key = q
+key = y
 x = 2
 y = 2
 w = 18
@@ -39,7 +55,7 @@ h = 10
 
 [button:R]
 label = R
-key = e
+key = p
 x = 80
 y = 2
 w = 18
@@ -47,27 +63,43 @@ h = 10
 
 [button:SELECT]
 label = SELECT
-key = v
-x = 38
-y = 80
-w = 16
+key = u
+x = 36
+y = 78
+w = 14
 h = 8
 
 [button:START]
 label = START
-key = Enter
-x = 58
-y = 80
-w = 16
+key = o
+x = 55
+y = 78
+w = 14
 h = 8
 
 ; ── Combos ─────────────────────────────────────────────────────
 ; Each combo is a dedicated button that sends all chord keys simultaneously
 
-[combo:TURBO_AB]
-label = A+B
-x = 82
+[combo:SUPER_JUMP]
+label = Super
+x = 86
 y = 30
-w = 12
+w = 11
 h = 10
-chord = z+x
+chord = w+n
+
+[combo:DASH]
+label = Dash
+x = 65
+y = 30
+w = 11
+h = 10
+chord = m+d
+
+[combo:SPECIAL]
+label = Spec
+x = 36
+y = 62
+w = 14
+h = 10
+chord = g+m+n
