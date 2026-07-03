@@ -20,57 +20,16 @@ interface EJSEmulator {
   gameManager: EJSManager
 }
 
-type EJSControlBinding = { value: string; value2: string | null }
-type EJSDefaultControls = Record<number, Record<number, EJSControlBinding>>
-
 declare global {
   interface Window {
-    EJS_player?:          string
-    EJS_gameUrl?:         string
-    EJS_core?:            string
-    EJS_pathtodata?:      string
-    EJS_startOnLoaded?:   boolean
-    EJS_emulator?:        EJSEmulator
-    EJS_onGameStart?:     () => void
-    EJS_defaultControls?: EJSDefaultControls
+    EJS_player?:        string
+    EJS_gameUrl?:       string
+    EJS_core?:          string
+    EJS_pathtodata?:    string
+    EJS_startOnLoaded?: boolean
+    EJS_emulator?:      EJSEmulator
+    EJS_onGameStart?:   () => void
   }
-}
-
-// ── Default controller scheme registered with EmulatorJS ──────────
-// Without this, EmulatorJS only ever registers a single connected
-// controller — simulateInput(1, ...) for player 2 is silently dropped
-// because the frontend doesn't know a second controller exists.
-// Declaring both player 0 and player 1 here mirrors our own P1/P2 key
-// scheme (see KEY_TO_RETROPAD below) and unlocks routing for player 2.
-const EJS_DEFAULT_CONTROLS: EJSDefaultControls = {
-  0: {
-    0:  { value: 'x',          value2: 'BUTTON_2' },           // B
-    1:  { value: 'f',          value2: 'BUTTON_4' },           // Y
-    2:  { value: 'v',          value2: 'SELECT' },
-    3:  { value: 'enter',      value2: 'START' },
-    4:  { value: 'up arrow',   value2: 'DPAD_UP' },
-    5:  { value: 'down arrow', value2: 'DPAD_DOWN' },
-    6:  { value: 'left arrow', value2: 'DPAD_LEFT' },
-    7:  { value: 'right arrow',value2: 'DPAD_RIGHT' },
-    8:  { value: 'z',          value2: 'BUTTON_1' },           // A
-    9:  { value: 'c',          value2: 'BUTTON_3' },           // X
-    10: { value: 'q',          value2: 'LEFT_TOP_SHOULDER' },
-    11: { value: 'e',          value2: 'RIGHT_TOP_SHOULDER' },
-  },
-  1: {
-    0:  { value: 'm', value2: 'BUTTON_2' },
-    1:  { value: 'g', value2: 'BUTTON_4' },
-    2:  { value: 'u', value2: 'SELECT' },
-    3:  { value: 'o', value2: 'START' },
-    4:  { value: 'w', value2: 'DPAD_UP' },
-    5:  { value: 's', value2: 'DPAD_DOWN' },
-    6:  { value: 'a', value2: 'DPAD_LEFT' },
-    7:  { value: 'd', value2: 'DPAD_RIGHT' },
-    8:  { value: 'n', value2: 'BUTTON_1' },
-    9:  { value: 'h', value2: 'BUTTON_3' },
-    10: { value: 'y', value2: 'LEFT_TOP_SHOULDER' },
-    11: { value: 'p', value2: 'RIGHT_TOP_SHOULDER' },
-  },
 }
 
 // ── Key name (from game-controller presets) → RetroPad index ─────
@@ -213,12 +172,11 @@ function EmulatorHost() {
       scriptRef.current = null
     }
 
-    window.EJS_player          = '#ejs-mount'
-    window.EJS_gameUrl         = romUrl
-    window.EJS_core            = SYSTEMS.find((s) => s.value === system)?.core ?? 'fceumm'
-    window.EJS_pathtodata      = EJS_DATA
-    window.EJS_startOnLoaded   = true
-    window.EJS_defaultControls = EJS_DEFAULT_CONTROLS
+    window.EJS_player        = '#ejs-mount'
+    window.EJS_gameUrl       = romUrl
+    window.EJS_core          = SYSTEMS.find((s) => s.value === system)?.core ?? 'fceumm'
+    window.EJS_pathtodata    = EJS_DATA
+    window.EJS_startOnLoaded = true
     window.EJS_onGameStart   = () => {
       ejsRef.current = window.EJS_emulator?.gameManager ?? null
       setGameReady(true)
@@ -253,7 +211,6 @@ function EmulatorHost() {
     delete window.EJS_player
     delete window.EJS_gameUrl
     delete window.EJS_onGameStart
-    delete window.EJS_defaultControls
     setRomUrl(null)
     setRomName(null)
     setGameReady(false)
