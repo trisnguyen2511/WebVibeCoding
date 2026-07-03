@@ -29,6 +29,22 @@ y = 55
 w = 12
 h = 14
 
+[button:L]
+label = L
+key = q
+x = 2
+y = 2
+w = 18
+h = 10
+
+[button:R]
+label = R
+key = w
+x = 80
+y = 2
+w = 18
+h = 10
+
 [button:SELECT]
 label = SELECT
 key = Shift

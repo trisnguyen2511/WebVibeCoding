@@ -26,11 +26,30 @@ declare global {
   }
 }
 
-// ── RetroPad button index → display label ────────────────────────
-const BTN_LABEL: Record<number, string> = {
-  0: 'B', 1: 'Y', 2: 'SEL', 3: 'STA',
-  4: '↑', 5: '↓', 6: '←',  7: '→',
-  8: 'A', 9: 'X', 10: 'L',  11: 'R',
+// ── Key name (from game-controller presets) → RetroPad index ─────
+const KEY_TO_RETROPAD: Record<string, number> = {
+  ArrowUp: 4, ArrowDown: 5, ArrowLeft: 6, ArrowRight: 7,
+  z: 8,      // A
+  x: 0,      // B
+  a: 9,      // X (SNES)
+  s: 1,      // Y (SNES)
+  Shift: 2,  // SELECT
+  Enter: 3,  // START
+  q: 10,     // L (SNES)
+  w: 11,     // R (SNES)
+}
+
+const KEY_LABEL: Record<string, string> = {
+  ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
+  z: 'A', x: 'B', a: 'X', s: 'Y',
+  Shift: 'SEL', Enter: 'STA',
+  q: 'L', w: 'R',
+}
+
+function keyToButton(key: string): number | null {
+  if (key in KEY_TO_RETROPAD) return KEY_TO_RETROPAD[key]
+  const n = parseInt(key, 10)
+  return !isNaN(n) && n >= 0 && n <= 11 ? n : null
 }
 
 // ── Supported systems ────────────────────────────────────────────
@@ -83,7 +102,7 @@ function EmulatorHost() {
   const scriptRef = useRef<HTMLScriptElement | null>(null)
 
   const controllerUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/tools/emulator/controller?room=${roomId}`
+    ? `${window.location.origin}/tools/game-controller?room=${roomId}`
     : ''
 
   // ── Wire controller inputs → EJS button API ──────────────────
@@ -96,8 +115,8 @@ function EmulatorHost() {
       const pidx = player.playerIndex
       for (const [key, pressed] of Object.entries(btns)) {
         if (pressed === prevBtns[key]) continue
-        const btnIdx = parseInt(key, 10)
-        if (!isNaN(btnIdx)) {
+        const btnIdx = keyToButton(key)
+        if (btnIdx !== null) {
           try {
             if (pressed) ejsRef.current?.pressButton(pidx, btnIdx)
             else         ejsRef.current?.releaseButton(pidx, btnIdx)
@@ -317,7 +336,7 @@ function EmulatorHost() {
                   const btns   = player
                     ? Object.entries(playerInputs[player.peerId] ?? {})
                         .filter(([, v]) => v)
-                        .map(([k]) => BTN_LABEL[parseInt(k, 10)] ?? k)
+                        .map(([k]) => KEY_LABEL[k] ?? k)
                     : []
                   return (
                     <div
