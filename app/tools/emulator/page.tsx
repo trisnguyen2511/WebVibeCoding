@@ -30,19 +30,21 @@ declare global {
 // P1 preset (nes.inf / snes.inf) + P2 preset (nes-p2.inf / snes-p2.inf)
 // use disjoint key sets so both can be mapped in this one global table —
 // player separation itself comes from peerId, not from the key string.
+// P1 keys mirror EmulatorJS's own defaults: arrows = dpad, z = A, x = B,
+// v = select, Enter = start. P2 uses WASD for the dpad.
 const KEY_TO_RETROPAD: Record<string, number> = {
-  // P1
+  // P1 — arrows + z/x/c/f/v/Enter/q/e
   ArrowUp: 4, ArrowDown: 5, ArrowLeft: 6, ArrowRight: 7,
   z: 8,      // A
   x: 0,      // B
-  a: 9,      // X (SNES)
-  s: 1,      // Y (SNES)
-  Shift: 2,  // SELECT
+  c: 9,      // X (SNES)
+  f: 1,      // Y (SNES)
+  v: 2,      // SELECT
   Enter: 3,  // START
   q: 10,     // L (SNES)
-  w: 11,     // R (SNES)
-  // P2
-  i: 4, k: 5, j: 6, l: 7,
+  e: 11,     // R (SNES)
+  // P2 — WASD + n/m/h/g/u/o/y/p
+  w: 4, a: 6, s: 5, d: 7,
   n: 8,      // A
   m: 0,      // B
   h: 9,      // X (SNES)
@@ -55,10 +57,10 @@ const KEY_TO_RETROPAD: Record<string, number> = {
 
 const KEY_LABEL: Record<string, string> = {
   ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
-  z: 'A', x: 'B', a: 'X', s: 'Y',
-  Shift: 'SEL', Enter: 'STA',
-  q: 'L', w: 'R',
-  i: '↑', k: '↓', j: '←', l: '→',
+  z: 'A', x: 'B', c: 'X', f: 'Y',
+  v: 'SEL', Enter: 'STA',
+  q: 'L', e: 'R',
+  w: '↑', a: '←', s: '↓', d: '→',
   n: 'A', m: 'B', h: 'X', g: 'Y',
   u: 'SEL', o: 'STA',
   y: 'L', p: 'R',

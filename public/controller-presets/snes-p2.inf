@@ -6,10 +6,10 @@ orientation = landscape
 x = 2
 y = 28
 size = 38
-up = i
-down = k
-left = j
-right = l
+up = w
+down = s
+left = a
+right = d
 diagonal = true
 hold_interval = 60
 
@@ -86,7 +86,7 @@ x = 86
 y = 30
 w = 11
 h = 10
-chord = i+n
+chord = w+n
 
 [combo:DASH]
 label = Dash
@@ -94,7 +94,7 @@ x = 65
 y = 30
 w = 11
 h = 10
-chord = m+l
+chord = m+d
 
 [combo:SPECIAL]
 label = Spec
