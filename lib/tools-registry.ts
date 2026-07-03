@@ -93,4 +93,11 @@ export const tools: Tool[] = [
     description: 'Vòng quay may mắn — preset đa dạng, tùy chỉnh lựa chọn, lịch sử kết quả',
     category: 'utility',
   },
+  {
+    name: 'Emulator',
+    slug: 'emulator',
+    icon: '🕹️',
+    description: 'Nintendo emulator trên web — NES, SNES, GBA, N64; điện thoại làm controller, multiplayer 4P',
+    category: 'game',
+  },
 ]
