@@ -1,0 +1,97 @@
+[controller]
+name = Arcade Fighter - P2
+orientation = landscape
+
+[dpad:MOVE]
+x = 3
+y = 32
+size = 36
+up = w
+down = s
+left = a
+right = d
+diagonal = true
+hold_interval = 50
+
+[button:LP]
+label = LP
+key = g
+x = 42
+y = 4
+w = 18
+h = 24
+
+[button:MP]
+label = MP
+key = h
+x = 61
+y = 4
+w = 18
+h = 24
+
+[button:HP]
+label = HP
+key = y
+x = 80
+y = 4
+w = 18
+h = 24
+
+[button:LK]
+label = LK
+key = m
+x = 42
+y = 30
+w = 18
+h = 24
+
+[button:MK]
+label = MK
+key = n
+x = 61
+y = 30
+w = 18
+h = 24
+
+[button:HK]
+label = HK
+key = p
+x = 80
+y = 30
+w = 18
+h = 24
+
+[button:COIN]
+label = COIN
+key = u
+x = 38
+y = 80
+w = 16
+h = 8
+
+[button:START]
+label = START
+key = o
+x = 58
+y = 80
+w = 16
+h = 8
+
+; ── Combos ─────────────────────────────────────────────────────
+; Bấm đồng thời cả 3 đấm / cả 3 đá — combo phổ biến trong game CPS/NeoGeo
+
+[combo:3P]
+label = 3P
+x = 42
+y = 58
+w = 27
+h = 13
+chord = g+h+y
+
+[combo:3K]
+label = 3K
+x = 71
+y = 58
+w = 27
+h = 13
+chord = m+n+p

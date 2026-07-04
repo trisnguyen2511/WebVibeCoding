@@ -23,6 +23,26 @@ const PLAYER_COLORS = [
 
 type HostMode = 'browser' | 'agent'
 
+// ── Cross-browser Fullscreen API (vendor prefixes for older WebViews) ──
+type FullscreenElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void>
+  mozRequestFullScreen?: () => Promise<void>
+  msRequestFullscreen?: () => Promise<void>
+}
+type FullscreenDocument = Document & {
+  webkitFullscreenElement?: Element | null
+  webkitExitFullscreen?: () => Promise<void>
+  mozFullScreenElement?: Element | null
+  mozCancelFullScreen?: () => Promise<void>
+  msFullscreenElement?: Element | null
+  msExitFullscreen?: () => Promise<void>
+}
+
+function getFullscreenElement(): Element | null {
+  const doc = document as FullscreenDocument
+  return document.fullscreenElement ?? doc.webkitFullscreenElement ?? doc.mozFullScreenElement ?? doc.msFullscreenElement ?? null
+}
+
 function generateRoomId() {
   return Math.random().toString(36).slice(2, 8).toUpperCase()
 }
@@ -145,7 +165,8 @@ function DpadControl({
       onPointerMove={handlePointerMove}
       onPointerUp={handleUp}
       onPointerCancel={handleUp}
-      className="select-none border border-[#1A1A2E] bg-[#0F0F1A]/90"
+      onContextMenu={(e) => e.preventDefault()}
+      className="no-callout select-none border border-[#1A1A2E] bg-[#0F0F1A]/90"
     >
       {/* Cross groove lines */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -382,7 +403,7 @@ function HostView({ roomId }: { roomId: string }) {
 
 // ── Phone: Layout Setup ──────────────────────────────────────────
 function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }) {
-  type Preset = 'nes' | 'nes-p2' | 'snes' | 'snes-p2' | 'wasd' | 'arcade-p1' | 'arcade-p2' | 'arcade-p3' | 'arcade-p4'
+  type Preset = 'nes' | 'nes-p2' | 'snes' | 'snes-p2' | 'wasd' | 'arcade-p1' | 'arcade-p2' | 'arcade-p3' | 'arcade-p4' | 'fbneo-p1' | 'fbneo-p2' | 'fbneo-p3' | 'fbneo-p4'
   const [preset, setPreset] = useState<Preset>('nes')
   const [config, setConfig] = useState<ControllerConfig | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
@@ -448,6 +469,12 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
                 <option value="arcade-p3">Arcade P3 (TFGH + Y/R/E/Q)</option>
                 <option value="arcade-p4">Arcade P4 (IBNO + P/M/,/.)</option>
               </optgroup>
+              <optgroup label="── Arcade Fighter (CP1/CP2/NeoGeo) ──">
+                <option value="fbneo-p1">Arcade Fighter — Player 1</option>
+                <option value="fbneo-p2">Arcade Fighter — Player 2</option>
+                <option value="fbneo-p3">Arcade Fighter — Player 3</option>
+                <option value="fbneo-p4">Arcade Fighter — Player 4</option>
+              </optgroup>
             </select>
           </div>
         )}
@@ -488,6 +515,7 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
   const [playerIndex, setPlayerIndex] = useState<number | null>(null)
   const [status, setStatus] = useState<'connecting' | 'ready' | 'disconnected'>('connecting')
   const [activeCombo, setActiveCombo] = useState<string | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const connRef = useRef<{
     sendInput: (m: Omit<InputMessage, 'peerId'>) => void
     disconnect: () => void
@@ -496,6 +524,25 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
   const holdTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const holdIntervalsRef = useRef<Record<string, ReturnType<typeof setInterval>>>({})
   const comboFlashRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!getFullscreenElement())
+    const events = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange']
+    events.forEach((ev) => document.addEventListener(ev, onFsChange))
+    return () => events.forEach((ev) => document.removeEventListener(ev, onFsChange))
+  }, [])
+
+  const toggleFullscreen = () => {
+    const el = document.documentElement as FullscreenElement
+    if (!getFullscreenElement()) {
+      const request = el.requestFullscreen ?? el.webkitRequestFullscreen ?? el.mozRequestFullScreen ?? el.msRequestFullscreen
+      request?.call(el)?.catch?.(() => {})
+    } else {
+      const doc = document as FullscreenDocument
+      const exit = document.exitFullscreen ?? doc.webkitExitFullscreen ?? doc.mozCancelFullScreen ?? doc.msExitFullscreen
+      exit?.call(document)?.catch?.(() => {})
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -526,7 +573,7 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
   const onDown = (id: string) => {
     const btn = config.buttons[id]
     sendKey(btn.key, 'pressed')
-    if (navigator.vibrate) navigator.vibrate(20)
+    if (navigator.vibrate) navigator.vibrate(6)
 
     if (btn.hold) {
       holdTimersRef.current[id] = setTimeout(() => {
@@ -549,7 +596,7 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
   const onComboDown = (comboId: string) => {
     const combo = config.combos[comboId]
     for (const key of combo.chord) sendKey(key, 'pressed')
-    if (navigator.vibrate) navigator.vibrate([30, 15, 30])
+    if (navigator.vibrate) navigator.vibrate(10)
     if (comboFlashRef.current) clearTimeout(comboFlashRef.current)
     setActiveCombo(combo.label)
     comboFlashRef.current = setTimeout(() => setActiveCombo(null), 800)
@@ -569,11 +616,23 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
     `Player ${(playerIndex ?? 0) + 1}`
 
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-[#08080E]" style={{ touchAction: 'none' }}>
+    <div
+      className="no-callout relative h-[100dvh] w-full overflow-hidden bg-[#08080E]"
+      style={{ touchAction: 'none' }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       {/* Player badge */}
       <div className={`absolute left-2 top-2 z-10 rounded-full border px-3 py-1 text-xs font-bold ${color.badge}`}>
         {badgeText}
       </div>
+
+      {/* Fullscreen toggle */}
+      <button
+        onClick={toggleFullscreen}
+        className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[#1A1A2E] bg-[#0F0F1A]/90 text-base text-white"
+      >
+        {isFullscreen ? '⤡' : '⛶'}
+      </button>
 
       {/* Combo flash */}
       {activeCombo && (

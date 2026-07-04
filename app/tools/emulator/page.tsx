@@ -1,6 +1,7 @@
 'use client'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
+import JSZip from 'jszip'
 import { ToolShell } from '@/components/tool-shell'
 import { useGameController } from '@/hooks/use-game-controller'
 
@@ -31,20 +32,26 @@ declare global {
   interface Window {
     EJS_player?:        string
     EJS_gameUrl?:       string
+    EJS_gameName?:      string
     EJS_core?:          string
     EJS_pathtodata?:    string
     EJS_startOnLoaded?: boolean
+    EJS_biosUrl?:       string
     EJS_emulator?:      EJSEmulator
     EJS_onGameStart?:   () => void
   }
 }
 
 // ── Key name (from game-controller presets) → RetroPad index ─────
-// P1 preset (nes.inf / snes.inf) + P2 preset (nes-p2.inf / snes-p2.inf)
-// use disjoint key sets so both can be mapped in this one global table —
-// player separation itself comes from peerId, not from the key string.
-// P1 keys mirror EmulatorJS's own defaults: arrows = dpad, z = A, x = B,
-// v = select, Enter = start. P2 uses WASD for the dpad.
+// P1 (nes.inf / snes.inf / fbneo-p1.inf) + P2 (nes-p2.inf / snes-p2.inf /
+// fbneo-p2.inf) use disjoint single-letter key sets so both can be mapped
+// in this one global table — player separation itself comes from peerId,
+// not from the key string. P1 keys mirror EmulatorJS's own defaults:
+// arrows = dpad, z = A, x = B, v = select, Enter = start. P2 uses WASD
+// for the dpad. P3/P4 (fbneo-p3.inf / fbneo-p4.inf, arcade-only so far)
+// use namespaced tokens instead of single letters — there's no "real
+// keyboard" convention to mirror for a 3rd/4th player, so plain unique
+// strings avoid any risk of colliding with P1/P2's letters.
 const KEY_TO_RETROPAD: Record<string, number> = {
   // P1 — arrows + z/x/c/f/v/Enter/q/e
   ArrowUp: 4, ArrowDown: 5, ArrowLeft: 6, ArrowRight: 7,
@@ -66,6 +73,14 @@ const KEY_TO_RETROPAD: Record<string, number> = {
   o: 3,      // START
   y: 10,     // L (SNES)
   p: 11,     // R (SNES)
+  // P3 — namespaced tokens (fbneo-p3.inf)
+  p3_up: 4, p3_down: 5, p3_left: 6, p3_right: 7,
+  p3_mk: 8, p3_lk: 0, p3_mp: 9, p3_lp: 1,
+  p3_hp: 10, p3_hk: 11, p3_coin: 2, p3_start: 3,
+  // P4 — namespaced tokens (fbneo-p4.inf)
+  p4_up: 4, p4_down: 5, p4_left: 6, p4_right: 7,
+  p4_mk: 8, p4_lk: 0, p4_mp: 9, p4_lp: 1,
+  p4_hp: 10, p4_hk: 11, p4_coin: 2, p4_start: 3,
 }
 
 const KEY_LABEL: Record<string, string> = {
@@ -77,6 +92,12 @@ const KEY_LABEL: Record<string, string> = {
   n: 'A', m: 'B', h: 'X', g: 'Y',
   u: 'SEL', o: 'STA',
   y: 'L', p: 'R',
+  p3_up: '↑', p3_down: '↓', p3_left: '←', p3_right: '→',
+  p3_lp: 'LP', p3_mp: 'MP', p3_hp: 'HP', p3_lk: 'LK', p3_mk: 'MK', p3_hk: 'HK',
+  p3_coin: 'COIN', p3_start: 'STA',
+  p4_up: '↑', p4_down: '↓', p4_left: '←', p4_right: '→',
+  p4_lp: 'LP', p4_mp: 'MP', p4_hp: 'HP', p4_lk: 'LK', p4_mk: 'MK', p4_hk: 'HK',
+  p4_coin: 'COIN', p4_start: 'STA',
 }
 
 function keyToButton(key: string): number | null {
@@ -86,14 +107,15 @@ function keyToButton(key: string): number | null {
 }
 
 // ── Supported systems ────────────────────────────────────────────
-type System = 'nes' | 'snes' | 'gba' | 'gbc' | 'n64'
+type System = 'nes' | 'snes' | 'gba' | 'gbc' | 'n64' | 'arcade'
 
 const SYSTEMS: { value: System; label: string; exts: string; core: string }[] = [
-  { value: 'nes',  label: 'NES',       exts: '.nes',      core: 'fceumm'           },
-  { value: 'snes', label: 'SNES',      exts: '.sfc .smc', core: 'snes9x'           },
-  { value: 'gba',  label: 'GBA',       exts: '.gba',      core: 'mgba'             },
-  { value: 'gbc',  label: 'Game Boy',  exts: '.gbc .gb',  core: 'gambatte'         },
-  { value: 'n64',  label: 'N64',       exts: '.n64 .z64', core: 'mupen64plus_next' },
+  { value: 'nes',    label: 'NES',                     exts: '.nes',      core: 'fceumm'           },
+  { value: 'snes',   label: 'SNES',                    exts: '.sfc .smc', core: 'snes9x'           },
+  { value: 'gba',    label: 'GBA',                     exts: '.gba',      core: 'mgba'             },
+  { value: 'gbc',    label: 'Game Boy',                exts: '.gbc .gb',  core: 'gambatte'         },
+  { value: 'n64',    label: 'N64',                     exts: '.n64 .z64', core: 'mupen64plus_next' },
+  { value: 'arcade', label: 'Arcade (CP1/CP2/NeoGeo)', exts: '.zip',      core: 'fbneo'            },
 ]
 
 // ── Free legal homebrew ROMs ─────────────────────────────────────
@@ -122,17 +144,24 @@ function generateRoomId() {
 // ── Host page ────────────────────────────────────────────────────
 function EmulatorHost() {
   const [roomId]  = useState(generateRoomId)
-  const { players, playerInputs } = useGameController(roomId)
+  const { players, playerInputs, kickPlayer } = useGameController(roomId)
 
   const [system,    setSystem]    = useState<System>('nes')
   const [romUrl,    setRomUrl]    = useState<string | null>(null)
   const [romName,   setRomName]   = useState<string | null>(null)
+  const [biosUrl,   setBiosUrl]   = useState<string | null>(null)
+  const [biosName,  setBiosName]  = useState<string | null>(null)
+  const [wrapZip,   setWrapZip]   = useState(false)
   const [gameReady, setGameReady] = useState(false)
+  const [romUrlInput, setRomUrlInput] = useState('')
+  const [urlLoading,  setUrlLoading]  = useState(false)
+  const [urlError,    setUrlError]    = useState<string | null>(null)
 
-  const ejsRef    = useRef<EJSManager | null>(null)
-  const prevRef   = useRef<Record<string, Record<string, boolean>>>({})
-  const blobRef   = useRef<string | null>(null)
-  const scriptRef = useRef<HTMLScriptElement | null>(null)
+  const ejsRef     = useRef<EJSManager | null>(null)
+  const prevRef    = useRef<Record<string, Record<string, boolean>>>({})
+  const blobRef    = useRef<string | null>(null)
+  const biosBlobRef = useRef<string | null>(null)
+  const scriptRef  = useRef<HTMLScriptElement | null>(null)
 
   const controllerUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/tools/game-controller?room=${roomId}`
@@ -160,14 +189,61 @@ function EmulatorHost() {
   }, [playerInputs, players])
 
   // ── Handle ROM file pick ──────────────────────────────────────
-  const handleRomFile = (file: File) => {
+  const handleRomFile = async (file: File) => {
     if (blobRef.current) URL.revokeObjectURL(blobRef.current)
-    const url = URL.createObjectURL(file)
-    blobRef.current = url
-    setRomUrl(url)
     setRomName(file.name)
     setGameReady(false)
     ejsRef.current = null
+
+    // Some EmulatorJS builds auto-extract a .zip passed as EJS_gameUrl
+    // before handing it to the core, which can corrupt the archive
+    // structure FBNeo's MAME-derived loader expects to open itself.
+    // Wrapping in one more outer zip is a reported workaround for that —
+    // but it's unconfirmed for this specific build, so it's opt-in via
+    // the checkbox rather than always-on, letting you test both ways.
+    let uploadBlob: Blob = file
+    if (system === 'arcade' && wrapZip && file.name.toLowerCase().endsWith('.zip')) {
+      const wrapper = new JSZip()
+      wrapper.file(file.name, file)
+      uploadBlob = await wrapper.generateAsync({ type: 'blob', compression: 'STORE' })
+    }
+
+    const url = URL.createObjectURL(uploadBlob)
+    blobRef.current = url
+    setRomUrl(url)
+  }
+
+  // ── Import ROM directly from a URL (skips the manual download step) ──
+  // Only works if the host serves the file with CORS allowed for this
+  // origin — most ROM sites don't, so this is best-effort with a clear
+  // error message rather than a guaranteed feature.
+  const handleRomUrlImport = async () => {
+    const trimmed = romUrlInput.trim()
+    if (!trimmed) return
+    setUrlError(null)
+    setUrlLoading(true)
+    try {
+      const res = await fetch(trimmed)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      const nameFromUrl = decodeURIComponent(trimmed.split('/').pop()?.split(/[?#]/)[0] || '')
+      const name = nameFromUrl || 'rom' + (SYSTEMS.find((s) => s.value === system)?.exts.split(' ')[0] ?? '')
+      await handleRomFile(new File([blob], name, { type: blob.type }))
+      setRomUrlInput('')
+    } catch {
+      setUrlError('Không tải được ROM từ link này — thường do server không cho phép CORS. Thử tải file về máy rồi upload thủ công.')
+    } finally {
+      setUrlLoading(false)
+    }
+  }
+
+  // ── Handle BIOS file pick (arcade only, e.g. neogeo.zip) ───────
+  const handleBiosFile = (file: File) => {
+    if (biosBlobRef.current) URL.revokeObjectURL(biosBlobRef.current)
+    const url = URL.createObjectURL(file)
+    biosBlobRef.current = url
+    setBiosUrl(url)
+    setBiosName(file.name)
   }
 
   // ── Bootstrap EmulatorJS when romUrl is set ───────────────────
@@ -179,17 +255,32 @@ function EmulatorHost() {
       scriptRef.current = null
     }
 
+    // blob: URLs carry no filename at all (just an opaque id) — FBNeo needs
+    // the real filename (its MAME/FBNeo "short name", e.g. "dino.zip") to
+    // mount the romset where its own virtual-filesystem lookup expects it.
+    // EJS_gameName is EmulatorJS's documented way to supply that name when
+    // the URL itself can't. Keep the extension: dropping it got the driver
+    // recognized ("dino" is a known game) but the core then reported the
+    // archive "not found in your paths" — it's searching for "dino.zip"
+    // specifically, not the extension-less name.
     window.EJS_player        = '#ejs-mount'
     window.EJS_gameUrl       = romUrl
+    window.EJS_gameName      = romName ?? undefined
     window.EJS_core          = SYSTEMS.find((s) => s.value === system)?.core ?? 'fceumm'
     window.EJS_pathtodata    = EJS_DATA
     window.EJS_startOnLoaded = true
+    if (biosUrl) window.EJS_biosUrl = biosUrl
+    else delete window.EJS_biosUrl
     window.EJS_onGameStart   = () => {
       const gm = window.EJS_emulator?.gameManager ?? null
       ejsRef.current = gm
-      // Port 0 has a joypad connected by default; port 1 (player 2) needs
-      // to be connected explicitly or the core ignores its input entirely.
-      try { gm?.setControllerPortDevice(1, RETRO_DEVICE_JOYPAD) } catch { /* core doesn't support 2P */ }
+      // Port 0 has a joypad connected by default; ports 1-3 (players 2-4)
+      // need to be connected explicitly or the core ignores their input
+      // entirely. Harmless to connect all 3 even for 2-player-max systems
+      // like NES/SNES — the extra ports just go unused.
+      for (const port of [1, 2, 3]) {
+        try { gm?.setControllerPortDevice(port, RETRO_DEVICE_JOYPAD) } catch { /* core doesn't support this many players */ }
+      }
       setGameReady(true)
     }
 
@@ -205,11 +296,12 @@ function EmulatorHost() {
         scriptRef.current = null
       }
     }
-  }, [romUrl, system])
+  }, [romUrl, romName, system, biosUrl])
 
-  // Revoke blob on unmount
+  // Revoke blobs on unmount
   useEffect(() => () => {
     if (blobRef.current) URL.revokeObjectURL(blobRef.current)
+    if (biosBlobRef.current) URL.revokeObjectURL(biosBlobRef.current)
   }, [])
 
   const resetRom = () => {
@@ -219,11 +311,16 @@ function EmulatorHost() {
       scriptRef.current = null
     }
     if (blobRef.current) { URL.revokeObjectURL(blobRef.current); blobRef.current = null }
+    if (biosBlobRef.current) { URL.revokeObjectURL(biosBlobRef.current); biosBlobRef.current = null }
     delete window.EJS_player
     delete window.EJS_gameUrl
+    delete window.EJS_gameName
     delete window.EJS_onGameStart
+    delete window.EJS_biosUrl
     setRomUrl(null)
     setRomName(null)
+    setBiosUrl(null)
+    setBiosName(null)
     setGameReady(false)
   }
 
@@ -270,37 +367,133 @@ function EmulatorHost() {
                     </div>
                     <input
                       type="file"
-                      accept=".nes,.sfc,.smc,.gba,.gbc,.gb,.n64,.z64,.v64"
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRomFile(f) }}
+                      accept=".nes,.sfc,.smc,.gba,.gbc,.gb,.n64,.z64,.v64,.zip"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleRomFile(f) }}
                       className="hidden"
                     />
                   </label>
+
+                  {/* Import ROM from URL — skips downloading to disk first */}
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="font-mono text-xs text-muted">hoặc dán link ROM</span>
+                    <div className="h-px flex-1 bg-border" />
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      type="url"
+                      value={romUrlInput}
+                      onChange={(e) => setRomUrlInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !urlLoading && void handleRomUrlImport()}
+                      placeholder="https://example.com/game.zip"
+                      className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs text-white outline-none placeholder:text-muted focus:border-accent/40"
+                    />
+                    <button
+                      onClick={() => void handleRomUrlImport()}
+                      disabled={urlLoading || !romUrlInput.trim()}
+                      className="shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-xs font-medium text-accent-soft transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {urlLoading ? 'Đang tải...' : 'Import'}
+                    </button>
+                  </div>
+                  {urlError && (
+                    <p className="mt-2 text-xs text-red-400">{urlError}</p>
+                  )}
+                  <p className="mt-2 text-xs text-muted">
+                    Chỉ chạy được nếu server host file cho phép CORS — nhiều trang ROM không hỗ trợ,
+                    lúc đó vẫn cần tải về máy rồi upload thủ công như trên.
+                  </p>
                 </div>
 
-                {/* Free homebrew list */}
-                <div>
-                  <p className="mb-2 font-mono text-xs uppercase tracking-widest text-muted">
-                    ROM miễn phí hợp pháp — tải về rồi upload
-                  </p>
-                  <div className="space-y-1.5">
-                    {FREE_ROMS.map((r) => (
-                      <a
-                        key={r.name}
-                        href={r.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 text-xs transition-colors hover:border-accent/30 hover:bg-accent/5"
-                      >
-                        <span className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-xs ${system === r.system ? 'border border-accent/40 bg-accent/10 text-accent-soft' : 'border border-border text-muted'}`}>
-                          {r.system.toUpperCase()}
-                        </span>
-                        <span className="font-medium text-white">{r.name}</span>
-                        <span className="hidden flex-1 text-muted sm:block">{r.desc}</span>
-                        <span className="ml-auto shrink-0 text-accent-soft">↗</span>
-                      </a>
-                    ))}
+                {/* Arcade troubleshooting: "Romset is unknown" ────────── */}
+                {system === 'arcade' && (
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
+                    <p className="text-xs font-medium text-amber-300">
+                      Nếu báo &quot;Romset is unknown&quot;
+                    </p>
+                    <p className="text-xs text-muted">
+                      1. App tự truyền tên file thật cho FBNeo (kể cả khi upload qua blob) — chỉ cần
+                      đặt tên file .zip đúng mã ngắn nội bộ (vd &quot;dino.zip&quot; cho Cadillacs and
+                      Dinosaurs), không phải tên mô tả. Tra đúng mã (short name) trong danh sách
+                      romset FBNeo/MAME rồi đổi tên trước khi chọn file.
+                    </p>
+                    <p className="text-xs text-muted">
+                      2. Nếu đã đúng tên mà vẫn lỗi, thử bật/tắt tùy chọn bọc zip bên dưới — chưa chắc
+                      chiều nào đúng với bản FBNeo đang chạy, cần thử cả 2.
+                    </p>
+                    <label className="flex items-center gap-2 pt-1 text-xs text-white">
+                      <input
+                        type="checkbox"
+                        checked={wrapZip}
+                        onChange={(e) => setWrapZip(e.target.checked)}
+                        className="h-3.5 w-3.5 accent-accent"
+                      />
+                      Bọc ROM trong 1 lớp zip nữa trước khi upload
+                    </label>
                   </div>
-                </div>
+                )}
+
+                {/* BIOS upload (arcade only — e.g. Neo Geo needs neogeo.zip) */}
+                {system === 'arcade' && (
+                  <div>
+                    <p className="mb-2 font-mono text-xs uppercase tracking-widest text-muted">
+                      BIOS (tùy chọn — Neo Geo cần neogeo.zip)
+                    </p>
+                    {biosName ? (
+                      <div className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3">
+                        <span className="font-mono text-xs text-white truncate">{biosName}</span>
+                        <button
+                          onClick={() => {
+                            if (biosBlobRef.current) URL.revokeObjectURL(biosBlobRef.current)
+                            biosBlobRef.current = null
+                            setBiosUrl(null)
+                            setBiosName(null)
+                          }}
+                          className="text-xs text-muted transition-colors hover:text-white"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-background px-4 py-3 text-sm text-muted transition-colors hover:border-accent/40 hover:text-white">
+                        📁 Chọn file BIOS (.zip)
+                        <input
+                          type="file"
+                          accept=".zip"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleBiosFile(f) }}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+                )}
+
+                {/* Free homebrew list — no legal free ROMs exist for arcade */}
+                {system !== 'arcade' && (
+                  <div>
+                    <p className="mb-2 font-mono text-xs uppercase tracking-widest text-muted">
+                      ROM miễn phí hợp pháp — tải về rồi upload
+                    </p>
+                    <div className="space-y-1.5">
+                      {FREE_ROMS.map((r) => (
+                        <a
+                          key={r.name}
+                          href={r.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 text-xs transition-colors hover:border-accent/30 hover:bg-accent/5"
+                        >
+                          <span className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-xs ${system === r.system ? 'border border-accent/40 bg-accent/10 text-accent-soft' : 'border border-border text-muted'}`}>
+                            {r.system.toUpperCase()}
+                          </span>
+                          <span className="font-medium text-white">{r.name}</span>
+                          <span className="hidden flex-1 text-muted sm:block">{r.desc}</span>
+                          <span className="ml-auto shrink-0 text-accent-soft">↗</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="overflow-hidden rounded-xl border border-border bg-black">
@@ -377,8 +570,17 @@ function EmulatorHost() {
                   return (
                     <div
                       key={i}
-                      className={`rounded-xl border p-2.5 text-center transition-all ${player ? BADGE_CLS[i] : 'border-border bg-background opacity-40'}`}
+                      className={`group relative rounded-xl border p-2.5 text-center transition-all ${player ? BADGE_CLS[i] : 'border-border bg-background opacity-40'}`}
                     >
+                      {player && (
+                        <button
+                          onClick={() => kickPlayer(player.peerId)}
+                          title="Ngắt kết nối"
+                          className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-xs text-muted hover:border-red-500 hover:text-red-400 group-hover:flex"
+                        >
+                          ✕
+                        </button>
+                      )}
                       <div className="flex items-center justify-center gap-1">
                         <span className={`h-2 w-2 rounded-full ${player ? DOT_CLS[i] : 'bg-muted/30'}`} />
                         <span className="text-xs font-bold">P{i + 1}</span>
@@ -395,15 +597,19 @@ function EmulatorHost() {
             {/* Legal note */}
             <div className="rounded-xl border border-border/50 bg-surface/60 p-3 space-y-1 text-xs text-muted">
               <p className="font-medium text-white">Lưu ý pháp lý</p>
-              <p>Phần mềm emulator hoàn toàn hợp pháp. ROM do bạn tự cung cấp — không lưu trên server, không upload lên internet.</p>
+              <p>Phần mềm emulator hoàn toàn hợp pháp. ROM (và BIOS) do bạn tự cung cấp — không lưu trên server, không upload lên internet.</p>
+              {system === 'arcade' && (
+                <p>Khác với NES/GBA, game Arcade (CP1/CP2/Neo Geo) hầu hết là thương mại có bản quyền — không có homebrew miễn phí hợp pháp tương đương, bạn tự chịu trách nhiệm về nguồn ROM.</p>
+              )}
             </div>
 
             {/* Multiplayer tips */}
             <div className="rounded-xl border border-border/50 bg-surface/60 p-3 space-y-1.5 text-xs text-muted">
               <p className="font-medium text-white">Multiplayer</p>
               <p>→ Tối đa 4 người chơi. Mỗi người scan QR từ điện thoại riêng.</p>
-              <p>→ P1 = người join đầu tiên. P2 = thứ hai, v.v.</p>
-              <p>→ Người join đầu chọn layout &quot;NES/SNES — Player 1&quot;, người join thứ hai chọn &quot;— Player 2&quot; để tránh trùng phím.</p>
+              <p>→ P1 = người join đầu tiên. P2, P3, P4 = lần lượt tiếp theo.</p>
+              <p>→ NES/SNES: chọn layout &quot;— Player 1&quot; / &quot;— Player 2&quot; đúng thứ tự join.</p>
+              <p>→ Arcade: chọn layout &quot;Arcade Fighter — Player 1/2/3/4&quot; đủ 6 nút đấm/đá + combo 3P/3K.</p>
               <p>→ Game phải hỗ trợ multiplayer (không phải game nào cũng có).</p>
             </div>
           </div>

@@ -1,4 +1,4 @@
-export type ToolCategory = 'utility' | 'crypto' | 'game' | 'media' | 'dev' | 'productivity'
+export type ToolCategory = 'utility' | 'crypto' | 'game' | 'media' | 'dev' | 'productivity' | 'social'
 
 export interface Tool {
   name: string
@@ -99,5 +99,12 @@ export const tools: Tool[] = [
     icon: '🕹️',
     description: 'Nintendo emulator trên web — NES, SNES, GBA, N64; điện thoại làm controller, multiplayer 4P',
     category: 'game',
+  },
+  {
+    name: 'Private Chat',
+    slug: 'private-chat',
+    icon: '💬',
+    description: 'PIN-based private chat with push notifications',
+    category: 'social',
   },
 ]
