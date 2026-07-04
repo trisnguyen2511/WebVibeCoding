@@ -8,7 +8,45 @@ const SESSION_KEY = 'wv-chat-session'
 const DEVICE_KEY = 'wv-chat-device-id'
 
 type Session = { pin: string; roomId: string; roomName: string; nickname: string }
-type ChatMessage = { id: string; device_id: string; nickname: string; content: string; created_at: string }
+type ChatMessage = {
+  id: string
+  device_id: string
+  nickname: string
+  content: string | null
+  image_url?: string | null
+  created_at: string
+}
+
+const MAX_IMAGE_DIMENSION = 1600
+const IMAGE_QUALITY = 0.75
+
+function compressImageToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('read failed'))
+    reader.onload = () => {
+      const img = new Image()
+      img.onerror = () => reject(new Error('decode failed'))
+      img.onload = () => {
+        let { width, height } = img
+        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+          const scale = MAX_IMAGE_DIMENSION / Math.max(width, height)
+          width = Math.round(width * scale)
+          height = Math.round(height * scale)
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { reject(new Error('canvas unsupported')); return }
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', IMAGE_QUALITY))
+      }
+      img.src = reader.result as string
+    }
+    reader.readAsDataURL(file)
+  })
+}
 
 function getDeviceId(): string {
   let id = localStorage.getItem(DEVICE_KEY)
@@ -178,9 +216,13 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [input, setInput] = useState('')
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [pendingImage, setPendingImage] = useState<{ dataUrl: string } | null>(null)
+  const [sending, setSending] = useState(false)
+  const [imageError, setImageError] = useState('')
   const deviceId = useRef(getDeviceId())
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const initialLoadDone = useRef(false)
 
   useEffect(() => {
@@ -262,14 +304,41 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
   const send = useCallback(async () => {
     const content = input.trim()
-    if (!content) return
+    if (!content && !pendingImage) return
+    setSending(true)
     setInput('')
-    await fetch('/api/chat/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomId: session.roomId, deviceId: deviceId.current, content }),
-    })
-  }, [input, session.roomId])
+    const imageToSend = pendingImage
+    setPendingImage(null)
+    try {
+      await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId: session.roomId,
+          deviceId: deviceId.current,
+          content,
+          image: imageToSend ? { dataUrl: imageToSend.dataUrl } : undefined,
+        }),
+      })
+    } finally {
+      setSending(false)
+    }
+  }, [input, pendingImage, session.roomId])
+
+  const pickImage = () => fileInputRef.current?.click()
+
+  const onImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setImageError('')
+    try {
+      const dataUrl = await compressImageToDataUrl(file)
+      setPendingImage({ dataUrl })
+    } catch {
+      setImageError('Không đọc được ảnh này — thử ảnh khác nhé')
+    }
+  }
 
   const leave = () => {
     localStorage.removeItem(SESSION_KEY)
@@ -285,23 +354,57 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       <div ref={scrollRef} onScroll={onScroll} className="flex-1 space-y-2 overflow-y-auto rounded-xl border border-border bg-surface p-4">
         {loadingMore && <p className="text-center text-xs text-muted">Đang tải tin nhắn cũ...</p>}
         {messages.map((m) => {
+          if (m.device_id === 'system') {
+            return (
+              <div key={m.id} className="flex justify-center">
+                <span className="max-w-[90%] rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-center text-xs text-amber-400">
+                  {m.content}
+                </span>
+              </div>
+            )
+          }
           const mine = m.device_id === deviceId.current
           return (
             <div key={m.id} className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
               {!mine && <span className="mb-0.5 text-[10px] text-muted">{m.nickname}</span>}
-              <span
-                className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
-                  mine ? 'bg-accent text-white' : 'bg-background border border-border text-white'
-                }`}
-              >
-                {m.content}
-              </span>
+              {m.image_url && (
+                <a href={m.image_url} target="_blank" rel="noreferrer" className="mb-1 block max-w-[75%]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={m.image_url} alt="" className="max-h-64 rounded-xl border border-border object-cover" />
+                </a>
+              )}
+              {m.content && (
+                <span
+                  className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
+                    mine ? 'bg-accent text-white' : 'bg-background border border-border text-white'
+                  }`}
+                >
+                  {m.content}
+                </span>
+              )}
             </div>
           )
         })}
         <div ref={bottomRef} />
       </div>
+      {pendingImage && (
+        <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-surface p-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={pendingImage.dataUrl} alt="" className="h-12 w-12 rounded-lg object-cover" />
+          <span className="flex-1 text-xs text-muted">Ảnh sẽ được gửi kèm tin nhắn</span>
+          <button onClick={() => setPendingImage(null)} className="text-xs text-muted hover:text-white">✕</button>
+        </div>
+      )}
+      {imageError && <p className="mt-2 text-xs text-red-400">{imageError}</p>}
       <div className="mt-3 flex gap-2">
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={onImageSelected} className="hidden" />
+        <button
+          onClick={pickImage}
+          title="Gửi ảnh"
+          className="rounded-xl border border-border bg-surface px-3 py-2.5 text-muted hover:text-white transition-colors"
+        >
+          🖼️
+        </button>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -309,8 +412,12 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           placeholder="Nhắn gì đó..."
           className="flex-1 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-white outline-none placeholder-muted focus:border-accent"
         />
-        <button onClick={send} className="rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent/80">
-          Gửi
+        <button
+          onClick={send}
+          disabled={sending || (!input.trim() && !pendingImage)}
+          className="rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
+        >
+          {sending ? '...' : 'Gửi'}
         </button>
       </div>
     </div>
