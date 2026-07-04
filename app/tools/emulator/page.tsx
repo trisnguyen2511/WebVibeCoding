@@ -144,7 +144,7 @@ function generateRoomId() {
 // ── Host page ────────────────────────────────────────────────────
 function EmulatorHost() {
   const [roomId]  = useState(generateRoomId)
-  const { players, playerInputs } = useGameController(roomId)
+  const { players, playerInputs, kickPlayer } = useGameController(roomId)
 
   const [system,    setSystem]    = useState<System>('nes')
   const [romUrl,    setRomUrl]    = useState<string | null>(null)
@@ -512,8 +512,17 @@ function EmulatorHost() {
                   return (
                     <div
                       key={i}
-                      className={`rounded-xl border p-2.5 text-center transition-all ${player ? BADGE_CLS[i] : 'border-border bg-background opacity-40'}`}
+                      className={`group relative rounded-xl border p-2.5 text-center transition-all ${player ? BADGE_CLS[i] : 'border-border bg-background opacity-40'}`}
                     >
+                      {player && (
+                        <button
+                          onClick={() => kickPlayer(player.peerId)}
+                          title="Ngắt kết nối"
+                          className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-xs text-muted hover:border-red-500 hover:text-red-400 group-hover:flex"
+                        >
+                          ✕
+                        </button>
+                      )}
                       <div className="flex items-center justify-center gap-1">
                         <span className={`h-2 w-2 rounded-full ${player ? DOT_CLS[i] : 'bg-muted/30'}`} />
                         <span className="text-xs font-bold">P{i + 1}</span>
