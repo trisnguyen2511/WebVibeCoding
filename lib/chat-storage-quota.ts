@@ -50,7 +50,7 @@ async function warnAllRoomsIfDue(
       const { data: msg } = await supabase
         .from('chat_messages')
         .insert({ room_id: room.id, device_id: 'system', nickname: 'Hệ thống', content: text })
-        .select('id, device_id, nickname, content, image_url, created_at')
+        .select('id, device_id, nickname, content, image_url, text_color, font_family, bold, italic, created_at')
         .single()
       if (!msg) return
       await supabase.channel(`chat-room-${room.id}`).send({ type: 'broadcast', event: 'message', payload: msg })

@@ -5,6 +5,8 @@ import { pushToRoom } from '@/lib/chat-notify'
 import { enforceStorageQuota } from '@/lib/chat-storage-quota'
 
 const MAX_IMAGE_DATA_URL_LENGTH = 8 * 1024 * 1024 // ~6MB image after base64 overhead
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/
+const FONT_FAMILIES = new Set(['sans', 'display', 'mono', 'cursive'])
 
 export async function POST(req: NextRequest) {
   let body: unknown
@@ -13,11 +15,12 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'invalid request body' }, { status: 400 })
   }
-  const { roomId, deviceId, content, image } = body as {
+  const { roomId, deviceId, content, image, style } = body as {
     roomId?: string
     deviceId?: string
     content?: string
     image?: { dataUrl?: string }
+    style?: { color?: string; font?: string; bold?: boolean; italic?: boolean }
   }
   if (!roomId || !deviceId) return NextResponse.json({ error: 'roomId and deviceId are required' }, { status: 400 })
 
@@ -48,11 +51,19 @@ export async function POST(req: NextRequest) {
     image_url?: string
     image_public_id?: string
     image_bytes?: number
+    text_color?: string | null
+    font_family?: string | null
+    bold?: boolean
+    italic?: boolean
   } = {
     room_id: roomId,
     device_id: deviceId,
     nickname: sender.nickname,
     content: trimmedContent || null,
+    text_color: style?.color && HEX_COLOR_RE.test(style.color) ? style.color : null,
+    font_family: style?.font && FONT_FAMILIES.has(style.font) ? style.font : null,
+    bold: Boolean(style?.bold),
+    italic: Boolean(style?.italic),
   }
 
   let uploadedImage = false
@@ -71,7 +82,7 @@ export async function POST(req: NextRequest) {
   const { data: message, error } = await supabase
     .from('chat_messages')
     .insert(insertPayload)
-    .select('id, device_id, nickname, content, image_url, created_at')
+    .select('id, device_id, nickname, content, image_url, text_color, font_family, bold, italic, created_at')
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

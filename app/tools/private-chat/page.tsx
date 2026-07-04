@@ -14,7 +14,39 @@ type ChatMessage = {
   nickname: string
   content: string | null
   image_url?: string | null
+  text_color?: string | null
+  font_family?: string | null
+  bold?: boolean
+  italic?: boolean
   created_at: string
+}
+
+type FontId = 'sans' | 'display' | 'mono' | 'cursive'
+type MessageStyle = { color: string | null; font: FontId | null; bold: boolean; italic: boolean }
+
+const STYLE_KEY = 'wv-chat-style'
+const DEFAULT_STYLE: MessageStyle = { color: null, font: null, bold: false, italic: false }
+
+const COLOR_PRESETS = ['#FAFAFA', '#F87171', '#FBBF24', '#34D399', '#60A5FA', '#A78BFA', '#F472B6']
+const FONT_OPTIONS: { id: FontId; label: string; style: React.CSSProperties }[] = [
+  { id: 'sans', label: 'Mặc định', style: {} },
+  { id: 'display', label: 'Tiêu đề', style: { fontFamily: 'var(--font-space-grotesk), sans-serif' } },
+  { id: 'mono', label: 'Mono', style: { fontFamily: 'var(--font-jetbrains-mono), monospace' } },
+  { id: 'cursive', label: 'Viết tay', style: { fontFamily: 'cursive' } },
+]
+
+function fontStyleFor(font?: string | null): React.CSSProperties {
+  return FONT_OPTIONS.find((f) => f.id === font)?.style ?? {}
+}
+
+function loadSavedStyle(): MessageStyle {
+  try {
+    const raw = localStorage.getItem(STYLE_KEY)
+    if (!raw) return DEFAULT_STYLE
+    return { ...DEFAULT_STYLE, ...JSON.parse(raw) }
+  } catch {
+    return DEFAULT_STYLE
+  }
 }
 
 const MAX_IMAGE_DIMENSION = 1600
@@ -219,6 +251,8 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [pendingImage, setPendingImage] = useState<{ dataUrl: string } | null>(null)
   const [sending, setSending] = useState(false)
   const [imageError, setImageError] = useState('')
+  const [style, setStyle] = useState<MessageStyle>(DEFAULT_STYLE)
+  const [showStylePicker, setShowStylePicker] = useState(false)
   const deviceId = useRef(getDeviceId())
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -270,6 +304,18 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   }, [loadMore])
 
   useEffect(() => {
+    setStyle(loadSavedStyle())
+  }, [])
+
+  const updateStyle = (patch: Partial<MessageStyle>) => {
+    setStyle((prev) => {
+      const next = { ...prev, ...patch }
+      localStorage.setItem(STYLE_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
+  useEffect(() => {
     subscribeToPush(session.roomId, deviceId.current)
   }, [session.roomId])
 
@@ -318,12 +364,13 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           deviceId: deviceId.current,
           content,
           image: imageToSend ? { dataUrl: imageToSend.dataUrl } : undefined,
+          style: { color: style.color, font: style.font, bold: style.bold, italic: style.italic },
         }),
       })
     } finally {
       setSending(false)
     }
-  }, [input, pendingImage, session.roomId])
+  }, [input, pendingImage, style, session.roomId])
 
   const pickImage = () => fileInputRef.current?.click()
 
@@ -378,6 +425,12 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                   className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
                     mine ? 'bg-accent text-white' : 'bg-background border border-border text-white'
                   }`}
+                  style={{
+                    ...fontStyleFor(m.font_family),
+                    color: m.text_color ?? undefined,
+                    fontWeight: m.bold ? 700 : undefined,
+                    fontStyle: m.italic ? 'italic' : undefined,
+                  }}
                 >
                   {m.content}
                 </span>
@@ -396,6 +449,68 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         </div>
       )}
       {imageError && <p className="mt-2 text-xs text-red-400">{imageError}</p>}
+
+      {showStylePicker && (
+        <div className="mt-3 space-y-2 rounded-xl border border-border bg-surface p-3">
+          <div className="flex items-center gap-2">
+            <span className="w-14 shrink-0 text-xs text-muted">Màu chữ</span>
+            <div className="flex flex-wrap gap-1.5">
+              {COLOR_PRESETS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => updateStyle({ color: c === COLOR_PRESETS[0] ? null : c })}
+                  title={c}
+                  className={`h-6 w-6 rounded-full border-2 transition-transform ${
+                    (style.color ?? COLOR_PRESETS[0]) === c ? 'border-white scale-110' : 'border-transparent'
+                  }`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-14 shrink-0 text-xs text-muted">Font chữ</span>
+            <div className="flex flex-wrap gap-1.5">
+              {FONT_OPTIONS.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => updateStyle({ font: f.id === 'sans' ? null : f.id })}
+                  style={f.style}
+                  className={`rounded-lg border px-2.5 py-1 text-xs transition-colors ${
+                    (style.font ?? 'sans') === f.id
+                      ? 'border-accent bg-accent/20 text-accent-soft'
+                      : 'border-border bg-background text-muted hover:text-white'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-14 shrink-0 text-xs text-muted">Kiểu chữ</span>
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => updateStyle({ bold: !style.bold })}
+                className={`h-7 w-7 rounded-lg border font-bold text-xs transition-colors ${
+                  style.bold ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-background text-muted hover:text-white'
+                }`}
+              >
+                B
+              </button>
+              <button
+                onClick={() => updateStyle({ italic: !style.italic })}
+                className={`h-7 w-7 rounded-lg border text-xs italic transition-colors ${
+                  style.italic ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-background text-muted hover:text-white'
+                }`}
+              >
+                I
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mt-3 flex gap-2">
         <input ref={fileInputRef} type="file" accept="image/*" onChange={onImageSelected} className="hidden" />
         <button
@@ -405,11 +520,26 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         >
           🖼️
         </button>
+        <button
+          onClick={() => setShowStylePicker((v) => !v)}
+          title="Tùy chỉnh kiểu chữ"
+          className={`rounded-xl border px-3 py-2.5 text-xs font-bold transition-colors ${
+            showStylePicker ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-white'
+          }`}
+        >
+          Aa
+        </button>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') send() }}
           placeholder="Nhắn gì đó..."
+          style={{
+            ...fontStyleFor(style.font),
+            color: style.color ?? undefined,
+            fontWeight: style.bold ? 700 : undefined,
+            fontStyle: style.italic ? 'italic' : undefined,
+          }}
           className="flex-1 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-white outline-none placeholder-muted focus:border-accent"
         />
         <button
