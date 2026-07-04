@@ -229,12 +229,16 @@ function EmulatorHost() {
     }
 
     // blob: URLs carry no filename at all (just an opaque id) — FBNeo needs
-    // the real filename (its MAME/FBNeo "short name", e.g. "dino") to look
-    // the romset up in its driver database. EJS_gameName is EmulatorJS's
-    // documented way to supply that name when the URL itself can't.
+    // the real filename (its MAME/FBNeo "short name", e.g. "dino.zip") to
+    // mount the romset where its own virtual-filesystem lookup expects it.
+    // EJS_gameName is EmulatorJS's documented way to supply that name when
+    // the URL itself can't. Keep the extension: dropping it got the driver
+    // recognized ("dino" is a known game) but the core then reported the
+    // archive "not found in your paths" — it's searching for "dino.zip"
+    // specifically, not the extension-less name.
     window.EJS_player        = '#ejs-mount'
     window.EJS_gameUrl       = romUrl
-    window.EJS_gameName      = romName?.replace(/\.[^./]+$/, '')
+    window.EJS_gameName      = romName ?? undefined
     window.EJS_core          = SYSTEMS.find((s) => s.value === system)?.core ?? 'fceumm'
     window.EJS_pathtodata    = EJS_DATA
     window.EJS_startOnLoaded = true
