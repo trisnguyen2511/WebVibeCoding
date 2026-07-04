@@ -150,6 +150,7 @@ function EmulatorHost() {
   const [romName,   setRomName]   = useState<string | null>(null)
   const [biosUrl,   setBiosUrl]   = useState<string | null>(null)
   const [biosName,  setBiosName]  = useState<string | null>(null)
+  const [wrapZip,   setWrapZip]   = useState(false)
   const [gameReady, setGameReady] = useState(false)
 
   const ejsRef     = useRef<EJSManager | null>(null)
@@ -190,17 +191,14 @@ function EmulatorHost() {
     setGameReady(false)
     ejsRef.current = null
 
-    // EmulatorJS auto-extracts any .zip passed as EJS_gameUrl before
-    // handing it to the core. That's fine for a single archived ROM file,
-    // but FBNeo's MAME-derived loader expects to open the arcade romset
-    // zip itself (matching internal filenames/CRCs against its driver
-    // database) — the pre-extraction corrupts that structure and FBNeo
-    // reports "Romset is unknown" even for a perfectly valid ROM.
-    // Wrapping the romset in one more outer zip means EmulatorJS's
-    // auto-extraction only unwraps that outer layer, handing FBNeo the
-    // untouched inner .zip it actually expects.
+    // Some EmulatorJS builds auto-extract a .zip passed as EJS_gameUrl
+    // before handing it to the core, which can corrupt the archive
+    // structure FBNeo's MAME-derived loader expects to open itself.
+    // Wrapping in one more outer zip is a reported workaround for that —
+    // but it's unconfirmed for this specific build, so it's opt-in via
+    // the checkbox rather than always-on, letting you test both ways.
     let uploadBlob: Blob = file
-    if (system === 'arcade' && file.name.toLowerCase().endsWith('.zip')) {
+    if (system === 'arcade' && wrapZip && file.name.toLowerCase().endsWith('.zip')) {
       const wrapper = new JSZip()
       wrapper.file(file.name, file)
       uploadBlob = await wrapper.generateAsync({ type: 'blob', compression: 'STORE' })
@@ -338,17 +336,38 @@ function EmulatorHost() {
                   </label>
                 </div>
 
+                {/* Arcade troubleshooting: "Romset is unknown" ────────── */}
+                {system === 'arcade' && (
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
+                    <p className="text-xs font-medium text-amber-300">
+                      Nếu báo &quot;Romset is unknown&quot;
+                    </p>
+                    <p className="text-xs text-muted">
+                      1. FBNeo nhận diện game qua đúng tên mã ngắn nội bộ (vd &quot;dino.zip&quot; cho
+                      Cadillacs and Dinosaurs), không phải tên mô tả — tra đúng mã (short name) trong
+                      danh sách romset FBNeo/MAME rồi đổi tên file .zip.
+                    </p>
+                    <p className="text-xs text-muted">
+                      2. Nếu đã đúng tên mà vẫn lỗi, thử bật/tắt tùy chọn bọc zip bên dưới — chưa chắc
+                      chiều nào đúng với bản FBNeo đang chạy, cần thử cả 2.
+                    </p>
+                    <label className="flex items-center gap-2 pt-1 text-xs text-white">
+                      <input
+                        type="checkbox"
+                        checked={wrapZip}
+                        onChange={(e) => setWrapZip(e.target.checked)}
+                        className="h-3.5 w-3.5 accent-accent"
+                      />
+                      Bọc ROM trong 1 lớp zip nữa trước khi upload
+                    </label>
+                  </div>
+                )}
+
                 {/* BIOS upload (arcade only — e.g. Neo Geo needs neogeo.zip) */}
                 {system === 'arcade' && (
                   <div>
                     <p className="mb-2 font-mono text-xs uppercase tracking-widest text-muted">
                       BIOS (tùy chọn — Neo Geo cần neogeo.zip)
-                    </p>
-                    <p className="mb-3 text-xs text-muted">
-                      Nếu báo &quot;Romset is unknown&quot;: FBNeo nhận diện game qua đúng tên mã ngắn
-                      nội bộ (vd &quot;dino.zip&quot; cho Cadillacs and Dinosaurs), không phải tên mô tả
-                      như &quot;CadillacsAndDinosaurs.zip&quot; — tra tên mã đúng (short name) trong danh
-                      sách romset của FBNeo/MAME rồi đổi tên file .zip trước khi upload.
                     </p>
                     {biosName ? (
                       <div className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3">
