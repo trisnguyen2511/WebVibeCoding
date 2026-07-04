@@ -11,6 +11,7 @@ const CAT_COLORS: Record<ToolCategory, string> = {
   media:        'text-pink-400',
   productivity: 'text-emerald-400',
   game:         'text-orange-400',
+  social:       'text-rose-400',
 }
 
 export function CommandPalette() {

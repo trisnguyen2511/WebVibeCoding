@@ -11,6 +11,7 @@ const CATEGORIES: { label: string; value: ToolCategory | 'all'; icon: string }[]
   { label: 'Media', value: 'media', icon: '🎬' },
   { label: 'Productivity', value: 'productivity', icon: '⚡' },
   { label: 'Game', value: 'game', icon: '🎮' },
+  { label: 'Social', value: 'social', icon: '💬' },
 ]
 
 const CAT_STYLES: Record<ToolCategory | 'all', { pill: string; icon: string; glow: string; bar: string }> = {
@@ -21,6 +22,7 @@ const CAT_STYLES: Record<ToolCategory | 'all', { pill: string; icon: string; glo
   media:        { pill: 'border-pink-500/30 bg-pink-500/10 text-pink-400',         icon: 'border-pink-500/30 bg-pink-500/10 text-pink-400',     glow: 'shadow-pink-500/10',   bar: 'from-pink-500 to-pink-400' },
   productivity: { pill: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400', icon: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400', glow: 'shadow-emerald-500/10', bar: 'from-emerald-500 to-emerald-400' },
   game:         { pill: 'border-orange-500/30 bg-orange-500/10 text-orange-400',   icon: 'border-orange-500/30 bg-orange-500/10 text-orange-400', glow: 'shadow-orange-500/10', bar: 'from-orange-500 to-orange-400' },
+  social:       { pill: 'border-rose-500/30 bg-rose-500/10 text-rose-400',         icon: 'border-rose-500/30 bg-rose-500/10 text-rose-400',     glow: 'shadow-rose-500/10',   bar: 'from-rose-500 to-rose-400' },
 }
 
 export function SearchableToolGrid({ tools }: { tools: Tool[] }) {
