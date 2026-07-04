@@ -32,6 +32,7 @@ declare global {
   interface Window {
     EJS_player?:        string
     EJS_gameUrl?:       string
+    EJS_gameName?:      string
     EJS_core?:          string
     EJS_pathtodata?:    string
     EJS_startOnLoaded?: boolean
@@ -227,8 +228,13 @@ function EmulatorHost() {
       scriptRef.current = null
     }
 
+    // blob: URLs carry no filename at all (just an opaque id) — FBNeo needs
+    // the real filename (its MAME/FBNeo "short name", e.g. "dino") to look
+    // the romset up in its driver database. EJS_gameName is EmulatorJS's
+    // documented way to supply that name when the URL itself can't.
     window.EJS_player        = '#ejs-mount'
     window.EJS_gameUrl       = romUrl
+    window.EJS_gameName      = romName?.replace(/\.[^./]+$/, '')
     window.EJS_core          = SYSTEMS.find((s) => s.value === system)?.core ?? 'fceumm'
     window.EJS_pathtodata    = EJS_DATA
     window.EJS_startOnLoaded = true
@@ -259,7 +265,7 @@ function EmulatorHost() {
         scriptRef.current = null
       }
     }
-  }, [romUrl, system, biosUrl])
+  }, [romUrl, romName, system, biosUrl])
 
   // Revoke blobs on unmount
   useEffect(() => () => {
@@ -277,6 +283,7 @@ function EmulatorHost() {
     if (biosBlobRef.current) { URL.revokeObjectURL(biosBlobRef.current); biosBlobRef.current = null }
     delete window.EJS_player
     delete window.EJS_gameUrl
+    delete window.EJS_gameName
     delete window.EJS_onGameStart
     delete window.EJS_biosUrl
     setRomUrl(null)
@@ -343,9 +350,10 @@ function EmulatorHost() {
                       Nếu báo &quot;Romset is unknown&quot;
                     </p>
                     <p className="text-xs text-muted">
-                      1. FBNeo nhận diện game qua đúng tên mã ngắn nội bộ (vd &quot;dino.zip&quot; cho
-                      Cadillacs and Dinosaurs), không phải tên mô tả — tra đúng mã (short name) trong
-                      danh sách romset FBNeo/MAME rồi đổi tên file .zip.
+                      1. App tự truyền tên file thật cho FBNeo (kể cả khi upload qua blob) — chỉ cần
+                      đặt tên file .zip đúng mã ngắn nội bộ (vd &quot;dino.zip&quot; cho Cadillacs and
+                      Dinosaurs), không phải tên mô tả. Tra đúng mã (short name) trong danh sách
+                      romset FBNeo/MAME rồi đổi tên trước khi chọn file.
                     </p>
                     <p className="text-xs text-muted">
                       2. Nếu đã đúng tên mà vẫn lỗi, thử bật/tắt tùy chọn bọc zip bên dưới — chưa chắc
