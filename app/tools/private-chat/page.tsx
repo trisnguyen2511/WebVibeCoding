@@ -243,12 +243,19 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
   const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null
   const lastMessageIdRef = useRef<string | null>(null)
+  const hasScrolledOnceRef = useRef(false)
   useEffect(() => {
     if (!initialLoadDone.current) return
     // Only autoscroll when a new message lands at the bottom — not when older
     // messages are prepended by scroll-up pagination.
     if (lastMessageId !== lastMessageIdRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      const isFirstScroll = !hasScrolledOnceRef.current
+      hasScrolledOnceRef.current = true
+      // Jump instantly on the very first render (layout may still be settling),
+      // then use a smooth scroll for every message that arrives after that.
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior: isFirstScroll ? 'auto' : 'smooth' })
+      })
     }
     lastMessageIdRef.current = lastMessageId
   }, [lastMessageId])
