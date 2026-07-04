@@ -345,9 +345,10 @@ function EmulatorHost() {
                       BIOS (tùy chọn — Neo Geo cần neogeo.zip)
                     </p>
                     <p className="mb-3 text-xs text-muted">
-                      Nếu báo &quot;Romset is unknown&quot;: giữ nguyên tên file .zip gốc (đừng đổi tên) —
-                      romset arcade phải khớp đúng phiên bản mà core FBNeo hỗ trợ, ROM chạy tốt trên
-                      emulator khác chưa chắc cùng phiên bản romset với FBNeo.
+                      Nếu báo &quot;Romset is unknown&quot;: FBNeo nhận diện game qua đúng tên mã ngắn
+                      nội bộ (vd &quot;dino.zip&quot; cho Cadillacs and Dinosaurs), không phải tên mô tả
+                      như &quot;CadillacsAndDinosaurs.zip&quot; — tra tên mã đúng (short name) trong danh
+                      sách romset của FBNeo/MAME rồi đổi tên file .zip trước khi upload.
                     </p>
                     {biosName ? (
                       <div className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3">
