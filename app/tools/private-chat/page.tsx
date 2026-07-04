@@ -57,9 +57,30 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
   const [nickname, setNickname] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [room, setRoom] = useState<{ name: string; type: 'group' | 'solo' } | null>(null)
+
+  const checkPin = async () => {
+    if (!pin.trim()) return
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/chat/room-info?pin=${pin.trim()}`)
+      const data = await res.json()
+      if (data.error) {
+        setError(data.error)
+        return
+      }
+      setRoom({ name: data.name, type: data.type })
+    } catch {
+      setError('Lỗi kết nối — thử lại nhé')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const join = async () => {
-    if (!pin.trim() || !nickname.trim()) return
+    if (!room) return
+    if (room.type !== 'solo' && !nickname.trim()) return
     setLoading(true)
     setError('')
     try {
@@ -74,7 +95,12 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         setError(data.error)
         return
       }
-      const session: Session = { pin: pin.trim(), roomId: data.roomId, roomName: data.roomName, nickname: nickname.trim() }
+      const session: Session = {
+        pin: pin.trim(),
+        roomId: data.roomId,
+        roomName: data.roomName,
+        nickname: nickname.trim() || 'my pal',
+      }
       localStorage.setItem(SESSION_KEY, JSON.stringify(session))
       onJoined(session)
     } catch {
@@ -84,33 +110,57 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
     }
   }
 
+  if (!room) {
+    return (
+      <div className="mx-auto max-w-sm space-y-4">
+        <p className="text-center text-sm text-muted">Nhập mã PIN của đoạn chat để tham gia</p>
+        <input
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+          onKeyDown={(e) => { if (e.key === 'Enter') checkPin() }}
+          inputMode="numeric"
+          placeholder="PIN code"
+          className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-center font-mono text-lg tracking-widest text-white outline-none placeholder-muted focus:border-accent"
+        />
+        {error && <p className="text-center text-xs text-red-400">{error}</p>}
+        <button
+          onClick={checkPin}
+          disabled={loading || !pin.trim()}
+          className="w-full rounded-xl bg-accent py-3 font-display font-semibold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
+        >
+          {loading ? 'Đang kiểm tra...' : 'Tiếp tục'}
+        </button>
+        <p className="text-center text-xs text-muted">
+          <Link href="/tools/private-chat/admin" className="hover:text-accent-soft">Quản lý phòng (admin)</Link>
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-sm space-y-4">
-      <p className="text-center text-sm text-muted">Nhập mã PIN của đoạn chat để tham gia</p>
-      <input
-        value={pin}
-        onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-        inputMode="numeric"
-        placeholder="PIN code"
-        className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-center font-mono text-lg tracking-widest text-white outline-none placeholder-muted focus:border-accent"
-      />
+      <p className="text-center text-sm text-muted">
+        Vào phòng <span className="text-white">{room.name}</span>
+        {room.type === 'solo' && <span className="text-muted"> · độc thoại</span>}
+      </p>
       <input
         value={nickname}
         onChange={(e) => setNickname(e.target.value)}
-        placeholder="Tên hiển thị của bạn"
+        onKeyDown={(e) => { if (e.key === 'Enter') join() }}
+        placeholder={room.type === 'solo' ? 'Tên hiển thị (để trống = "my pal")' : 'Tên hiển thị của bạn'}
         className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-white outline-none placeholder-muted focus:border-accent"
       />
       {error && <p className="text-center text-xs text-red-400">{error}</p>}
       <button
         onClick={join}
-        disabled={loading || !pin.trim() || !nickname.trim()}
+        disabled={loading || (room.type !== 'solo' && !nickname.trim())}
         className="w-full rounded-xl bg-accent py-3 font-display font-semibold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
       >
         {loading ? 'Đang vào...' : 'Vào đoạn chat'}
       </button>
-      <p className="text-center text-xs text-muted">
-        <Link href="/tools/private-chat/admin" className="hover:text-accent-soft">Quản lý phòng (admin)</Link>
-      </p>
+      <button onClick={() => { setRoom(null); setError('') }} className="w-full text-center text-xs text-muted hover:text-white">
+        ← Nhập PIN khác
+      </button>
     </div>
   )
 }

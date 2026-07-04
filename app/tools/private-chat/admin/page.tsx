@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ToolShell } from '@/components/tool-shell'
 
-type Room = { id: string; pin: string; name: string; created_at: string; deviceCount: number }
+type Room = { id: string; pin: string; name: string; type: 'group' | 'solo'; created_at: string; deviceCount: number }
 
 function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [password, setPassword] = useState('')
@@ -54,6 +54,7 @@ function AdminPanel() {
   const [rooms, setRooms] = useState<Room[]>([])
   const [pin, setPin] = useState('')
   const [name, setName] = useState('')
+  const [type, setType] = useState<'group' | 'solo'>('group')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -73,11 +74,11 @@ function AdminPanel() {
       const res = await fetch('/api/chat/admin/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: pin.trim(), name: name.trim() }),
+        body: JSON.stringify({ pin: pin.trim(), name: name.trim(), type }),
       })
       const data = await res.json()
       if (data.error) { setError(data.error); return }
-      setPin(''); setName('')
+      setPin(''); setName(''); setType('group')
       load()
     } catch {
       setError('Lỗi kết nối')
@@ -127,6 +128,19 @@ function AdminPanel() {
             Tạo
           </button>
         </div>
+        <div className="flex gap-2">
+          {(['group', 'solo'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setType(t)}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                type === t ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-background text-muted hover:text-white'
+              }`}
+            >
+              {t === 'group' ? 'Nhóm (bắt buộc tên)' : 'Độc thoại (không cần tên)'}
+            </button>
+          ))}
+        </div>
         {error && <p className="text-xs text-red-400">{error}</p>}
       </div>
 
@@ -135,7 +149,12 @@ function AdminPanel() {
         {rooms.map((r) => (
           <div key={r.id} className="flex items-center justify-between rounded-xl border border-border bg-surface p-4">
             <div>
-              <p className="font-medium text-white">{r.name}</p>
+              <p className="font-medium text-white">
+                {r.name}
+                {r.type === 'solo' && (
+                  <span className="ml-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-normal text-rose-400">độc thoại</span>
+                )}
+              </p>
               <p className="font-mono text-xs text-muted">PIN: {r.pin} · {r.deviceCount} thiết bị</p>
             </div>
             <button onClick={() => remove(r.id)} className="text-xs text-red-400 hover:text-red-300">Xóa</button>

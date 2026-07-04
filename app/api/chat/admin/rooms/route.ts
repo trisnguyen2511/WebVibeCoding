@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { data: rooms, error } = await supabase
     .from('chat_rooms')
-    .select('id, pin, name, created_at')
+    .select('id, pin, name, type, created_at')
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -30,19 +30,20 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'invalid request body' }, { status: 400 })
   }
-  const { pin, name } = body as { pin?: string; name?: string }
+  const { pin, name, type } = body as { pin?: string; name?: string; type?: string }
   if (!pin || typeof pin !== 'string' || !/^[0-9]{4,10}$/.test(pin)) {
     return NextResponse.json({ error: 'pin must be 4-10 digits' }, { status: 400 })
   }
   if (!name || typeof name !== 'string' || !name.trim()) {
     return NextResponse.json({ error: 'name is required' }, { status: 400 })
   }
+  const roomType = type === 'solo' ? 'solo' : 'group'
 
   const supabase = getSupabaseAdmin()
   const { data, error } = await supabase
     .from('chat_rooms')
-    .insert({ pin, name: name.trim() })
-    .select('id, pin, name, created_at')
+    .insert({ pin, name: name.trim(), type: roomType })
+    .select('id, pin, name, type, created_at')
     .single()
 
   if (error) {
