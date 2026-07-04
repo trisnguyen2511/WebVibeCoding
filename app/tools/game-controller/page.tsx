@@ -145,7 +145,8 @@ function DpadControl({
       onPointerMove={handlePointerMove}
       onPointerUp={handleUp}
       onPointerCancel={handleUp}
-      className="select-none border border-[#1A1A2E] bg-[#0F0F1A]/90"
+      onContextMenu={(e) => e.preventDefault()}
+      className="no-callout select-none border border-[#1A1A2E] bg-[#0F0F1A]/90"
     >
       {/* Cross groove lines */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -494,6 +495,8 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
   const [playerIndex, setPlayerIndex] = useState<number | null>(null)
   const [status, setStatus] = useState<'connecting' | 'ready' | 'disconnected'>('connecting')
   const [activeCombo, setActiveCombo] = useState<string | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [fsSupported] = useState(() => typeof document !== 'undefined' && document.fullscreenEnabled)
   const connRef = useRef<{
     sendInput: (m: Omit<InputMessage, 'peerId'>) => void
     disconnect: () => void
@@ -502,6 +505,17 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
   const holdTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const holdIntervalsRef = useRef<Record<string, ReturnType<typeof setInterval>>>({})
   const comboFlashRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onFsChange)
+    return () => document.removeEventListener('fullscreenchange', onFsChange)
+  }, [])
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {})
+    else document.exitFullscreen?.().catch(() => {})
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -575,11 +589,25 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
     `Player ${(playerIndex ?? 0) + 1}`
 
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-[#08080E]" style={{ touchAction: 'none' }}>
+    <div
+      className="no-callout relative h-[100dvh] w-full overflow-hidden bg-[#08080E]"
+      style={{ touchAction: 'none' }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       {/* Player badge */}
       <div className={`absolute left-2 top-2 z-10 rounded-full border px-3 py-1 text-xs font-bold ${color.badge}`}>
         {badgeText}
       </div>
+
+      {/* Fullscreen toggle */}
+      {fsSupported && (
+        <button
+          onClick={toggleFullscreen}
+          className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-[#1A1A2E] bg-[#0F0F1A]/90 text-sm text-white"
+        >
+          {isFullscreen ? '⤡' : '⛶'}
+        </button>
+      )}
 
       {/* Combo flash */}
       {activeCombo && (

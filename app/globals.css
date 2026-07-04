@@ -53,3 +53,12 @@
   background-clip: text;
   animation: shimmer 4s linear infinite;
 }
+
+/* Blocks the iOS/Android long-press "select / copy" callout on touch
+   controllers — user-select:none alone isn't enough to suppress it. */
+.no-callout {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
