@@ -59,6 +59,36 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
   const [loading, setLoading] = useState(false)
   const [room, setRoom] = useState<{ name: string; type: 'group' | 'solo' } | null>(null)
 
+  const doJoin = async (pinValue: string, nicknameValue: string) => {
+    setLoading(true)
+    setError('')
+    try {
+      const deviceId = getDeviceId()
+      const res = await fetch('/api/chat/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pinValue, deviceId, nickname: nicknameValue.trim() }),
+      })
+      const data = await res.json()
+      if (data.error) {
+        setError(data.error)
+        return
+      }
+      const session: Session = {
+        pin: pinValue,
+        roomId: data.roomId,
+        roomName: data.roomName,
+        nickname: nicknameValue.trim() || 'my pal',
+      }
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+      onJoined(session)
+    } catch {
+      setError('Lỗi kết nối — thử lại nhé')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const checkPin = async () => {
     if (!pin.trim()) return
     setLoading(true)
@@ -70,6 +100,11 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         setError(data.error)
         return
       }
+      if (data.type === 'solo') {
+        // Solo rooms skip the nickname screen entirely — join immediately.
+        await doJoin(pin.trim(), '')
+        return
+      }
       setRoom({ name: data.name, type: data.type })
     } catch {
       setError('Lỗi kết nối — thử lại nhé')
@@ -78,36 +113,10 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
     }
   }
 
-  const join = async () => {
+  const join = () => {
     if (!room) return
-    if (room.type !== 'solo' && !nickname.trim()) return
-    setLoading(true)
-    setError('')
-    try {
-      const deviceId = getDeviceId()
-      const res = await fetch('/api/chat/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: pin.trim(), deviceId, nickname: nickname.trim() }),
-      })
-      const data = await res.json()
-      if (data.error) {
-        setError(data.error)
-        return
-      }
-      const session: Session = {
-        pin: pin.trim(),
-        roomId: data.roomId,
-        roomName: data.roomName,
-        nickname: nickname.trim() || 'my pal',
-      }
-      localStorage.setItem(SESSION_KEY, JSON.stringify(session))
-      onJoined(session)
-    } catch {
-      setError('Lỗi kết nối — thử lại nhé')
-    } finally {
-      setLoading(false)
-    }
+    if (!nickname.trim()) return
+    doJoin(pin.trim(), nickname)
   }
 
   if (!room) {
@@ -141,19 +150,18 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
     <div className="mx-auto max-w-sm space-y-4">
       <p className="text-center text-sm text-muted">
         Vào phòng <span className="text-white">{room.name}</span>
-        {room.type === 'solo' && <span className="text-muted"> · độc thoại</span>}
       </p>
       <input
         value={nickname}
         onChange={(e) => setNickname(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') join() }}
-        placeholder={room.type === 'solo' ? 'Tên hiển thị (để trống = "my pal")' : 'Tên hiển thị của bạn'}
+        placeholder="Tên hiển thị của bạn"
         className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-white outline-none placeholder-muted focus:border-accent"
       />
       {error && <p className="text-center text-xs text-red-400">{error}</p>}
       <button
         onClick={join}
-        disabled={loading || (room.type !== 'solo' && !nickname.trim())}
+        disabled={loading || !nickname.trim()}
         className="w-full rounded-xl bg-accent py-3 font-display font-semibold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
       >
         {loading ? 'Đang vào...' : 'Vào đoạn chat'}
@@ -168,18 +176,56 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
 function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => void }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const deviceId = useRef(getDeviceId())
   const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const initialLoadDone = useRef(false)
 
   useEffect(() => {
     let cancelled = false
     fetch(`/api/chat/messages?roomId=${session.roomId}&deviceId=${deviceId.current}`)
       .then((r) => r.json())
       .then((data) => {
-        if (!cancelled && data.messages) setMessages(data.messages)
+        if (cancelled || !data.messages) return
+        setMessages(data.messages)
+        setHasMore(Boolean(data.hasMore))
+        initialLoadDone.current = true
       })
     return () => { cancelled = true }
   }, [session.roomId])
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || messages.length === 0) return
+    setLoadingMore(true)
+    const container = scrollRef.current
+    const prevHeight = container?.scrollHeight ?? 0
+    try {
+      const oldest = messages[0].created_at
+      const res = await fetch(
+        `/api/chat/messages?roomId=${session.roomId}&deviceId=${deviceId.current}&before=${encodeURIComponent(oldest)}`
+      )
+      const data = await res.json()
+      if (data.messages?.length) {
+        setMessages((prev) => [...data.messages, ...prev])
+        setHasMore(Boolean(data.hasMore))
+        requestAnimationFrame(() => {
+          if (container) container.scrollTop = container.scrollHeight - prevHeight
+        })
+      } else {
+        setHasMore(false)
+      }
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [loadingMore, hasMore, messages, session.roomId])
+
+  const onScroll = useCallback(() => {
+    const container = scrollRef.current
+    if (!container) return
+    if (container.scrollTop < 80) loadMore()
+  }, [loadMore])
 
   useEffect(() => {
     subscribeToPush(session.roomId, deviceId.current)
@@ -195,9 +241,17 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     return () => { supabase.removeChannel(channel) }
   }, [session.roomId])
 
+  const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null
+  const lastMessageIdRef = useRef<string | null>(null)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    if (!initialLoadDone.current) return
+    // Only autoscroll when a new message lands at the bottom — not when older
+    // messages are prepended by scroll-up pagination.
+    if (lastMessageId !== lastMessageIdRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+    lastMessageIdRef.current = lastMessageId
+  }, [lastMessageId])
 
   const send = useCallback(async () => {
     const content = input.trim()
@@ -221,7 +275,8 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         <p className="font-display font-semibold text-white">{session.roomName}</p>
         <button onClick={leave} className="text-xs text-muted hover:text-white">Rời phòng</button>
       </div>
-      <div className="flex-1 space-y-2 overflow-y-auto rounded-xl border border-border bg-surface p-4">
+      <div ref={scrollRef} onScroll={onScroll} className="flex-1 space-y-2 overflow-y-auto rounded-xl border border-border bg-surface p-4">
+        {loadingMore && <p className="text-center text-xs text-muted">Đang tải tin nhắn cũ...</p>}
         {messages.map((m) => {
           const mine = m.device_id === deviceId.current
           return (
