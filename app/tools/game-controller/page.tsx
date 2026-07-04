@@ -23,6 +23,26 @@ const PLAYER_COLORS = [
 
 type HostMode = 'browser' | 'agent'
 
+// ── Cross-browser Fullscreen API (vendor prefixes for older WebViews) ──
+type FullscreenElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void>
+  mozRequestFullScreen?: () => Promise<void>
+  msRequestFullscreen?: () => Promise<void>
+}
+type FullscreenDocument = Document & {
+  webkitFullscreenElement?: Element | null
+  webkitExitFullscreen?: () => Promise<void>
+  mozFullScreenElement?: Element | null
+  mozCancelFullScreen?: () => Promise<void>
+  msFullscreenElement?: Element | null
+  msExitFullscreen?: () => Promise<void>
+}
+
+function getFullscreenElement(): Element | null {
+  const doc = document as FullscreenDocument
+  return document.fullscreenElement ?? doc.webkitFullscreenElement ?? doc.mozFullScreenElement ?? doc.msFullscreenElement ?? null
+}
+
 function generateRoomId() {
   return Math.random().toString(36).slice(2, 8).toUpperCase()
 }
@@ -496,7 +516,6 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
   const [status, setStatus] = useState<'connecting' | 'ready' | 'disconnected'>('connecting')
   const [activeCombo, setActiveCombo] = useState<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [fsSupported] = useState(() => typeof document !== 'undefined' && document.fullscreenEnabled)
   const connRef = useRef<{
     sendInput: (m: Omit<InputMessage, 'peerId'>) => void
     disconnect: () => void
@@ -507,14 +526,22 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
   const comboFlashRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement)
-    document.addEventListener('fullscreenchange', onFsChange)
-    return () => document.removeEventListener('fullscreenchange', onFsChange)
+    const onFsChange = () => setIsFullscreen(!!getFullscreenElement())
+    const events = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange']
+    events.forEach((ev) => document.addEventListener(ev, onFsChange))
+    return () => events.forEach((ev) => document.removeEventListener(ev, onFsChange))
   }, [])
 
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {})
-    else document.exitFullscreen?.().catch(() => {})
+    const el = document.documentElement as FullscreenElement
+    if (!getFullscreenElement()) {
+      const request = el.requestFullscreen ?? el.webkitRequestFullscreen ?? el.mozRequestFullScreen ?? el.msRequestFullscreen
+      request?.call(el)?.catch?.(() => {})
+    } else {
+      const doc = document as FullscreenDocument
+      const exit = document.exitFullscreen ?? doc.webkitExitFullscreen ?? doc.mozCancelFullScreen ?? doc.msExitFullscreen
+      exit?.call(document)?.catch?.(() => {})
+    }
   }
 
   useEffect(() => {
@@ -600,14 +627,12 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
       </div>
 
       {/* Fullscreen toggle */}
-      {fsSupported && (
-        <button
-          onClick={toggleFullscreen}
-          className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-[#1A1A2E] bg-[#0F0F1A]/90 text-sm text-white"
-        >
-          {isFullscreen ? '⤡' : '⛶'}
-        </button>
-      )}
+      <button
+        onClick={toggleFullscreen}
+        className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[#1A1A2E] bg-[#0F0F1A]/90 text-base text-white"
+      >
+        {isFullscreen ? '⤡' : '⛶'}
+      </button>
 
       {/* Combo flash */}
       {activeCombo && (
