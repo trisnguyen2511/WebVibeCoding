@@ -16,18 +16,18 @@ hold_interval = 60
 [button:A]
 label = A
 key = n
-x = 82
-y = 50
-w = 12
-h = 14
+x = 78
+y = 46
+w = 20
+h = 24
 
 [button:B]
 label = B
 key = m
-x = 70
-y = 55
-w = 12
-h = 14
+x = 55
+y = 56
+w = 20
+h = 22
 
 [button:L]
 label = L
