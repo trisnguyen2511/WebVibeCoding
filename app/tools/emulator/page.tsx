@@ -1,6 +1,7 @@
 'use client'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
+import JSZip from 'jszip'
 import { ToolShell } from '@/components/tool-shell'
 import { useGameController } from '@/hooks/use-game-controller'
 
@@ -183,14 +184,31 @@ function EmulatorHost() {
   }, [playerInputs, players])
 
   // ── Handle ROM file pick ──────────────────────────────────────
-  const handleRomFile = (file: File) => {
+  const handleRomFile = async (file: File) => {
     if (blobRef.current) URL.revokeObjectURL(blobRef.current)
-    const url = URL.createObjectURL(file)
-    blobRef.current = url
-    setRomUrl(url)
     setRomName(file.name)
     setGameReady(false)
     ejsRef.current = null
+
+    // EmulatorJS auto-extracts any .zip passed as EJS_gameUrl before
+    // handing it to the core. That's fine for a single archived ROM file,
+    // but FBNeo's MAME-derived loader expects to open the arcade romset
+    // zip itself (matching internal filenames/CRCs against its driver
+    // database) — the pre-extraction corrupts that structure and FBNeo
+    // reports "Romset is unknown" even for a perfectly valid ROM.
+    // Wrapping the romset in one more outer zip means EmulatorJS's
+    // auto-extraction only unwraps that outer layer, handing FBNeo the
+    // untouched inner .zip it actually expects.
+    let uploadBlob: Blob = file
+    if (system === 'arcade' && file.name.toLowerCase().endsWith('.zip')) {
+      const wrapper = new JSZip()
+      wrapper.file(file.name, file)
+      uploadBlob = await wrapper.generateAsync({ type: 'blob', compression: 'STORE' })
+    }
+
+    const url = URL.createObjectURL(uploadBlob)
+    blobRef.current = url
+    setRomUrl(url)
   }
 
   // ── Handle BIOS file pick (arcade only, e.g. neogeo.zip) ───────
@@ -314,7 +332,7 @@ function EmulatorHost() {
                     <input
                       type="file"
                       accept=".nes,.sfc,.smc,.gba,.gbc,.gb,.n64,.z64,.v64,.zip"
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRomFile(f) }}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleRomFile(f) }}
                       className="hidden"
                     />
                   </label>
@@ -325,6 +343,11 @@ function EmulatorHost() {
                   <div>
                     <p className="mb-2 font-mono text-xs uppercase tracking-widest text-muted">
                       BIOS (tùy chọn — Neo Geo cần neogeo.zip)
+                    </p>
+                    <p className="mb-3 text-xs text-muted">
+                      Nếu báo &quot;Romset is unknown&quot;: giữ nguyên tên file .zip gốc (đừng đổi tên) —
+                      romset arcade phải khớp đúng phiên bản mà core FBNeo hỗ trợ, ROM chạy tốt trên
+                      emulator khác chưa chắc cùng phiên bản romset với FBNeo.
                     </p>
                     {biosName ? (
                       <div className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3">
