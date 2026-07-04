@@ -382,7 +382,7 @@ function HostView({ roomId }: { roomId: string }) {
 
 // ── Phone: Layout Setup ──────────────────────────────────────────
 function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }) {
-  type Preset = 'nes' | 'nes-p2' | 'snes' | 'snes-p2' | 'wasd' | 'arcade-p1' | 'arcade-p2' | 'arcade-p3' | 'arcade-p4'
+  type Preset = 'nes' | 'nes-p2' | 'snes' | 'snes-p2' | 'wasd' | 'arcade-p1' | 'arcade-p2' | 'arcade-p3' | 'arcade-p4' | 'fbneo-p1' | 'fbneo-p2' | 'fbneo-p3' | 'fbneo-p4'
   const [preset, setPreset] = useState<Preset>('nes')
   const [config, setConfig] = useState<ControllerConfig | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
@@ -447,6 +447,12 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
                 <option value="arcade-p2">Arcade P2 (WASD + J/K/L/U)</option>
                 <option value="arcade-p3">Arcade P3 (TFGH + Y/R/E/Q)</option>
                 <option value="arcade-p4">Arcade P4 (IBNO + P/M/,/.)</option>
+              </optgroup>
+              <optgroup label="── Arcade Fighter (CP1/CP2/NeoGeo) ──">
+                <option value="fbneo-p1">Arcade Fighter — Player 1</option>
+                <option value="fbneo-p2">Arcade Fighter — Player 2</option>
+                <option value="fbneo-p3">Arcade Fighter — Player 3</option>
+                <option value="fbneo-p4">Arcade Fighter — Player 4</option>
               </optgroup>
             </select>
           </div>
