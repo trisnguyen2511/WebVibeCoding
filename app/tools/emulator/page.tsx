@@ -153,6 +153,9 @@ function EmulatorHost() {
   const [biosName,  setBiosName]  = useState<string | null>(null)
   const [wrapZip,   setWrapZip]   = useState(false)
   const [gameReady, setGameReady] = useState(false)
+  const [romUrlInput, setRomUrlInput] = useState('')
+  const [urlLoading,  setUrlLoading]  = useState(false)
+  const [urlError,    setUrlError]    = useState<string | null>(null)
 
   const ejsRef     = useRef<EJSManager | null>(null)
   const prevRef    = useRef<Record<string, Record<string, boolean>>>({})
@@ -208,6 +211,30 @@ function EmulatorHost() {
     const url = URL.createObjectURL(uploadBlob)
     blobRef.current = url
     setRomUrl(url)
+  }
+
+  // ── Import ROM directly from a URL (skips the manual download step) ──
+  // Only works if the host serves the file with CORS allowed for this
+  // origin — most ROM sites don't, so this is best-effort with a clear
+  // error message rather than a guaranteed feature.
+  const handleRomUrlImport = async () => {
+    const trimmed = romUrlInput.trim()
+    if (!trimmed) return
+    setUrlError(null)
+    setUrlLoading(true)
+    try {
+      const res = await fetch(trimmed)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      const nameFromUrl = decodeURIComponent(trimmed.split('/').pop()?.split(/[?#]/)[0] || '')
+      const name = nameFromUrl || 'rom' + (SYSTEMS.find((s) => s.value === system)?.exts.split(' ')[0] ?? '')
+      await handleRomFile(new File([blob], name, { type: blob.type }))
+      setRomUrlInput('')
+    } catch {
+      setUrlError('Không tải được ROM từ link này — thường do server không cho phép CORS. Thử tải file về máy rồi upload thủ công.')
+    } finally {
+      setUrlLoading(false)
+    }
   }
 
   // ── Handle BIOS file pick (arcade only, e.g. neogeo.zip) ───────
@@ -345,6 +372,37 @@ function EmulatorHost() {
                       className="hidden"
                     />
                   </label>
+
+                  {/* Import ROM from URL — skips downloading to disk first */}
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="font-mono text-xs text-muted">hoặc dán link ROM</span>
+                    <div className="h-px flex-1 bg-border" />
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      type="url"
+                      value={romUrlInput}
+                      onChange={(e) => setRomUrlInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !urlLoading && void handleRomUrlImport()}
+                      placeholder="https://example.com/game.zip"
+                      className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs text-white outline-none placeholder:text-muted focus:border-accent/40"
+                    />
+                    <button
+                      onClick={() => void handleRomUrlImport()}
+                      disabled={urlLoading || !romUrlInput.trim()}
+                      className="shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-xs font-medium text-accent-soft transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {urlLoading ? 'Đang tải...' : 'Import'}
+                    </button>
+                  </div>
+                  {urlError && (
+                    <p className="mt-2 text-xs text-red-400">{urlError}</p>
+                  )}
+                  <p className="mt-2 text-xs text-muted">
+                    Chỉ chạy được nếu server host file cho phép CORS — nhiều trang ROM không hỗ trợ,
+                    lúc đó vẫn cần tải về máy rồi upload thủ công như trên.
+                  </p>
                 </div>
 
                 {/* Arcade troubleshooting: "Romset is unknown" ────────── */}
