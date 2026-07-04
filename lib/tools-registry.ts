@@ -1,4 +1,4 @@
-export type ToolCategory = 'utility' | 'crypto' | 'game' | 'media' | 'dev' | 'productivity'
+export type ToolCategory = 'utility' | 'crypto' | 'game' | 'media' | 'dev' | 'productivity' | 'social'
 
 export interface Tool {
   name: string
@@ -85,5 +85,12 @@ export const tools: Tool[] = [
     icon: '🖼️',
     description: 'Compress, resize and convert images in the browser',
     category: 'media',
+  },
+  {
+    name: 'Private Chat',
+    slug: 'private-chat',
+    icon: '💬',
+    description: 'PIN-based private chat with push notifications',
+    category: 'social',
   },
 ]

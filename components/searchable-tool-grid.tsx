@@ -11,6 +11,7 @@ const CATEGORIES: { label: string; value: ToolCategory | 'all' }[] = [
   { label: 'Media', value: 'media' },
   { label: 'Productivity', value: 'productivity' },
   { label: 'Game', value: 'game' },
+  { label: 'Social', value: 'social' },
 ]
 
 export function SearchableToolGrid({ tools }: { tools: Tool[] }) {
