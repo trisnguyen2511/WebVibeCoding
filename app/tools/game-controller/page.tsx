@@ -573,7 +573,7 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
   const onDown = (id: string) => {
     const btn = config.buttons[id]
     sendKey(btn.key, 'pressed')
-    if (navigator.vibrate) navigator.vibrate(20)
+    if (navigator.vibrate) navigator.vibrate(6)
 
     if (btn.hold) {
       holdTimersRef.current[id] = setTimeout(() => {
@@ -596,7 +596,7 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
   const onComboDown = (comboId: string) => {
     const combo = config.combos[comboId]
     for (const key of combo.chord) sendKey(key, 'pressed')
-    if (navigator.vibrate) navigator.vibrate([30, 15, 30])
+    if (navigator.vibrate) navigator.vibrate(10)
     if (comboFlashRef.current) clearTimeout(comboFlashRef.current)
     setActiveCombo(combo.label)
     comboFlashRef.current = setTimeout(() => setActiveCombo(null), 800)
