@@ -7,14 +7,24 @@ interface ToolShellProps {
   description?: string
   children: React.ReactNode
   wide?: boolean
+  /**
+   * Fills exactly the viewport height with no outer scroll — the header
+   * shrinks to fit and `children` gets the rest via a flex-1 region with
+   * its own internal scrolling. Use for tools like chat that need a fixed,
+   * app-like frame instead of a normal scrolling page.
+   */
+  fullBleed?: boolean
 }
 
-export function ToolShell({ name, icon, description, children, wide = false }: ToolShellProps) {
+export function ToolShell({ name, icon, description, children, wide = false, fullBleed = false }: ToolShellProps) {
   const maxW = wide ? 'max-w-6xl' : 'max-w-4xl'
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur-md">
+    <div
+      className={fullBleed ? 'flex h-dvh flex-col overflow-hidden bg-background' : 'min-h-screen bg-background'}
+      style={fullBleed ? { overscrollBehavior: 'none' } : undefined}
+    >
+      <header className="sticky top-0 z-20 shrink-0 border-b border-border bg-background/85 backdrop-blur-md">
         <div className={`mx-auto flex ${maxW} items-center gap-3 px-4 py-2.5`}>
           <Link
             href="/"
@@ -48,7 +58,7 @@ export function ToolShell({ name, icon, description, children, wide = false }: T
         </div>
       </header>
 
-      <main className={`mx-auto ${maxW} px-4 py-6`}>
+      <main className={fullBleed ? 'min-h-0 flex-1 overflow-hidden' : `mx-auto ${maxW} px-4 py-6`}>
         {children}
       </main>
     </div>

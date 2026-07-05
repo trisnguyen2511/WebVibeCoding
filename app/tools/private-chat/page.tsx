@@ -754,7 +754,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   })()
 
   return (
-    <div className="mx-auto flex h-[70dvh] max-w-xl flex-col">
+    <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
       {gestureOverlay && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-md animate-[panel-in_0.15s_ease-out]">
           <span className="animate-gesture-burst text-8xl drop-shadow-[0_0_24px_rgba(124,58,237,0.6)]">{gestureOverlay.emoji}</span>
@@ -824,7 +824,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="flex-1 space-y-3 overflow-y-auto rounded-xl border border-border bg-surface p-4 shadow-inner transition-shadow duration-500"
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface p-4 shadow-inner transition-shadow duration-500"
         style={otherMoodColor ? { boxShadow: `inset 0 0 60px ${otherMoodColor}22` } : undefined}
       >
         {initialLoading ? (
@@ -1230,11 +1230,13 @@ export default function PrivateChatPage() {
   }, [])
 
   return (
-    <ToolShell name="Private Chat" icon="💬" description="Đoạn chat riêng tư bằng mã PIN">
+    <ToolShell name="Private Chat" icon="💬" description="Đoạn chat riêng tư bằng mã PIN" fullBleed>
       {session === undefined ? null : session ? (
         <ChatScreen session={session} onLeave={() => setSession(null)} />
       ) : (
-        <JoinScreen onJoined={setSession} />
+        <div className="flex h-full items-center justify-center overflow-y-auto p-4">
+          <JoinScreen onJoined={setSession} />
+        </div>
       )}
     </ToolShell>
   )
