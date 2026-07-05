@@ -764,23 +764,32 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         </div>
       )}
 
-      <div className="mb-3 flex items-center justify-between border-b border-border pb-3">
-        <div>
-          <p className="font-display font-semibold text-white">{session.roomName}</p>
-          {session.anniversaryDate && (
-            <p className="mt-0.5 text-xs font-medium text-accent-soft">💞 Yêu nhau được {daysSince(session.anniversaryDate)} ngày</p>
+      <div className="mb-3 flex items-center gap-3 border-b border-border pb-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10 text-base">
+          {session.roomType === 'solo' ? '📔' : '💬'}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-display font-semibold text-white">{session.roomName}</p>
+          {session.anniversaryDate ? (
+            <p className="mt-0.5 truncate text-xs font-medium text-accent-soft">💞 Yêu nhau được {daysSince(session.anniversaryDate)} ngày</p>
+          ) : (
+            <p className="mt-0.5 text-xs text-muted">{session.roomType === 'solo' ? 'Độc thoại' : 'Nhóm'}</p>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-0.5">
           <button
             onClick={() => setShowMoodPicker((v) => !v)}
             title="Trạng thái cảm xúc"
-            className={`rounded-lg px-2 py-1 text-lg transition-transform hover:scale-110 ${showMoodPicker ? 'bg-accent/20' : ''}`}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-all hover:scale-110 ${showMoodPicker ? 'bg-accent/20' : 'hover:bg-background'}`}
           >
             {MOOD_OPTIONS.find((m) => m.id === ownMood)?.emoji ?? '🙂'}
           </button>
-          <button onClick={leave} className="rounded-lg px-2 py-1 text-xs text-muted transition-colors hover:bg-background hover:text-white">
-            Rời phòng
+          <button
+            onClick={leave}
+            title="Rời phòng"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-base text-muted transition-colors hover:bg-background hover:text-white"
+          >
+            🚪
           </button>
         </div>
       </div>
