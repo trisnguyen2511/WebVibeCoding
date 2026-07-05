@@ -287,7 +287,7 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         onChange={(e) => setNickname(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') join() }}
         placeholder="Tên hiển thị của bạn"
-        className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-white outline-none placeholder-muted focus:border-accent"
+        className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-base text-white outline-none placeholder-muted focus:border-accent sm:text-sm"
       />
       {error && <p className="text-center text-xs text-red-400">{error}</p>}
       <button
@@ -1057,7 +1057,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             type="datetime-local"
             value={capsuleAt}
             onChange={(e) => setCapsuleAt(e.target.value)}
-            className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-white outline-none focus:border-accent"
+            className="rounded-lg border border-border bg-background px-2 py-1 text-base text-white outline-none focus:border-accent sm:text-xs"
           />
           <button onClick={() => { setCapsuleAt(''); setShowCapsulePicker(false) }} className="text-xs text-muted transition-colors hover:text-white">Huỷ</button>
         </div>
@@ -1205,7 +1205,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             fontWeight: style.bold ? 700 : undefined,
             fontStyle: style.italic ? 'italic' : undefined,
           }}
-          className="flex-1 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-white outline-none transition-all placeholder-muted focus:border-accent focus:ring-2 focus:ring-accent/20"
+          className="flex-1 rounded-xl border border-border bg-surface px-4 py-2.5 text-base text-white outline-none transition-all placeholder-muted focus:border-accent focus:ring-2 focus:ring-accent/20 sm:text-sm"
         />
         <button
           onClick={send}

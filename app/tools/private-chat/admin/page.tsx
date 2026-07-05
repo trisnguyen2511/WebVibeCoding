@@ -44,7 +44,7 @@ function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
         onChange={(e) => setPassword(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') login() }}
         placeholder="Admin password"
-        className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-white outline-none placeholder-muted focus:border-accent"
+        className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-base text-white outline-none placeholder-muted focus:border-accent sm:text-sm"
       />
       {error && <p className="text-center text-xs text-red-400">{error}</p>}
       <button
@@ -129,13 +129,13 @@ function AdminPanel() {
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
             inputMode="numeric"
             placeholder="PIN (4-10 số)"
-            className="w-32 rounded-lg border border-border bg-background px-3 py-2 text-sm text-white outline-none placeholder-muted focus:border-accent"
+            className="w-32 rounded-lg border border-border bg-background px-3 py-2 text-base text-white outline-none placeholder-muted focus:border-accent sm:text-sm"
           />
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Tên phòng"
-            className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-white outline-none placeholder-muted focus:border-accent"
+            className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-base text-white outline-none placeholder-muted focus:border-accent sm:text-sm"
           />
           <button
             onClick={create}
@@ -179,7 +179,7 @@ function AdminPanel() {
                   type="date"
                   defaultValue={r.anniversary_date ?? ''}
                   onBlur={(e) => setAnniversary(r.id, e.target.value)}
-                  className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-white outline-none focus:border-accent"
+                  className="rounded-lg border border-border bg-background px-2 py-1 text-base text-white outline-none focus:border-accent sm:text-xs"
                 />
               </div>
             </div>
