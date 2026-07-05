@@ -637,13 +637,35 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     })
   }
 
-  const toggleReaction = async (messageId: string, emoji: string) => {
+  const toggleReaction = (messageId: string, emoji: string) => {
     setReactionPickerFor(null)
-    await fetch('/api/chat/react', {
+
+    // Show the reaction immediately and reconcile with the server in the
+    // background — a failed request just quietly reverts, no error UI.
+    let previousReactions: Reaction[] | undefined
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m
+        previousReactions = m.chat_message_reactions
+        const others = (m.chat_message_reactions ?? []).filter((r) => r.device_id !== deviceId.current)
+        const alreadyHadThis = (m.chat_message_reactions ?? []).some(
+          (r) => r.device_id === deviceId.current && r.emoji === emoji
+        )
+        return { ...m, chat_message_reactions: alreadyHadThis ? others : [...others, { device_id: deviceId.current, emoji }] }
+      })
+    )
+
+    fetch('/api/chat/react', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roomId: session.roomId, messageId, deviceId: deviceId.current, emoji }),
     })
+      .then((res) => {
+        if (!res.ok) throw new Error('react failed')
+      })
+      .catch(() => {
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, chat_message_reactions: previousReactions } : m)))
+      })
   }
 
   const pinMessage = async (messageId: string | null) => {
