@@ -170,6 +170,17 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 }
 
+function formatDayLabel(iso: string): string {
+  const date = new Date(iso)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
+  const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString()
+  if (sameDay(date, today)) return 'Hôm nay'
+  if (sameDay(date, yesterday)) return 'Hôm qua'
+  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
 function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
   const [pin, setPin] = useState('')
   const [nickname, setNickname] = useState('')
@@ -298,6 +309,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [input, setInput] = useState('')
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [pendingImage, setPendingImage] = useState<{ dataUrl: string } | null>(null)
   const [imageError, setImageError] = useState('')
   const [style, setStyle] = useState<MessageStyle>(DEFAULT_STYLE)
@@ -346,6 +358,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         initialLoadDone.current = true
         markSeen()
       })
+      .finally(() => { if (!cancelled) setInitialLoading(false) })
     fetch(`/api/chat/pin?roomId=${session.roomId}`)
       .then((r) => r.json())
       .then((data) => { if (!cancelled) setPinnedMessage(data.message ?? null) })
@@ -741,7 +754,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   })()
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col" style={{ height: '70vh' }}>
+    <div className="mx-auto flex h-[70dvh] max-w-xl flex-col">
       {gestureOverlay && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-md animate-[panel-in_0.15s_ease-out]">
           <span className="animate-gesture-burst text-8xl drop-shadow-[0_0_24px_rgba(124,58,237,0.6)]">{gestureOverlay.emoji}</span>
@@ -805,14 +818,44 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         className="flex-1 space-y-3 overflow-y-auto rounded-xl border border-border bg-surface p-4 shadow-inner transition-shadow duration-500"
         style={otherMoodColor ? { boxShadow: `inset 0 0 60px ${otherMoodColor}22` } : undefined}
       >
+        {initialLoading ? (
+          <div className="space-y-3">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className={`flex ${i % 2 ? 'justify-end' : 'justify-start'}`}>
+                <div
+                  className="h-8 animate-pulse rounded-2xl bg-background"
+                  style={{ width: `${40 + (i * 37) % 35}%` }}
+                />
+              </div>
+            ))}
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+            <span className="text-3xl">👋</span>
+            <p className="text-sm text-muted">Chưa có tin nhắn nào — gửi lời chào đầu tiên đi!</p>
+          </div>
+        ) : (
+          <>
         {loadingMore && <p className="text-center text-xs text-muted animate-pulse">Đang tải tin nhắn cũ...</p>}
-        {messages.map((m) => {
+        {messages.map((m, i) => {
+          const prev = messages[i - 1]
+          const showDayDivider = session.roomType === 'solo' && (!prev || formatDayLabel(prev.created_at) !== formatDayLabel(m.created_at))
+
           if (m.device_id === 'system') {
             return (
-              <div key={m.id} className="flex justify-center animate-msg-in">
-                <span className="max-w-[90%] rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-center text-xs text-amber-400">
-                  {m.content}
-                </span>
+              <div key={m.id}>
+                {showDayDivider && (
+                  <div className="mb-3 flex items-center gap-3 text-[10px] font-medium uppercase tracking-widest text-muted">
+                    <span className="h-px flex-1 bg-border" />
+                    {formatDayLabel(m.created_at)}
+                    <span className="h-px flex-1 bg-border" />
+                  </div>
+                )}
+                <div className="flex justify-center animate-msg-in">
+                  <span className="max-w-[90%] rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-center text-xs text-amber-400">
+                    {m.content}
+                  </span>
+                </div>
               </div>
             )
           }
@@ -826,10 +869,18 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           reactions.forEach((r) => reactionGroups.set(r.emoji, (reactionGroups.get(r.emoji) ?? 0) + 1))
           const myReaction = reactions.find((r) => r.device_id === deviceId.current)?.emoji
           const bubbleMaxWidth = isJournal ? 'max-w-full' : 'max-w-[75%]'
+          const tailClass = isJournal ? '' : mine ? 'rounded-br-md' : 'rounded-bl-md'
 
           return (
+            <div key={m.id}>
+              {showDayDivider && (
+                <div className="mb-3 flex items-center gap-3 text-[10px] font-medium uppercase tracking-widest text-muted">
+                  <span className="h-px flex-1 bg-border" />
+                  {formatDayLabel(m.created_at)}
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+              )}
             <div
-              key={m.id}
               className={`group flex animate-msg-in flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'}`}
             >
               {!mine && !isJournal && <span className="mb-0.5 text-[10px] text-muted">{m.nickname}</span>}
@@ -878,8 +929,8 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                     )}
                     {m.content && (
                       <span
-                        className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm shadow-sm ${
-                          mine ? 'bg-accent text-white' : 'bg-background border border-border text-white'
+                        className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm shadow-sm ${tailClass} ${
+                          mine ? 'bg-gradient-to-br from-accent to-accent/80 text-white' : 'bg-background border border-border text-white'
                         }`}
                         style={{
                           ...fontStyleFor(m.font_family),
@@ -953,9 +1004,12 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                 <span className="mt-0.5 text-[10px] text-muted">Đã xem lúc {formatTime(seenAt)}</span>
               )}
             </div>
+            </div>
           )
         })}
         <div ref={bottomRef} />
+        </>
+        )}
       </div>
 
       {replyingTo && (
@@ -1134,6 +1188,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           value={input}
           onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') send() }}
+          onFocus={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 300)}
           placeholder="Nhắn gì đó..."
           style={{
             ...fontStyleFor(style.font),
