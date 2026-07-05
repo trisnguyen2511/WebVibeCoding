@@ -312,6 +312,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [showMoodPicker, setShowMoodPicker] = useState(false)
   const [showGesturePicker, setShowGesturePicker] = useState(false)
   const [gestureOverlay, setGestureOverlay] = useState<{ emoji: string; nickname: string; label: string } | null>(null)
+  const [showToolsMenu, setShowToolsMenu] = useState(false)
 
   const deviceId = useRef(getDeviceId())
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -943,42 +944,60 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         </div>
       )}
 
-      <div className="mt-3 flex gap-2">
+      <div className="relative mt-3 flex items-center gap-2">
         <input ref={fileInputRef} type="file" accept="image/*" onChange={onImageSelected} className="hidden" />
+
         <button
-          onClick={pickImage}
-          title="Gửi ảnh"
-          className="rounded-xl border border-border bg-surface px-3 py-2.5 text-muted hover:text-white transition-colors"
-        >
-          🖼️
-        </button>
-        <button
-          onClick={() => setShowStylePicker((v) => !v)}
-          title="Tùy chỉnh kiểu chữ"
-          className={`rounded-xl border px-3 py-2.5 text-xs font-bold transition-colors ${
-            showStylePicker ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-white'
+          onClick={() => setShowToolsMenu((v) => !v)}
+          title="Thêm"
+          className={`shrink-0 rounded-xl border px-3 py-2.5 text-lg leading-none transition-colors ${
+            showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker
+              ? 'border-accent bg-accent/20 text-accent-soft'
+              : 'border-border bg-surface text-muted hover:text-white'
           }`}
         >
-          Aa
+          +
         </button>
-        <button
-          onClick={() => setShowCapsulePicker((v) => !v)}
-          title="Tin nhắn hẹn giờ"
-          className={`rounded-xl border px-3 py-2.5 transition-colors ${
-            showCapsulePicker || capsuleAt ? 'border-accent bg-accent/20' : 'border-border bg-surface text-muted hover:text-white'
-          }`}
-        >
-          🕰️
-        </button>
-        <button
-          onClick={() => setShowGesturePicker((v) => !v)}
-          title="Gửi cử chỉ"
-          className={`rounded-xl border px-3 py-2.5 transition-colors ${
-            showGesturePicker ? 'border-accent bg-accent/20' : 'border-border bg-surface text-muted hover:text-white'
-          }`}
-        >
-          🤗
-        </button>
+
+        {showToolsMenu && (
+          <div className="absolute bottom-full left-0 mb-2 flex gap-1 rounded-xl border border-border bg-surface p-1.5 shadow-lg">
+            <button
+              onClick={() => { pickImage(); setShowToolsMenu(false) }}
+              title="Gửi ảnh"
+              className="rounded-lg px-2.5 py-2 text-lg text-muted hover:bg-background hover:text-white transition-colors"
+            >
+              🖼️
+            </button>
+            <button
+              onClick={() => { setShowStylePicker((v) => !v); setShowToolsMenu(false) }}
+              title="Tùy chỉnh kiểu chữ"
+              className={`rounded-lg px-2.5 py-2 text-sm font-bold transition-colors ${
+                showStylePicker ? 'text-accent-soft' : 'text-muted hover:bg-background hover:text-white'
+              }`}
+            >
+              Aa
+            </button>
+            <button
+              onClick={() => { setShowCapsulePicker((v) => !v); setShowToolsMenu(false) }}
+              title="Tin nhắn hẹn giờ"
+              className={`rounded-lg px-2.5 py-2 text-lg transition-colors ${
+                showCapsulePicker || capsuleAt ? 'text-accent-soft' : 'text-muted hover:bg-background hover:text-white'
+              }`}
+            >
+              🕰️
+            </button>
+            <button
+              onClick={() => { setShowGesturePicker((v) => !v); setShowToolsMenu(false) }}
+              title="Gửi cử chỉ"
+              className={`rounded-lg px-2.5 py-2 text-lg transition-colors ${
+                showGesturePicker ? 'text-accent-soft' : 'text-muted hover:bg-background hover:text-white'
+              }`}
+            >
+              🤗
+            </button>
+          </div>
+        )}
+
         <input
           value={input}
           onChange={(e) => handleInputChange(e.target.value)}
