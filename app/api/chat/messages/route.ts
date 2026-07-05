@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabase
     .from('chat_messages')
-    .select('id, device_id, nickname, content, created_at')
+    .select('id, device_id, nickname, content, image_url, text_color, font_family, bold, italic, created_at')
     .eq('room_id', roomId)
     .order('created_at', { ascending: false })
     .limit(PAGE_SIZE)
