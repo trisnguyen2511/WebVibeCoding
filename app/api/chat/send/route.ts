@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'invalid request body' }, { status: 400 })
   }
-  const { roomId, deviceId, content, image, style, replyTo, revealAt, gesture } = body as {
+  const { roomId, deviceId, content, image, style, replyTo, revealAt, gesture, clientId } = body as {
     roomId?: string
     deviceId?: string
     content?: string
@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
     replyTo?: { id?: string; nickname?: string; content?: string }
     revealAt?: string
     gesture?: string
+    clientId?: string
   }
   if (!roomId || !deviceId) return NextResponse.json({ error: 'roomId and deviceId are required' }, { status: 400 })
 
@@ -122,7 +123,8 @@ export async function POST(req: NextRequest) {
   // broadcast to other devices before reveal_at — only the API's GET route
   // (which re-checks the clock on every request) is allowed to unlock them.
   const isLocked = Boolean(message.reveal_at && new Date(message.reveal_at).getTime() > Date.now())
-  const broadcastPayload = isLocked ? { ...message, content: null, locked: true } : message
+  const withClientId = clientId ? { ...message, clientId } : message
+  const broadcastPayload = isLocked ? { ...withClientId, content: null, locked: true } : withClientId
 
   await supabase.channel(`chat-room-${roomId}`).send({
     type: 'broadcast',

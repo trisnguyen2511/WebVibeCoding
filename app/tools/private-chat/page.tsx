@@ -34,6 +34,9 @@ type ChatMessage = {
   locked?: boolean
   chat_message_reactions?: Reaction[]
   created_at: string
+  clientId?: string
+  pending?: boolean
+  failed?: boolean
 }
 
 type PinnedMessage = { id: string; device_id: string; nickname: string; content: string | null; image_url?: string | null }
@@ -296,7 +299,6 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [pendingImage, setPendingImage] = useState<{ dataUrl: string } | null>(null)
-  const [sending, setSending] = useState(false)
   const [imageError, setImageError] = useState('')
   const [style, setStyle] = useState<MessageStyle>(DEFAULT_STYLE)
   const [showStylePicker, setShowStylePicker] = useState(false)
@@ -323,6 +325,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const typingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const lastTypingSentRef = useRef(0)
   const unlockTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const pendingPayloadsRef = useRef<Map<string, Record<string, unknown>>>(new Map())
 
   const markSeen = useCallback(() => {
     fetch('/api/chat/seen', {
@@ -428,7 +431,18 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     })
     channel.on('broadcast', { event: 'message' }, (payload) => {
       const message = payload.payload as ChatMessage
-      setMessages((prev) => [...prev, message])
+      setMessages((prev) => {
+        // Echo of a message this device sent — replace the optimistic
+        // placeholder instead of appending a duplicate.
+        const idx = message.clientId ? prev.findIndex((m) => m.clientId === message.clientId) : -1
+        if (idx !== -1) {
+          const next = [...prev]
+          next[idx] = message
+          return next
+        }
+        return [...prev, message]
+      })
+      if (message.clientId) pendingPayloadsRef.current.delete(message.clientId)
       markSeen()
     })
     channel.on('broadcast', { event: 'typing' }, (payload) => {
@@ -537,36 +551,82 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     lastMessageIdRef.current = lastMessageId
   }, [lastMessageId])
 
-  const send = useCallback(async () => {
+  const performSend = useCallback(async (clientId: string, payload: Record<string, unknown>) => {
+    setMessages((prev) => prev.map((m) => (m.clientId === clientId ? { ...m, pending: true, failed: false } : m)))
+    try {
+      const res = await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.message) throw new Error('send failed')
+      pendingPayloadsRef.current.delete(clientId)
+      setMessages((prev) => prev.map((m) => (m.clientId === clientId ? { ...data.message, clientId, pending: false } : m)))
+    } catch {
+      setMessages((prev) => prev.map((m) => (m.clientId === clientId ? { ...m, pending: false, failed: true } : m)))
+    }
+  }, [])
+
+  const retrySend = useCallback((clientId: string) => {
+    const payload = pendingPayloadsRef.current.get(clientId)
+    if (!payload) return
+    performSend(clientId, payload)
+  }, [performSend])
+
+  const send = useCallback(() => {
     const content = input.trim()
     if (!content && !pendingImage) return
-    setSending(true)
-    setInput('')
     const imageToSend = pendingImage
     const reply = replyingTo
     const revealAt = capsuleAt ? new Date(capsuleAt).toISOString() : undefined
+    const sentStyle = style
+    setInput('')
     setPendingImage(null)
     setReplyingTo(null)
     setCapsuleAt('')
     setShowCapsulePicker(false)
-    try {
-      await fetch('/api/chat/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomId: session.roomId,
-          deviceId: deviceId.current,
-          content,
-          image: imageToSend ? { dataUrl: imageToSend.dataUrl } : undefined,
-          style: { color: style.color, font: style.font, bold: style.bold, italic: style.italic },
-          replyTo: reply ? { id: reply.id, nickname: reply.nickname, content: reply.preview } : undefined,
-          revealAt,
-        }),
-      })
-    } finally {
-      setSending(false)
+
+    const clientId = crypto.randomUUID()
+    const payload = {
+      roomId: session.roomId,
+      deviceId: deviceId.current,
+      content,
+      image: imageToSend ? { dataUrl: imageToSend.dataUrl } : undefined,
+      style: { color: sentStyle.color, font: sentStyle.font, bold: sentStyle.bold, italic: sentStyle.italic },
+      replyTo: reply ? { id: reply.id, nickname: reply.nickname, content: reply.preview } : undefined,
+      revealAt,
+      clientId,
     }
-  }, [input, pendingImage, style, replyingTo, capsuleAt, session.roomId])
+    pendingPayloadsRef.current.set(clientId, payload)
+
+    // Show the message immediately — it gets swapped for the server copy
+    // (real id, uploaded image URL, ...) once the request/broadcast lands.
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: clientId,
+        clientId,
+        device_id: deviceId.current,
+        nickname: session.nickname,
+        content: content || null,
+        image_url: imageToSend?.dataUrl ?? null,
+        text_color: sentStyle.color,
+        font_family: sentStyle.font,
+        bold: sentStyle.bold,
+        italic: sentStyle.italic,
+        reply_to_id: reply?.id ?? null,
+        reply_to_nickname: reply?.nickname ?? null,
+        reply_to_content: reply?.preview ?? null,
+        reveal_at: revealAt ?? null,
+        locked: false,
+        created_at: new Date().toISOString(),
+        pending: true,
+      },
+    ])
+
+    performSend(clientId, payload)
+  }, [input, pendingImage, style, replyingTo, capsuleAt, session.roomId, session.nickname, performSend])
 
   const sendGesture = async (gestureId: string) => {
     setShowGesturePicker(false)
@@ -746,34 +806,44 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                 </div>
               )}
 
-              {m.locked ? (
-                <span className="max-w-[75%] rounded-2xl border border-dashed border-border bg-background px-3.5 py-2 text-sm text-muted">
-                  🔒 Tin nhắn hẹn giờ, mở lúc {m.reveal_at ? formatTime(m.reveal_at) : '...'}
-                </span>
-              ) : (
-                <>
-                  {m.image_url && (
-                    <a href={m.image_url} target="_blank" rel="noreferrer" className="mb-1 block max-w-[75%]">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={m.image_url} alt="" className="max-h-64 rounded-xl border border-border object-cover" />
-                    </a>
-                  )}
-                  {m.content && (
-                    <span
-                      className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
-                        mine ? 'bg-accent text-white' : 'bg-background border border-border text-white'
-                      }`}
-                      style={{
-                        ...fontStyleFor(m.font_family),
-                        color: m.text_color ?? undefined,
-                        fontWeight: m.bold ? 700 : undefined,
-                        fontStyle: m.italic ? 'italic' : undefined,
-                      }}
-                    >
-                      {m.content}
-                    </span>
-                  )}
-                </>
+              <div className={`flex flex-col ${mine ? 'items-end' : 'items-start'} ${m.pending || m.failed ? 'opacity-50' : ''}`}>
+                {m.locked ? (
+                  <span className="max-w-[75%] rounded-2xl border border-dashed border-border bg-background px-3.5 py-2 text-sm text-muted">
+                    🔒 Tin nhắn hẹn giờ, mở lúc {m.reveal_at ? formatTime(m.reveal_at) : '...'}
+                  </span>
+                ) : (
+                  <>
+                    {m.image_url && (
+                      <a href={m.image_url} target="_blank" rel="noreferrer" className="mb-1 block max-w-[75%]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={m.image_url} alt="" className="max-h-64 rounded-xl border border-border object-cover" />
+                      </a>
+                    )}
+                    {m.content && (
+                      <span
+                        className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
+                          mine ? 'bg-accent text-white' : 'bg-background border border-border text-white'
+                        }`}
+                        style={{
+                          ...fontStyleFor(m.font_family),
+                          color: m.text_color ?? undefined,
+                          fontWeight: m.bold ? 700 : undefined,
+                          fontStyle: m.italic ? 'italic' : undefined,
+                        }}
+                      >
+                        {m.content}
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+              {m.failed && (
+                <button
+                  onClick={() => retrySend(m.clientId!)}
+                  className="mt-0.5 text-[10px] text-red-400 hover:underline"
+                >
+                  Tin chưa được gửi · Nhắn lại
+                </button>
               )}
 
               {reactionGroups.size > 0 && (
@@ -1013,10 +1083,10 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         />
         <button
           onClick={send}
-          disabled={sending || (!input.trim() && !pendingImage)}
+          disabled={!input.trim() && !pendingImage}
           className="rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
         >
-          {sending ? '...' : 'Gửi'}
+          Gửi
         </button>
       </div>
     </div>
