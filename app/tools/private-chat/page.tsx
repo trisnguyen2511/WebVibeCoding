@@ -7,7 +7,7 @@ import { getSupabaseBrowser } from '@/lib/supabase-browser'
 const SESSION_KEY = 'wv-chat-session'
 const DEVICE_KEY = 'wv-chat-device-id'
 
-type Session = { pin: string; roomId: string; roomName: string; nickname: string }
+type Session = { pin: string; roomId: string; roomName: string; nickname: string; roomType: 'group' | 'solo' }
 type ChatMessage = {
   id: string
   device_id: string
@@ -149,6 +149,7 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         roomId: data.roomId,
         roomName: data.roomName,
         nickname: nicknameValue.trim() || 'my pal',
+        roomType: data.roomType === 'solo' ? 'solo' : 'group',
       }
       localStorage.setItem(SESSION_KEY, JSON.stringify(session))
       onJoined(session)
@@ -253,11 +254,15 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [imageError, setImageError] = useState('')
   const [style, setStyle] = useState<MessageStyle>(DEFAULT_STYLE)
   const [showStylePicker, setShowStylePicker] = useState(false)
+  const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map())
   const deviceId = useRef(getDeviceId())
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const initialLoadDone = useRef(false)
+  const channelRef = useRef<ReturnType<ReturnType<typeof getSupabaseBrowser>['channel']> | null>(null)
+  const typingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const lastTypingSentRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -325,8 +330,34 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     channel.on('broadcast', { event: 'message' }, (payload) => {
       setMessages((prev) => [...prev, payload.payload as ChatMessage])
     })
+    channel.on('broadcast', { event: 'typing' }, (payload) => {
+      const { deviceId: typingDeviceId, nickname } = payload.payload as { deviceId: string; nickname: string }
+      if (typingDeviceId === deviceId.current) return
+      const timers = typingTimersRef.current
+      const existing = timers.get(typingDeviceId)
+      if (existing) clearTimeout(existing)
+      setTypingUsers((prev) => new Map(prev).set(typingDeviceId, nickname))
+      timers.set(
+        typingDeviceId,
+        setTimeout(() => {
+          setTypingUsers((prev) => {
+            const next = new Map(prev)
+            next.delete(typingDeviceId)
+            return next
+          })
+          timers.delete(typingDeviceId)
+        }, 3000)
+      )
+    })
     channel.subscribe()
-    return () => { supabase.removeChannel(channel) }
+    channelRef.current = channel
+    return () => {
+      supabase.removeChannel(channel)
+      channelRef.current = null
+      typingTimersRef.current.forEach(clearTimeout)
+      typingTimersRef.current.clear()
+      setTypingUsers(new Map())
+    }
   }, [session.roomId])
 
   const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null
@@ -372,6 +403,19 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     }
   }, [input, pendingImage, style, session.roomId])
 
+  const handleInputChange = (value: string) => {
+    setInput(value)
+    const now = Date.now()
+    if (now - lastTypingSentRef.current > 1500) {
+      lastTypingSentRef.current = now
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { deviceId: deviceId.current, nickname: session.nickname },
+      })
+    }
+  }
+
   const pickImage = () => fileInputRef.current?.click()
 
   const onImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -410,7 +454,9 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               </div>
             )
           }
-          const mine = m.device_id === deviceId.current
+          // Solo rooms have no "other person" — every bubble is treated as
+          // the reader's own, regardless of which device actually sent it.
+          const mine = session.roomType === 'solo' || m.device_id === deviceId.current
           return (
             <div key={m.id} className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
               {!mine && <span className="mb-0.5 text-[10px] text-muted">{m.nickname}</span>}
@@ -449,6 +495,11 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         </div>
       )}
       {imageError && <p className="mt-2 text-xs text-red-400">{imageError}</p>}
+      {typingUsers.size > 0 && (
+        <p className="mt-2 text-xs italic text-muted">
+          {Array.from(typingUsers.values()).join(', ')} đang nhập...
+        </p>
+      )}
 
       {showStylePicker && (
         <div className="mt-3 space-y-2 rounded-xl border border-border bg-surface p-3">
@@ -531,7 +582,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         </button>
         <input
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') send() }}
           placeholder="Nhắn gì đó..."
           style={{
@@ -559,7 +610,9 @@ export default function PrivateChatPage() {
 
   useEffect(() => {
     const raw = localStorage.getItem(SESSION_KEY)
-    setSession(raw ? JSON.parse(raw) : null)
+    if (!raw) { setSession(null); return }
+    const parsed = JSON.parse(raw)
+    setSession({ roomType: 'group', ...parsed })
   }, [])
 
   return (
