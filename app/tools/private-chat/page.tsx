@@ -721,37 +721,43 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   return (
     <div className="mx-auto flex max-w-xl flex-col" style={{ height: '70vh' }}>
       {gestureOverlay && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/60 backdrop-blur-sm">
-          <span className="animate-bounce text-7xl">{gestureOverlay.emoji}</span>
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-md animate-[panel-in_0.15s_ease-out]">
+          <span className="animate-gesture-burst text-8xl drop-shadow-[0_0_24px_rgba(124,58,237,0.6)]">{gestureOverlay.emoji}</span>
           <p className="text-lg font-display font-semibold text-white">
             {gestureOverlay.nickname} đã gửi {gestureOverlay.label.toLowerCase()}!
           </p>
         </div>
       )}
 
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between border-b border-border pb-3">
         <div>
           <p className="font-display font-semibold text-white">{session.roomName}</p>
           {session.anniversaryDate && (
-            <p className="text-xs text-accent-soft">💞 Yêu nhau được {daysSince(session.anniversaryDate)} ngày</p>
+            <p className="mt-0.5 text-xs font-medium text-accent-soft">💞 Yêu nhau được {daysSince(session.anniversaryDate)} ngày</p>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setShowMoodPicker((v) => !v)} title="Trạng thái cảm xúc" className="text-lg">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowMoodPicker((v) => !v)}
+            title="Trạng thái cảm xúc"
+            className={`rounded-lg px-2 py-1 text-lg transition-transform hover:scale-110 ${showMoodPicker ? 'bg-accent/20' : ''}`}
+          >
             {MOOD_OPTIONS.find((m) => m.id === ownMood)?.emoji ?? '🙂'}
           </button>
-          <button onClick={leave} className="text-xs text-muted hover:text-white">Rời phòng</button>
+          <button onClick={leave} className="rounded-lg px-2 py-1 text-xs text-muted transition-colors hover:bg-background hover:text-white">
+            Rời phòng
+          </button>
         </div>
       </div>
 
       {showMoodPicker && (
-        <div className="mb-2 flex flex-wrap gap-1.5 rounded-xl border border-border bg-surface p-2">
+        <div className="mb-2 flex flex-wrap gap-1.5 rounded-xl border border-border bg-surface p-2 animate-panel-in">
           {MOOD_OPTIONS.map((m) => (
             <button
               key={m.id}
               onClick={() => changeMood(ownMood === m.id ? null : m.id)}
               title={m.label}
-              className={`rounded-lg border px-2 py-1 text-lg transition-colors ${
+              className={`rounded-lg border px-2 py-1 text-lg transition-all hover:scale-110 ${
                 ownMood === m.id ? 'border-accent bg-accent/20' : 'border-transparent hover:border-border'
               }`}
             >
@@ -762,66 +768,95 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       )}
 
       {pinnedMessage && (
-        <div className="mb-2 flex items-center gap-2 rounded-xl border border-accent/30 bg-accent/10 px-3 py-2 text-xs">
+        <div className="mb-2 flex items-center gap-2 rounded-xl border border-accent/30 bg-accent/10 px-3 py-2 text-xs animate-panel-in">
           <span>📌</span>
           <span className="flex-1 truncate text-accent-soft">
             <b>{pinnedMessage.nickname}:</b> {pinnedMessage.content ?? '[Hình ảnh]'}
           </span>
-          <button onClick={() => pinMessage(null)} className="text-muted hover:text-white">✕</button>
+          <button onClick={() => pinMessage(null)} className="text-muted transition-colors hover:text-white">✕</button>
         </div>
       )}
 
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="flex-1 space-y-2 overflow-y-auto rounded-xl border border-border bg-surface p-4 transition-colors"
+        className="flex-1 space-y-3 overflow-y-auto rounded-xl border border-border bg-surface p-4 shadow-inner transition-shadow duration-500"
         style={otherMoodColor ? { boxShadow: `inset 0 0 60px ${otherMoodColor}22` } : undefined}
       >
-        {loadingMore && <p className="text-center text-xs text-muted">Đang tải tin nhắn cũ...</p>}
+        {loadingMore && <p className="text-center text-xs text-muted animate-pulse">Đang tải tin nhắn cũ...</p>}
         {messages.map((m) => {
           if (m.device_id === 'system') {
             return (
-              <div key={m.id} className="flex justify-center">
+              <div key={m.id} className="flex justify-center animate-msg-in">
                 <span className="max-w-[90%] rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-center text-xs text-amber-400">
                   {m.content}
                 </span>
               </div>
             )
           }
-          // Solo rooms have no "other person" — every bubble is treated as
-          // the reader's own, regardless of which device actually sent it.
-          const mine = session.roomType === 'solo' || m.device_id === deviceId.current
+          // Solo rooms read like a journal — every entry is full-width and
+          // left-aligned instead of a narrow chat bubble, "mine" vs "my
+          // pal"'s is not visually distinguished.
+          const isJournal = session.roomType === 'solo'
+          const mine = !isJournal && m.device_id === deviceId.current
           const reactions = m.chat_message_reactions ?? []
           const reactionGroups = new Map<string, number>()
           reactions.forEach((r) => reactionGroups.set(r.emoji, (reactionGroups.get(r.emoji) ?? 0) + 1))
           const myReaction = reactions.find((r) => r.device_id === deviceId.current)?.emoji
+          const bubbleMaxWidth = isJournal ? 'max-w-full' : 'max-w-[75%]'
 
           return (
-            <div key={m.id} className={`group flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
-              {!mine && <span className="mb-0.5 text-[10px] text-muted">{m.nickname}</span>}
+            <div
+              key={m.id}
+              className={`group flex animate-msg-in flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'}`}
+            >
+              {!mine && !isJournal && <span className="mb-0.5 text-[10px] text-muted">{m.nickname}</span>}
 
               {m.reply_to_id && (
-                <div className={`mb-1 max-w-[75%] rounded-lg border-l-2 border-accent/50 bg-background/50 px-2 py-1 text-xs text-muted ${mine ? 'text-right' : ''}`}>
+                <div className={`mb-1 ${bubbleMaxWidth} rounded-lg border-l-2 border-accent/50 bg-background/50 px-2 py-1 text-xs text-muted ${mine ? 'text-right' : ''}`}>
                   <b className="text-accent-soft">{m.reply_to_nickname}</b>: {m.reply_to_content}
                 </div>
               )}
 
-              <div className={`flex flex-col ${mine ? 'items-end' : 'items-start'} ${m.pending || m.failed ? 'opacity-50' : ''}`}>
+              <div className={`flex flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'} ${m.pending || m.failed ? 'opacity-50' : ''} transition-opacity`}>
                 {m.locked ? (
-                  <span className="max-w-[75%] rounded-2xl border border-dashed border-border bg-background px-3.5 py-2 text-sm text-muted">
+                  <span className={`${bubbleMaxWidth} rounded-2xl border border-dashed border-border bg-background px-3.5 py-2 text-sm text-muted`}>
                     🔒 Tin nhắn hẹn giờ, mở lúc {m.reveal_at ? formatTime(m.reveal_at) : '...'}
                   </span>
+                ) : isJournal ? (
+                  <div className="w-full border-l-2 border-accent/40 py-1 pl-4">
+                    {m.image_url && (
+                      <a href={m.image_url} target="_blank" rel="noreferrer" className="mb-2 block max-w-md">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={m.image_url} alt="" className="rounded-xl border border-border object-cover" />
+                      </a>
+                    )}
+                    {m.content && (
+                      <p
+                        className="text-[15px] leading-relaxed text-white"
+                        style={{
+                          ...fontStyleFor(m.font_family),
+                          color: m.text_color ?? undefined,
+                          fontWeight: m.bold ? 700 : undefined,
+                          fontStyle: m.italic ? 'italic' : undefined,
+                        }}
+                      >
+                        {m.content}
+                      </p>
+                    )}
+                    <span className="mt-1 block text-[10px] text-muted">{formatTime(m.created_at)}</span>
+                  </div>
                 ) : (
                   <>
                     {m.image_url && (
                       <a href={m.image_url} target="_blank" rel="noreferrer" className="mb-1 block max-w-[75%]">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={m.image_url} alt="" className="max-h-64 rounded-xl border border-border object-cover" />
+                        <img src={m.image_url} alt="" className="max-h-64 rounded-xl border border-border object-cover shadow-sm" />
                       </a>
                     )}
                     {m.content && (
                       <span
-                        className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
+                        className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm shadow-sm ${
                           mine ? 'bg-accent text-white' : 'bg-background border border-border text-white'
                         }`}
                         style={{
@@ -847,12 +882,12 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               )}
 
               {reactionGroups.size > 0 && (
-                <div className="mt-1 flex gap-1">
+                <div className={`mt-1 flex gap-1 ${isJournal ? 'pl-4' : ''}`}>
                   {Array.from(reactionGroups.entries()).map(([emoji, count]) => (
                     <button
                       key={emoji}
                       onClick={() => toggleReaction(m.id, emoji)}
-                      className={`rounded-full border px-1.5 py-0.5 text-xs ${
+                      className={`animate-pop-in rounded-full border px-1.5 py-0.5 text-xs transition-transform hover:scale-110 ${
                         myReaction === emoji ? 'border-accent bg-accent/20' : 'border-border bg-background'
                       }`}
                     >
@@ -862,37 +897,37 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                 </div>
               )}
 
-              <div className="mt-0.5 hidden gap-2 group-hover:flex">
+              <div className={`mt-0.5 hidden gap-2 group-hover:flex ${isJournal ? 'pl-4' : ''}`}>
                 <button
                   onClick={() => setReactionPickerFor(reactionPickerFor === m.id ? null : m.id)}
-                  className="text-[10px] text-muted hover:text-white"
+                  className="text-[10px] text-muted transition-colors hover:text-white"
                 >
                   😊
                 </button>
                 {!m.locked && (
                   <button
                     onClick={() => setReplyingTo({ id: m.id, nickname: m.nickname, preview: m.content ?? '[Hình ảnh]' })}
-                    className="text-[10px] text-muted hover:text-white"
+                    className="text-[10px] text-muted transition-colors hover:text-white"
                   >
                     ↩ Trả lời
                   </button>
                 )}
-                <button onClick={() => pinMessage(m.id)} className="text-[10px] text-muted hover:text-white">
+                <button onClick={() => pinMessage(m.id)} className="text-[10px] text-muted transition-colors hover:text-white">
                   📌 Ghim
                 </button>
               </div>
 
               {reactionPickerFor === m.id && (
-                <div className="mt-1 flex gap-1 rounded-full border border-border bg-background px-2 py-1">
+                <div className={`mt-1 flex animate-panel-in gap-1 rounded-full border border-border bg-background px-2 py-1 ${isJournal ? 'ml-4' : ''}`}>
                   {REACTION_EMOJIS.map((emoji) => (
-                    <button key={emoji} onClick={() => toggleReaction(m.id, emoji)} className="text-sm hover:scale-125 transition-transform">
+                    <button key={emoji} onClick={() => toggleReaction(m.id, emoji)} className="text-sm transition-transform hover:scale-125">
                       {emoji}
                     </button>
                   ))}
                 </div>
               )}
 
-              {mine && m.id === lastMineId && seenAt && (
+              {!isJournal && mine && m.id === lastMineId && seenAt && (
                 <span className="mt-0.5 text-[10px] text-muted">Đã xem lúc {formatTime(seenAt)}</span>
               )}
             </div>
@@ -920,13 +955,18 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       )}
       {imageError && <p className="mt-2 text-xs text-red-400">{imageError}</p>}
       {typingUsers.size > 0 && (
-        <p className="mt-2 text-xs italic text-muted">
-          {Array.from(typingUsers.values()).join(', ')} đang nhập...
-        </p>
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-muted animate-panel-in">
+          <span>{Array.from(typingUsers.values()).join(', ')} đang nhập</span>
+          <span className="flex gap-0.5">
+            <span className="h-1 w-1 animate-typing-dot rounded-full bg-muted" style={{ animationDelay: '0ms' }} />
+            <span className="h-1 w-1 animate-typing-dot rounded-full bg-muted" style={{ animationDelay: '150ms' }} />
+            <span className="h-1 w-1 animate-typing-dot rounded-full bg-muted" style={{ animationDelay: '300ms' }} />
+          </span>
+        </div>
       )}
 
       {showCapsulePicker && (
-        <div className="mt-3 flex items-center gap-2 rounded-xl border border-border bg-surface p-3">
+        <div className="mt-3 flex items-center gap-2 rounded-xl border border-border bg-surface p-3 animate-panel-in">
           <span className="text-xs text-muted">🕰️ Mở lúc</span>
           <input
             type="datetime-local"
@@ -934,17 +974,17 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             onChange={(e) => setCapsuleAt(e.target.value)}
             className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-white outline-none focus:border-accent"
           />
-          <button onClick={() => { setCapsuleAt(''); setShowCapsulePicker(false) }} className="text-xs text-muted hover:text-white">Huỷ</button>
+          <button onClick={() => { setCapsuleAt(''); setShowCapsulePicker(false) }} className="text-xs text-muted transition-colors hover:text-white">Huỷ</button>
         </div>
       )}
 
       {showGesturePicker && (
-        <div className="mt-3 flex gap-2 rounded-xl border border-border bg-surface p-3">
+        <div className="mt-3 flex gap-2 rounded-xl border border-border bg-surface p-3 animate-panel-in">
           {GESTURE_OPTIONS.map((g) => (
             <button
               key={g.id}
               onClick={() => sendGesture(g.id)}
-              className="flex flex-1 flex-col items-center gap-1 rounded-lg border border-border bg-background py-2 text-xs text-muted transition-colors hover:border-accent hover:text-white"
+              className="flex flex-1 flex-col items-center gap-1 rounded-lg border border-border bg-background py-2 text-xs text-muted transition-all hover:-translate-y-0.5 hover:border-accent hover:text-white"
             >
               <span className="text-xl">{g.emoji}</span>
               {g.label}
@@ -954,7 +994,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       )}
 
       {showStylePicker && (
-        <div className="mt-3 space-y-2 rounded-xl border border-border bg-surface p-3">
+        <div className="mt-3 space-y-2 rounded-xl border border-border bg-surface p-3 animate-panel-in">
           <div className="flex items-center gap-2">
             <span className="w-14 shrink-0 text-xs text-muted">Màu chữ</span>
             <div className="flex flex-wrap gap-1.5">
@@ -1020,9 +1060,9 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         <button
           onClick={() => setShowToolsMenu((v) => !v)}
           title="Thêm"
-          className={`shrink-0 rounded-xl border px-3 py-2.5 text-lg leading-none transition-colors ${
+          className={`shrink-0 rounded-xl border px-3 py-2.5 text-lg leading-none transition-all ${
             showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker
-              ? 'border-accent bg-accent/20 text-accent-soft'
+              ? 'border-accent bg-accent/20 text-accent-soft rotate-45'
               : 'border-border bg-surface text-muted hover:text-white'
           }`}
         >
@@ -1030,18 +1070,18 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         </button>
 
         {showToolsMenu && (
-          <div className="absolute bottom-full left-0 mb-2 flex gap-1 rounded-xl border border-border bg-surface p-1.5 shadow-lg">
+          <div className="absolute bottom-full left-0 mb-2 flex animate-panel-in gap-1 rounded-xl border border-border bg-surface p-1.5 shadow-lg">
             <button
               onClick={() => { pickImage(); setShowToolsMenu(false) }}
               title="Gửi ảnh"
-              className="rounded-lg px-2.5 py-2 text-lg text-muted hover:bg-background hover:text-white transition-colors"
+              className="rounded-lg px-2.5 py-2 text-lg text-muted transition-all hover:-translate-y-0.5 hover:bg-background hover:text-white"
             >
               🖼️
             </button>
             <button
               onClick={() => { setShowStylePicker((v) => !v); setShowToolsMenu(false) }}
               title="Tùy chỉnh kiểu chữ"
-              className={`rounded-lg px-2.5 py-2 text-sm font-bold transition-colors ${
+              className={`rounded-lg px-2.5 py-2 text-sm font-bold transition-all hover:-translate-y-0.5 ${
                 showStylePicker ? 'text-accent-soft' : 'text-muted hover:bg-background hover:text-white'
               }`}
             >
@@ -1050,7 +1090,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             <button
               onClick={() => { setShowCapsulePicker((v) => !v); setShowToolsMenu(false) }}
               title="Tin nhắn hẹn giờ"
-              className={`rounded-lg px-2.5 py-2 text-lg transition-colors ${
+              className={`rounded-lg px-2.5 py-2 text-lg transition-all hover:-translate-y-0.5 ${
                 showCapsulePicker || capsuleAt ? 'text-accent-soft' : 'text-muted hover:bg-background hover:text-white'
               }`}
             >
@@ -1059,7 +1099,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             <button
               onClick={() => { setShowGesturePicker((v) => !v); setShowToolsMenu(false) }}
               title="Gửi cử chỉ"
-              className={`rounded-lg px-2.5 py-2 text-lg transition-colors ${
+              className={`rounded-lg px-2.5 py-2 text-lg transition-all hover:-translate-y-0.5 ${
                 showGesturePicker ? 'text-accent-soft' : 'text-muted hover:bg-background hover:text-white'
               }`}
             >
@@ -1079,12 +1119,12 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             fontWeight: style.bold ? 700 : undefined,
             fontStyle: style.italic ? 'italic' : undefined,
           }}
-          className="flex-1 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-white outline-none placeholder-muted focus:border-accent"
+          className="flex-1 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-white outline-none transition-all placeholder-muted focus:border-accent focus:ring-2 focus:ring-accent/20"
         />
         <button
           onClick={send}
           disabled={!input.trim() && !pendingImage}
-          className="rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
+          className="rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-accent/80 hover:shadow-lg hover:shadow-accent/20 active:scale-95 disabled:opacity-40 disabled:hover:shadow-none"
         >
           Gửi
         </button>
