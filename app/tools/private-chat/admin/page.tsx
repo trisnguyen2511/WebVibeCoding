@@ -2,7 +2,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ToolShell } from '@/components/tool-shell'
 
-type Room = { id: string; pin: string; name: string; type: 'group' | 'solo'; created_at: string; deviceCount: number }
+type Room = {
+  id: string
+  pin: string
+  name: string
+  type: 'group' | 'solo'
+  anniversary_date: string | null
+  created_at: string
+  deviceCount: number
+}
 
 function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [password, setPassword] = useState('')
@@ -92,6 +100,15 @@ function AdminPanel() {
     load()
   }
 
+  const setAnniversary = async (id: string, date: string) => {
+    await fetch(`/api/chat/admin/rooms?id=${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ anniversaryDate: date || null }),
+    })
+    load()
+  }
+
   const logout = async () => {
     await fetch('/api/chat/admin/logout', { method: 'POST' })
     window.location.reload()
@@ -156,6 +173,15 @@ function AdminPanel() {
                 )}
               </p>
               <p className="font-mono text-xs text-muted">PIN: {r.pin} · {r.deviceCount} thiết bị</p>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-muted">💞 Ngày bắt đầu yêu:</span>
+                <input
+                  type="date"
+                  defaultValue={r.anniversary_date ?? ''}
+                  onBlur={(e) => setAnniversary(r.id, e.target.value)}
+                  className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-white outline-none focus:border-accent"
+                />
+              </div>
             </div>
             <button onClick={() => remove(r.id)} className="text-xs text-red-400 hover:text-red-300">Xóa</button>
           </div>

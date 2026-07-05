@@ -7,7 +7,16 @@ import { getSupabaseBrowser } from '@/lib/supabase-browser'
 const SESSION_KEY = 'wv-chat-session'
 const DEVICE_KEY = 'wv-chat-device-id'
 
-type Session = { pin: string; roomId: string; roomName: string; nickname: string; roomType: 'group' | 'solo' }
+type Session = {
+  pin: string
+  roomId: string
+  roomName: string
+  nickname: string
+  roomType: 'group' | 'solo'
+  anniversaryDate?: string | null
+}
+
+type Reaction = { device_id: string; emoji: string }
 type ChatMessage = {
   id: string
   device_id: string
@@ -18,8 +27,16 @@ type ChatMessage = {
   font_family?: string | null
   bold?: boolean
   italic?: boolean
+  reply_to_id?: string | null
+  reply_to_nickname?: string | null
+  reply_to_content?: string | null
+  reveal_at?: string | null
+  locked?: boolean
+  chat_message_reactions?: Reaction[]
   created_at: string
 }
+
+type PinnedMessage = { id: string; device_id: string; nickname: string; content: string | null; image_url?: string | null }
 
 type FontId = 'sans' | 'display' | 'mono' | 'cursive'
 type MessageStyle = { color: string | null; font: FontId | null; bold: boolean; italic: boolean }
@@ -33,6 +50,24 @@ const FONT_OPTIONS: { id: FontId; label: string; style: React.CSSProperties }[] 
   { id: 'display', label: 'Tiêu đề', style: { fontFamily: 'var(--font-space-grotesk), sans-serif' } },
   { id: 'mono', label: 'Mono', style: { fontFamily: 'var(--font-jetbrains-mono), monospace' } },
   { id: 'cursive', label: 'Viết tay', style: { fontFamily: 'cursive' } },
+]
+
+const REACTION_EMOJIS = ['❤️', '👍', '😂', '😮', '😢', '🎉']
+
+const MOOD_OPTIONS: { id: string; emoji: string; label: string; color: string }[] = [
+  { id: 'happy', emoji: '😄', label: 'Vui', color: '#FBBF24' },
+  { id: 'love', emoji: '🥰', label: 'Yêu đời', color: '#F472B6' },
+  { id: 'calm', emoji: '😌', label: 'Bình yên', color: '#34D399' },
+  { id: 'tired', emoji: '😴', label: 'Mệt', color: '#60A5FA' },
+  { id: 'sad', emoji: '😢', label: 'Buồn', color: '#818CF8' },
+  { id: 'angry', emoji: '😤', label: 'Bực', color: '#F87171' },
+]
+
+const GESTURE_OPTIONS: { id: string; emoji: string; label: string }[] = [
+  { id: 'hug', emoji: '🤗', label: 'Ôm' },
+  { id: 'pat', emoji: '👊', label: 'Đấm lưng' },
+  { id: 'wave', emoji: '👋', label: 'Vẫy tay' },
+  { id: 'kiss', emoji: '😘', label: 'Hôn' },
 ]
 
 function fontStyleFor(font?: string | null): React.CSSProperties {
@@ -122,6 +157,16 @@ async function subscribeToPush(roomId: string, deviceId: string) {
   }
 }
 
+function daysSince(dateStr: string): number {
+  const start = new Date(dateStr + 'T00:00:00')
+  const diff = Date.now() - start.getTime()
+  return Math.max(1, Math.floor(diff / 86400000) + 1)
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+}
+
 function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
   const [pin, setPin] = useState('')
   const [nickname, setNickname] = useState('')
@@ -150,6 +195,7 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         roomName: data.roomName,
         nickname: nicknameValue.trim() || 'my pal',
         roomType: data.roomType === 'solo' ? 'solo' : 'group',
+        anniversaryDate: data.anniversaryDate ?? null,
       }
       localStorage.setItem(SESSION_KEY, JSON.stringify(session))
       onJoined(session)
@@ -255,6 +301,18 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [style, setStyle] = useState<MessageStyle>(DEFAULT_STYLE)
   const [showStylePicker, setShowStylePicker] = useState(false)
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map())
+  const [replyingTo, setReplyingTo] = useState<{ id: string; nickname: string; preview: string } | null>(null)
+  const [pinnedMessage, setPinnedMessage] = useState<PinnedMessage | null>(null)
+  const [seenMap, setSeenMap] = useState<Map<string, string>>(new Map())
+  const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null)
+  const [showCapsulePicker, setShowCapsulePicker] = useState(false)
+  const [capsuleAt, setCapsuleAt] = useState('')
+  const [ownMood, setOwnMood] = useState<string | null>(null)
+  const [otherMood, setOtherMood] = useState<string | null>(null)
+  const [showMoodPicker, setShowMoodPicker] = useState(false)
+  const [showGesturePicker, setShowGesturePicker] = useState(false)
+  const [gestureOverlay, setGestureOverlay] = useState<{ emoji: string; nickname: string; label: string } | null>(null)
+
   const deviceId = useRef(getDeviceId())
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -263,6 +321,15 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabaseBrowser>['channel']> | null>(null)
   const typingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const lastTypingSentRef = useRef(0)
+  const unlockTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+
+  const markSeen = useCallback(() => {
+    fetch('/api/chat/seen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId: session.roomId, deviceId: deviceId.current }),
+    }).catch(() => {})
+  }, [session.roomId])
 
   useEffect(() => {
     let cancelled = false
@@ -273,9 +340,13 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         setMessages(data.messages)
         setHasMore(Boolean(data.hasMore))
         initialLoadDone.current = true
+        markSeen()
       })
+    fetch(`/api/chat/pin?roomId=${session.roomId}`)
+      .then((r) => r.json())
+      .then((data) => { if (!cancelled) setPinnedMessage(data.message ?? null) })
     return () => { cancelled = true }
-  }, [session.roomId])
+  }, [session.roomId, markSeen])
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || messages.length === 0) return
@@ -324,11 +395,40 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     subscribeToPush(session.roomId, deviceId.current)
   }, [session.roomId])
 
+  // Schedule an unlock check for a time-capsule message so its real content
+  // is fetched the moment reveal_at passes, without polling.
+  const scheduleUnlock = useCallback((message: ChatMessage) => {
+    if (!message.locked || !message.reveal_at) return
+    if (unlockTimersRef.current.has(message.id)) return
+    const delay = Math.max(0, new Date(message.reveal_at).getTime() - Date.now())
+    const timer = setTimeout(async () => {
+      unlockTimersRef.current.delete(message.id)
+      try {
+        const res = await fetch(`/api/chat/message-unlock?id=${message.id}&deviceId=${deviceId.current}`)
+        const data = await res.json()
+        if (data.message && !data.message.locked) {
+          setMessages((prev) => prev.map((m) => (m.id === message.id ? { ...m, ...data.message } : m)))
+        }
+      } catch {
+        // best-effort — user can reload the page to unlock manually
+      }
+    }, delay)
+    unlockTimersRef.current.set(message.id, timer)
+  }, [])
+
+  useEffect(() => {
+    messages.forEach(scheduleUnlock)
+  }, [messages, scheduleUnlock])
+
   useEffect(() => {
     const supabase = getSupabaseBrowser()
-    const channel = supabase.channel(`chat-room-${session.roomId}`)
+    const channel = supabase.channel(`chat-room-${session.roomId}`, {
+      config: { presence: { key: deviceId.current } },
+    })
     channel.on('broadcast', { event: 'message' }, (payload) => {
-      setMessages((prev) => [...prev, payload.payload as ChatMessage])
+      const message = payload.payload as ChatMessage
+      setMessages((prev) => [...prev, message])
+      markSeen()
     })
     channel.on('broadcast', { event: 'typing' }, (payload) => {
       const { deviceId: typingDeviceId, nickname } = payload.payload as { deviceId: string; nickname: string }
@@ -349,16 +449,73 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         }, 3000)
       )
     })
-    channel.subscribe()
+    channel.on('broadcast', { event: 'reaction' }, (payload) => {
+      const { messageId, deviceId: reactorId, emoji } = payload.payload as {
+        messageId: string
+        deviceId: string
+        emoji: string | null
+      }
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId) return m
+          const others = (m.chat_message_reactions ?? []).filter((r) => r.device_id !== reactorId)
+          return { ...m, chat_message_reactions: emoji ? [...others, { device_id: reactorId, emoji }] : others }
+        })
+      )
+    })
+    channel.on('broadcast', { event: 'pin' }, (payload) => {
+      const { message } = payload.payload as { message: PinnedMessage | null }
+      setPinnedMessage(message)
+    })
+    channel.on('broadcast', { event: 'seen' }, (payload) => {
+      const { deviceId: seenDeviceId, lastReadAt } = payload.payload as { deviceId: string; lastReadAt: string }
+      if (seenDeviceId === deviceId.current) return
+      setSeenMap((prev) => new Map(prev).set(seenDeviceId, lastReadAt))
+    })
+    channel.on('broadcast', { event: 'gesture' }, (payload) => {
+      const { deviceId: fromDeviceId, nickname, gesture } = payload.payload as {
+        deviceId: string
+        nickname: string
+        gesture: string
+      }
+      if (fromDeviceId === deviceId.current) return
+      const option = GESTURE_OPTIONS.find((g) => g.id === gesture)
+      if (!option) return
+      setGestureOverlay({ emoji: option.emoji, nickname, label: option.label })
+      if ('vibrate' in navigator) navigator.vibrate([150, 80, 150])
+      setTimeout(() => setGestureOverlay(null), 2500)
+    })
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState() as Record<string, { mood?: string }[]>
+      let found: string | null = null
+      for (const [key, entries] of Object.entries(state)) {
+        if (key === deviceId.current) continue
+        const mood = entries[0]?.mood
+        if (mood) found = mood
+      }
+      setOtherMood(found)
+    })
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        channel.track({ mood: ownMood })
+      }
+    })
     channelRef.current = channel
     return () => {
       supabase.removeChannel(channel)
       channelRef.current = null
       typingTimersRef.current.forEach(clearTimeout)
       typingTimersRef.current.clear()
+      unlockTimersRef.current.forEach(clearTimeout)
+      unlockTimersRef.current.clear()
       setTypingUsers(new Map())
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.roomId])
+
+  useEffect(() => {
+    channelRef.current?.track({ mood: ownMood })
+  }, [ownMood])
 
   const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null
   const lastMessageIdRef = useRef<string | null>(null)
@@ -385,7 +542,12 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     setSending(true)
     setInput('')
     const imageToSend = pendingImage
+    const reply = replyingTo
+    const revealAt = capsuleAt ? new Date(capsuleAt).toISOString() : undefined
     setPendingImage(null)
+    setReplyingTo(null)
+    setCapsuleAt('')
+    setShowCapsulePicker(false)
     try {
       await fetch('/api/chat/send', {
         method: 'POST',
@@ -396,12 +558,50 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           content,
           image: imageToSend ? { dataUrl: imageToSend.dataUrl } : undefined,
           style: { color: style.color, font: style.font, bold: style.bold, italic: style.italic },
+          replyTo: reply ? { id: reply.id, nickname: reply.nickname, content: reply.preview } : undefined,
+          revealAt,
         }),
       })
     } finally {
       setSending(false)
     }
-  }, [input, pendingImage, style, session.roomId])
+  }, [input, pendingImage, style, replyingTo, capsuleAt, session.roomId])
+
+  const sendGesture = async (gestureId: string) => {
+    setShowGesturePicker(false)
+    await fetch('/api/chat/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId: session.roomId, deviceId: deviceId.current, gesture: gestureId }),
+    })
+  }
+
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    setReactionPickerFor(null)
+    await fetch('/api/chat/react', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId: session.roomId, messageId, deviceId: deviceId.current, emoji }),
+    })
+  }
+
+  const pinMessage = async (messageId: string | null) => {
+    await fetch('/api/chat/pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId: session.roomId, deviceId: deviceId.current, messageId }),
+    })
+  }
+
+  const changeMood = async (mood: string | null) => {
+    setOwnMood(mood)
+    setShowMoodPicker(false)
+    await fetch('/api/chat/mood', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId: session.roomId, deviceId: deviceId.current, mood }),
+    })
+  }
 
   const handleInputChange = (value: string) => {
     setInput(value)
@@ -436,13 +636,86 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     onLeave()
   }
 
+  const otherMoodColor = MOOD_OPTIONS.find((m) => m.id === otherMood)?.color
+  const showSeenIndicator = session.roomType !== 'solo'
+  const lastMineId = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].device_id === deviceId.current) return messages[i].id
+    }
+    return null
+  })()
+  const seenAt = (() => {
+    if (!showSeenIndicator || !lastMineId) return null
+    const lastMine = messages.find((m) => m.id === lastMineId)
+    if (!lastMine) return null
+    let latest: string | null = null
+    seenMap.forEach((ts) => {
+      if (new Date(ts).getTime() >= new Date(lastMine.created_at).getTime()) {
+        if (!latest || new Date(ts).getTime() > new Date(latest).getTime()) latest = ts
+      }
+    })
+    return latest
+  })()
+
   return (
     <div className="mx-auto flex max-w-xl flex-col" style={{ height: '70vh' }}>
-      <div className="mb-3 flex items-center justify-between">
-        <p className="font-display font-semibold text-white">{session.roomName}</p>
-        <button onClick={leave} className="text-xs text-muted hover:text-white">Rời phòng</button>
+      {gestureOverlay && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/60 backdrop-blur-sm">
+          <span className="animate-bounce text-7xl">{gestureOverlay.emoji}</span>
+          <p className="text-lg font-display font-semibold text-white">
+            {gestureOverlay.nickname} đã gửi {gestureOverlay.label.toLowerCase()}!
+          </p>
+        </div>
+      )}
+
+      <div className="mb-2 flex items-center justify-between">
+        <div>
+          <p className="font-display font-semibold text-white">{session.roomName}</p>
+          {session.anniversaryDate && (
+            <p className="text-xs text-accent-soft">💞 Yêu nhau được {daysSince(session.anniversaryDate)} ngày</p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowMoodPicker((v) => !v)} title="Trạng thái cảm xúc" className="text-lg">
+            {MOOD_OPTIONS.find((m) => m.id === ownMood)?.emoji ?? '🙂'}
+          </button>
+          <button onClick={leave} className="text-xs text-muted hover:text-white">Rời phòng</button>
+        </div>
       </div>
-      <div ref={scrollRef} onScroll={onScroll} className="flex-1 space-y-2 overflow-y-auto rounded-xl border border-border bg-surface p-4">
+
+      {showMoodPicker && (
+        <div className="mb-2 flex flex-wrap gap-1.5 rounded-xl border border-border bg-surface p-2">
+          {MOOD_OPTIONS.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => changeMood(ownMood === m.id ? null : m.id)}
+              title={m.label}
+              className={`rounded-lg border px-2 py-1 text-lg transition-colors ${
+                ownMood === m.id ? 'border-accent bg-accent/20' : 'border-transparent hover:border-border'
+              }`}
+            >
+              {m.emoji}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {pinnedMessage && (
+        <div className="mb-2 flex items-center gap-2 rounded-xl border border-accent/30 bg-accent/10 px-3 py-2 text-xs">
+          <span>📌</span>
+          <span className="flex-1 truncate text-accent-soft">
+            <b>{pinnedMessage.nickname}:</b> {pinnedMessage.content ?? '[Hình ảnh]'}
+          </span>
+          <button onClick={() => pinMessage(null)} className="text-muted hover:text-white">✕</button>
+        </div>
+      )}
+
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="flex-1 space-y-2 overflow-y-auto rounded-xl border border-border bg-surface p-4 transition-colors"
+        style={otherMoodColor ? { boxShadow: `inset 0 0 60px ${otherMoodColor}22` } : undefined}
+      >
         {loadingMore && <p className="text-center text-xs text-muted">Đang tải tin nhắn cũ...</p>}
         {messages.map((m) => {
           if (m.device_id === 'system') {
@@ -457,35 +730,115 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           // Solo rooms have no "other person" — every bubble is treated as
           // the reader's own, regardless of which device actually sent it.
           const mine = session.roomType === 'solo' || m.device_id === deviceId.current
+          const reactions = m.chat_message_reactions ?? []
+          const reactionGroups = new Map<string, number>()
+          reactions.forEach((r) => reactionGroups.set(r.emoji, (reactionGroups.get(r.emoji) ?? 0) + 1))
+          const myReaction = reactions.find((r) => r.device_id === deviceId.current)?.emoji
+
           return (
-            <div key={m.id} className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
+            <div key={m.id} className={`group flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
               {!mine && <span className="mb-0.5 text-[10px] text-muted">{m.nickname}</span>}
-              {m.image_url && (
-                <a href={m.image_url} target="_blank" rel="noreferrer" className="mb-1 block max-w-[75%]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={m.image_url} alt="" className="max-h-64 rounded-xl border border-border object-cover" />
-                </a>
+
+              {m.reply_to_id && (
+                <div className={`mb-1 max-w-[75%] rounded-lg border-l-2 border-accent/50 bg-background/50 px-2 py-1 text-xs text-muted ${mine ? 'text-right' : ''}`}>
+                  <b className="text-accent-soft">{m.reply_to_nickname}</b>: {m.reply_to_content}
+                </div>
               )}
-              {m.content && (
-                <span
-                  className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
-                    mine ? 'bg-accent text-white' : 'bg-background border border-border text-white'
-                  }`}
-                  style={{
-                    ...fontStyleFor(m.font_family),
-                    color: m.text_color ?? undefined,
-                    fontWeight: m.bold ? 700 : undefined,
-                    fontStyle: m.italic ? 'italic' : undefined,
-                  }}
-                >
-                  {m.content}
+
+              {m.locked ? (
+                <span className="max-w-[75%] rounded-2xl border border-dashed border-border bg-background px-3.5 py-2 text-sm text-muted">
+                  🔒 Tin nhắn hẹn giờ, mở lúc {m.reveal_at ? formatTime(m.reveal_at) : '...'}
                 </span>
+              ) : (
+                <>
+                  {m.image_url && (
+                    <a href={m.image_url} target="_blank" rel="noreferrer" className="mb-1 block max-w-[75%]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={m.image_url} alt="" className="max-h-64 rounded-xl border border-border object-cover" />
+                    </a>
+                  )}
+                  {m.content && (
+                    <span
+                      className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${
+                        mine ? 'bg-accent text-white' : 'bg-background border border-border text-white'
+                      }`}
+                      style={{
+                        ...fontStyleFor(m.font_family),
+                        color: m.text_color ?? undefined,
+                        fontWeight: m.bold ? 700 : undefined,
+                        fontStyle: m.italic ? 'italic' : undefined,
+                      }}
+                    >
+                      {m.content}
+                    </span>
+                  )}
+                </>
+              )}
+
+              {reactionGroups.size > 0 && (
+                <div className="mt-1 flex gap-1">
+                  {Array.from(reactionGroups.entries()).map(([emoji, count]) => (
+                    <button
+                      key={emoji}
+                      onClick={() => toggleReaction(m.id, emoji)}
+                      className={`rounded-full border px-1.5 py-0.5 text-xs ${
+                        myReaction === emoji ? 'border-accent bg-accent/20' : 'border-border bg-background'
+                      }`}
+                    >
+                      {emoji} {count > 1 ? count : ''}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-0.5 hidden gap-2 group-hover:flex">
+                <button
+                  onClick={() => setReactionPickerFor(reactionPickerFor === m.id ? null : m.id)}
+                  className="text-[10px] text-muted hover:text-white"
+                >
+                  😊
+                </button>
+                {!m.locked && (
+                  <button
+                    onClick={() => setReplyingTo({ id: m.id, nickname: m.nickname, preview: m.content ?? '[Hình ảnh]' })}
+                    className="text-[10px] text-muted hover:text-white"
+                  >
+                    ↩ Trả lời
+                  </button>
+                )}
+                <button onClick={() => pinMessage(m.id)} className="text-[10px] text-muted hover:text-white">
+                  📌 Ghim
+                </button>
+              </div>
+
+              {reactionPickerFor === m.id && (
+                <div className="mt-1 flex gap-1 rounded-full border border-border bg-background px-2 py-1">
+                  {REACTION_EMOJIS.map((emoji) => (
+                    <button key={emoji} onClick={() => toggleReaction(m.id, emoji)} className="text-sm hover:scale-125 transition-transform">
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {mine && m.id === lastMineId && seenAt && (
+                <span className="mt-0.5 text-[10px] text-muted">Đã xem lúc {formatTime(seenAt)}</span>
               )}
             </div>
           )
         })}
         <div ref={bottomRef} />
       </div>
+
+      {replyingTo && (
+        <div className="mt-3 flex items-center gap-2 rounded-xl border border-border bg-surface p-2 text-xs">
+          <span className="flex-1 truncate text-muted">
+            Trả lời <b className="text-accent-soft">{replyingTo.nickname}</b>: {replyingTo.preview}
+          </span>
+          <button onClick={() => setReplyingTo(null)} className="text-muted hover:text-white">✕</button>
+        </div>
+      )}
+
       {pendingImage && (
         <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-surface p-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -499,6 +852,34 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         <p className="mt-2 text-xs italic text-muted">
           {Array.from(typingUsers.values()).join(', ')} đang nhập...
         </p>
+      )}
+
+      {showCapsulePicker && (
+        <div className="mt-3 flex items-center gap-2 rounded-xl border border-border bg-surface p-3">
+          <span className="text-xs text-muted">🕰️ Mở lúc</span>
+          <input
+            type="datetime-local"
+            value={capsuleAt}
+            onChange={(e) => setCapsuleAt(e.target.value)}
+            className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-white outline-none focus:border-accent"
+          />
+          <button onClick={() => { setCapsuleAt(''); setShowCapsulePicker(false) }} className="text-xs text-muted hover:text-white">Huỷ</button>
+        </div>
+      )}
+
+      {showGesturePicker && (
+        <div className="mt-3 flex gap-2 rounded-xl border border-border bg-surface p-3">
+          {GESTURE_OPTIONS.map((g) => (
+            <button
+              key={g.id}
+              onClick={() => sendGesture(g.id)}
+              className="flex flex-1 flex-col items-center gap-1 rounded-lg border border-border bg-background py-2 text-xs text-muted transition-colors hover:border-accent hover:text-white"
+            >
+              <span className="text-xl">{g.emoji}</span>
+              {g.label}
+            </button>
+          ))}
+        </div>
       )}
 
       {showStylePicker && (
@@ -579,6 +960,24 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           }`}
         >
           Aa
+        </button>
+        <button
+          onClick={() => setShowCapsulePicker((v) => !v)}
+          title="Tin nhắn hẹn giờ"
+          className={`rounded-xl border px-3 py-2.5 transition-colors ${
+            showCapsulePicker || capsuleAt ? 'border-accent bg-accent/20' : 'border-border bg-surface text-muted hover:text-white'
+          }`}
+        >
+          🕰️
+        </button>
+        <button
+          onClick={() => setShowGesturePicker((v) => !v)}
+          title="Gửi cử chỉ"
+          className={`rounded-xl border px-3 py-2.5 transition-colors ${
+            showGesturePicker ? 'border-accent bg-accent/20' : 'border-border bg-surface text-muted hover:text-white'
+          }`}
+        >
+          🤗
         </button>
         <input
           value={input}

@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { data: rooms, error } = await supabase
     .from('chat_rooms')
-    .select('id, pin, name, type, created_at')
+    .select('id, pin, name, type, anniversary_date, created_at')
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -51,6 +51,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 })
   }
   return NextResponse.json({ room: data })
+}
+
+export async function PATCH(req: NextRequest) {
+  if (!isAdminRequest(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  const id = req.nextUrl.searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
+
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'invalid request body' }, { status: 400 })
+  }
+  const { anniversaryDate } = body as { anniversaryDate?: string | null }
+
+  const supabase = getSupabaseAdmin()
+  const { error } = await supabase
+    .from('chat_rooms')
+    .update({ anniversary_date: anniversaryDate || null })
+    .eq('id', id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
 }
 
 export async function DELETE(req: NextRequest) {

@@ -3,6 +3,12 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 const PAGE_SIZE = 50
 
+function redactLocked<T extends { reveal_at: string | null; content: string | null }>(message: T) {
+  const isLocked = Boolean(message.reveal_at && new Date(message.reveal_at).getTime() > Date.now())
+  if (!isLocked) return { ...message, locked: false }
+  return { ...message, content: null, locked: true }
+}
+
 export async function GET(req: NextRequest) {
   const roomId = req.nextUrl.searchParams.get('roomId')
   const deviceId = req.nextUrl.searchParams.get('deviceId')
@@ -21,7 +27,9 @@ export async function GET(req: NextRequest) {
 
   let query = supabase
     .from('chat_messages')
-    .select('id, device_id, nickname, content, image_url, text_color, font_family, bold, italic, created_at')
+    .select(
+      'id, device_id, nickname, content, image_url, text_color, font_family, bold, italic, reply_to_id, reply_to_nickname, reply_to_content, reveal_at, created_at, chat_message_reactions(device_id, emoji)'
+    )
     .eq('room_id', roomId)
     .order('created_at', { ascending: false })
     .limit(PAGE_SIZE)
@@ -31,6 +39,6 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const messages = (data ?? []).reverse()
+  const messages = (data ?? []).reverse().map(redactLocked)
   return NextResponse.json({ messages, hasMore: (data ?? []).length === PAGE_SIZE })
 }

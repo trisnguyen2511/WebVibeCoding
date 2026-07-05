@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { data: room, error: roomError } = await supabase
     .from('chat_rooms')
-    .select('id, name, type')
+    .select('id, name, type, anniversary_date')
     .eq('pin', pin.trim())
     .maybeSingle()
 
@@ -36,5 +36,10 @@ export async function POST(req: NextRequest) {
     )
   if (deviceError) return NextResponse.json({ error: deviceError.message }, { status: 500 })
 
-  return NextResponse.json({ roomId: room.id, roomName: room.name, roomType: room.type })
+  return NextResponse.json({
+    roomId: room.id,
+    roomName: room.name,
+    roomType: room.type,
+    anniversaryDate: room.anniversary_date,
+  })
 }
