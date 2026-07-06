@@ -9,6 +9,8 @@ export function getWebPush() {
     const subject = process.env.VAPID_SUBJECT ?? 'mailto:admin@example.com'
     if (publicKey && privateKey) {
       webpush.setVapidDetails(subject, publicKey, privateKey)
+    } else {
+      console.error('[web-push] VAPID keys are not configured — push notifications will fail')
     }
     configured = true
   }

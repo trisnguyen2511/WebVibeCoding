@@ -15,8 +15,15 @@ export async function pushToRoom(
     .not('push_subscription', 'is', null)
   if (excludeDeviceId) query = query.neq('device_id', excludeDeviceId)
 
-  const { data: devices } = await query
-  if (!devices || devices.length === 0) return
+  const { data: devices, error } = await query
+  if (error) {
+    console.error('[chat-notify] failed to load subscribed devices', error.message)
+    return
+  }
+  if (!devices || devices.length === 0) {
+    console.log(`[chat-notify] no push-subscribed devices for room ${roomId} (excluding ${excludeDeviceId ?? 'none'})`)
+    return
+  }
 
   const webpush = getWebPush()
   const payload = JSON.stringify({ title, body, roomId })
@@ -24,8 +31,9 @@ export async function pushToRoom(
     devices.map(async (d) => {
       try {
         await webpush.sendNotification(d.push_subscription, payload)
-      } catch {
-        // subscription may be stale/expired — ignore, device will resubscribe on next visit
+      } catch (err) {
+        const statusCode = (err as { statusCode?: number }).statusCode
+        console.error(`[chat-notify] push send failed (status ${statusCode ?? 'unknown'})`, err instanceof Error ? err.message : err)
       }
     })
   )
