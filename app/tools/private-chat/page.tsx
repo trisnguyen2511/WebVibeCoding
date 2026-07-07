@@ -138,10 +138,20 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 async function subscribeToPush(roomId: string, deviceId: string) {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-  if (!publicKey || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+  if (!publicKey) {
+    console.warn('[push] NEXT_PUBLIC_VAPID_PUBLIC_KEY is not set at build time — push disabled')
+    return
+  }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('[push] this browser does not support service workers / Push API')
+    return
+  }
   try {
     const permission = await Notification.requestPermission()
-    if (permission !== 'granted') return
+    if (permission !== 'granted') {
+      console.warn(`[push] notification permission is "${permission}", not requesting a subscription`)
+      return
+    }
     const registration = await navigator.serviceWorker.ready
     let subscription = await registration.pushManager.getSubscription()
     if (!subscription) {
@@ -149,14 +159,22 @@ async function subscribeToPush(roomId: string, deviceId: string) {
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
       })
+      console.log('[push] created new push subscription')
+    } else {
+      console.log('[push] reusing existing push subscription')
     }
-    await fetch('/api/chat/subscribe', {
+    const res = await fetch('/api/chat/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roomId, deviceId, subscription }),
     })
-  } catch {
-    // push not supported/denied — chat still works without it
+    if (!res.ok) {
+      console.error('[push] failed to save subscription on server', await res.text())
+    } else {
+      console.log('[push] subscription saved for this room')
+    }
+  } catch (err) {
+    console.error('[push] subscribe flow failed', err)
   }
 }
 
