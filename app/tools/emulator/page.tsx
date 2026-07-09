@@ -156,12 +156,38 @@ function EmulatorHost() {
   const [urlLoading,   setUrlLoading]   = useState(false)
   const [urlError,     setUrlError]     = useState<string | null>(null)
   const [showRomSwap,  setShowRomSwap]  = useState(false)
+  const [cacheStatus,  setCacheStatus]  = useState<'idle' | 'cleaning' | 'done' | 'error'>('idle')
 
   const ejsRef     = useRef<EJSManager | null>(null)
   const prevRef    = useRef<Record<string, Record<string, boolean>>>({})
   const blobRef    = useRef<string | null>(null)
   const biosBlobRef = useRef<string | null>(null)
   const scriptRef  = useRef<HTMLScriptElement | null>(null)
+
+  // Clear all browser storage used by EmulatorJS (Cache API cores, IndexedDB saves, localStorage)
+  const cleanCache = async () => {
+    setCacheStatus('cleaning')
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys()
+        await Promise.all(keys.map((k) => caches.delete(k)))
+      }
+      if ('indexedDB' in window && indexedDB.databases) {
+        const dbs = await indexedDB.databases()
+        await Promise.all(dbs.map((db) => db.name ? new Promise<void>((res) => {
+          const req = indexedDB.deleteDatabase(db.name!)
+          req.onsuccess = () => res()
+          req.onerror   = () => res()
+        }) : Promise.resolve()))
+      }
+      localStorage.clear()
+      setCacheStatus('done')
+    } catch {
+      setCacheStatus('error')
+    } finally {
+      setTimeout(() => setCacheStatus('idle'), 3000)
+    }
+  }
 
   // Called by phone controller when player pastes a ROM URL
   const loadRomFromUrl = useCallback(async (url: string, sys: string) => {
@@ -671,6 +697,31 @@ function EmulatorHost() {
               <p>→ NES/SNES: chọn layout &quot;— Player 1&quot; / &quot;— Player 2&quot; đúng thứ tự join.</p>
               <p>→ Arcade: chọn layout &quot;Arcade Fighter — Player 1/2/3/4&quot; đủ 6 nút đấm/đá + combo 3P/3K.</p>
               <p>→ Game phải hỗ trợ multiplayer (không phải game nào cũng có).</p>
+            </div>
+
+            {/* Cache cleanup */}
+            <div className="rounded-xl border border-border/50 bg-surface/60 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-white">Dọn cache game</p>
+                  <p className="text-xs text-muted">Xóa file core/WASM, save state, localStorage — dùng sau khi chơi xong để giải phóng bộ nhớ</p>
+                </div>
+                <button
+                  onClick={() => void cleanCache()}
+                  disabled={cacheStatus !== 'idle'}
+                  className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed ${
+                    cacheStatus === 'done'     ? 'border-green-500/40 bg-green-500/10 text-green-400' :
+                    cacheStatus === 'error'    ? 'border-red-500/40   bg-red-500/10   text-red-400'   :
+                    cacheStatus === 'cleaning' ? 'border-border bg-background text-muted'              :
+                    'border-border bg-background text-muted hover:border-accent/40 hover:text-white'
+                  }`}
+                >
+                  {cacheStatus === 'cleaning' ? 'Đang xóa...' :
+                   cacheStatus === 'done'     ? '✓ Đã xóa'    :
+                   cacheStatus === 'error'    ? '✕ Lỗi'       :
+                   '🗑 Dọn cache'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
