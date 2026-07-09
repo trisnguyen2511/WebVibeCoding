@@ -153,9 +153,10 @@ function EmulatorHost() {
   const [biosName,  setBiosName]  = useState<string | null>(null)
   const [wrapZip,   setWrapZip]   = useState(false)
   const [gameReady, setGameReady] = useState(false)
-  const [romUrlInput, setRomUrlInput] = useState('')
-  const [urlLoading,  setUrlLoading]  = useState(false)
-  const [urlError,    setUrlError]    = useState<string | null>(null)
+  const [romUrlInput,  setRomUrlInput]  = useState('')
+  const [urlLoading,   setUrlLoading]   = useState(false)
+  const [urlError,     setUrlError]     = useState<string | null>(null)
+  const [showRomSwap,  setShowRomSwap]  = useState(false)
 
   const ejsRef     = useRef<EJSManager | null>(null)
   const prevRef    = useRef<Record<string, Record<string, boolean>>>({})
@@ -217,7 +218,7 @@ function EmulatorHost() {
   // Only works if the host serves the file with CORS allowed for this
   // origin — most ROM sites don't, so this is best-effort with a clear
   // error message rather than a guaranteed feature.
-  const handleRomUrlImport = async () => {
+  const handleRomUrlImport = async (afterSuccess?: () => void) => {
     const trimmed = romUrlInput.trim()
     if (!trimmed) return
     setUrlError(null)
@@ -230,6 +231,7 @@ function EmulatorHost() {
       const name = nameFromUrl || 'rom' + (SYSTEMS.find((s) => s.value === system)?.exts.split(' ')[0] ?? '')
       await handleRomFile(new File([blob], name, { type: blob.type }))
       setRomUrlInput('')
+      afterSuccess?.()
     } catch {
       setUrlError('Không tải được ROM từ link này — thường do server không cho phép CORS. Thử tải file về máy rồi upload thủ công.')
     } finally {
@@ -500,26 +502,63 @@ function EmulatorHost() {
                 <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-2">
                   <span className="font-mono text-xs text-muted truncate max-w-xs">{romName}</span>
                   <div className="flex shrink-0 items-center gap-3">
-                    {gameReady && (
+                    {gameReady ? (
                       <span className="flex items-center gap-1.5 font-mono text-xs text-green-400">
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />
                         Running
                       </span>
-                    )}
-                    {!gameReady && (
+                    ) : (
                       <span className="flex items-center gap-1.5 font-mono text-xs text-amber-400">
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
                         Loading...
                       </span>
                     )}
                     <button
+                      onClick={() => { setShowRomSwap((v) => !v); setUrlError(null) }}
+                      className={`text-xs transition-colors ${showRomSwap ? 'text-accent-soft' : 'text-muted hover:text-white'}`}
+                    >
+                      🔗 Đổi ROM
+                    </button>
+                    <button
                       onClick={resetRom}
                       className="text-xs text-muted transition-colors hover:text-white"
                     >
-                      ✕ Đổi game
+                      ✕ Reset
                     </button>
                   </div>
                 </div>
+
+                {/* ── Inline ROM swap panel (Player 1) ─────────────── */}
+                {showRomSwap && (
+                  <div className="border-b border-border bg-surface/80 px-4 py-3 space-y-2">
+                    <p className="font-mono text-xs text-muted">Dán URL ROM mới để đổi game ngay</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={romUrlInput}
+                        onChange={(e) => setRomUrlInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !urlLoading)
+                            void handleRomUrlImport(() => setShowRomSwap(false))
+                        }}
+                        placeholder="https://example.com/game.nes"
+                        className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs text-white outline-none placeholder:text-muted focus:border-accent/40"
+                      />
+                      <button
+                        onClick={() => void handleRomUrlImport(() => setShowRomSwap(false))}
+                        disabled={urlLoading || !romUrlInput.trim()}
+                        className="shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-xs font-medium text-accent-soft transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {urlLoading ? 'Đang tải...' : 'Tải ROM'}
+                      </button>
+                    </div>
+                    {urlError && <p className="text-xs text-red-400">{urlError}</p>}
+                    <p className="text-xs text-muted">
+                      Chỉ hoạt động nếu server ROM cho phép CORS. Nếu lỗi thì tải file về máy → dùng nút &quot;✕ Reset&quot; → upload thủ công.
+                    </p>
+                  </div>
+                )}
+
                 {/* EJS mounts here — do NOT conditionally render this div */}
                 <div id="ejs-mount" style={{ width: '100%', minHeight: 400 }} />
               </div>
