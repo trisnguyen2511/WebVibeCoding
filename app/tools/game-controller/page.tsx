@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 import { ToolShell } from '@/components/tool-shell'
 import { useGameController } from '@/hooks/use-game-controller'
-import { joinRoom, InputMessage } from '@/lib/webrtc'
+import { joinRoom, ControllerInput } from '@/lib/webrtc'
 import { parseInf, ControllerConfig, DpadConfig } from '@/lib/inf-parser'
 
 const MAX_PLAYERS = 8
@@ -22,6 +22,16 @@ const PLAYER_COLORS = [
 ]
 
 type HostMode = 'browser' | 'agent'
+
+const CONTROLLER_SYSTEMS = [
+  { value: 'nes',    label: 'NES'  },
+  { value: 'snes',   label: 'SNES' },
+  { value: 'gba',    label: 'GBA'  },
+  { value: 'gbc',    label: 'GB'   },
+  { value: 'n64',    label: 'N64'  },
+  { value: 'arcade', label: 'ARC'  },
+] as const
+type ControllerSystem = typeof CONTROLLER_SYSTEMS[number]['value']
 
 // ── Cross-browser Fullscreen API (vendor prefixes for older WebViews) ──
 type FullscreenElement = HTMLElement & {
@@ -516,8 +526,11 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
   const [status, setStatus] = useState<'connecting' | 'ready' | 'disconnected'>('connecting')
   const [activeCombo, setActiveCombo] = useState<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showRomPanel, setShowRomPanel] = useState(false)
+  const [romPanelUrl, setRomPanelUrl] = useState('')
+  const [romPanelSystem, setRomPanelSystem] = useState<ControllerSystem>('nes')
   const connRef = useRef<{
-    sendInput: (m: Omit<InputMessage, 'peerId'>) => void
+    sendInput: (m: ControllerInput) => void
     disconnect: () => void
   } | null>(null)
 
@@ -568,6 +581,14 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
 
   const sendKey = (key: string, state: 'pressed' | 'released') => {
     connRef.current?.sendInput({ type: 'button', key, state, ts: Date.now() })
+  }
+
+  const sendRomUrl = () => {
+    const url = romPanelUrl.trim()
+    if (!url) return
+    connRef.current?.sendInput({ type: 'rom-url', url, system: romPanelSystem })
+    setShowRomPanel(false)
+    setRomPanelUrl('')
   }
 
   const onDown = (id: string) => {
@@ -626,6 +647,15 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
         {badgeText}
       </div>
 
+      {/* ROM panel button */}
+      <button
+        onClick={() => setShowRomPanel((v) => !v)}
+        className="absolute left-2 top-[42px] z-10 flex h-8 w-8 items-center justify-center rounded-full border border-[#1A1A2E] bg-[#0F0F1A]/90 text-sm"
+        title="Đổi game"
+      >
+        📁
+      </button>
+
       {/* Fullscreen toggle */}
       <button
         onClick={toggleFullscreen}
@@ -633,6 +663,51 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
       >
         {isFullscreen ? '⤡' : '⛶'}
       </button>
+
+      {/* ROM panel */}
+      {showRomPanel && (
+        <div className="absolute inset-0 z-30 flex items-end">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setShowRomPanel(false)}
+          />
+          <div className="relative w-full space-y-3 rounded-t-2xl border-t border-[#1A1A2E] bg-[#08080E] p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-white">Đổi game từ điện thoại</p>
+              <button onClick={() => setShowRomPanel(false)} className="text-[#52525B] hover:text-white">✕</button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {CONTROLLER_SYSTEMS.map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setRomPanelSystem(s.value)}
+                  className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${romPanelSystem === s.value ? 'border-[#7C3AED] bg-[#7C3AED]/20 text-[#A78BFA]' : 'border-[#1A1A2E] text-[#52525B] hover:text-white'}`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={romPanelUrl}
+                onChange={(e) => setRomPanelUrl(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendRomUrl()}
+                placeholder="https://example.com/game.nes"
+                className="min-w-0 flex-1 rounded-lg border border-[#1A1A2E] bg-[#0F0F1A] px-3 py-2.5 font-mono text-xs text-white outline-none placeholder:text-[#52525B] focus:border-[#7C3AED]"
+              />
+              <button
+                onClick={sendRomUrl}
+                disabled={!romPanelUrl.trim()}
+                className="shrink-0 rounded-lg border border-[#7C3AED]/40 bg-[#7C3AED]/10 px-4 py-2.5 text-xs font-medium text-[#A78BFA] transition-colors hover:bg-[#7C3AED]/20 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Tải
+              </button>
+            </div>
+            <p className="text-xs text-[#52525B]">PC sẽ tải ROM này về và bắt đầu ngay (cần server cho phép CORS).</p>
+          </div>
+        </div>
+      )}
 
       {/* Combo flash */}
       {activeCombo && (

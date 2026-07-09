@@ -12,13 +12,22 @@ function getSupabase() {
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }]
 
-export type InputMessage = {
+export type ButtonInput = {
   type: 'button'
   key: string
   state: 'pressed' | 'released'
   ts: number
-  peerId: string
 }
+
+export type RomUrlInput = {
+  type: 'rom-url'
+  url: string
+  system: string
+}
+
+export type ControllerInput = ButtonInput | RomUrlInput
+
+export type InputMessage = ControllerInput & { peerId: string }
 
 export type PlayerInfo = {
   peerId: string
@@ -138,7 +147,7 @@ export async function joinRoom(
   onAssigned: (playerIndex: number) => void,
   onDisconnected: () => void
 ): Promise<{
-  sendInput: (msg: Omit<InputMessage, 'peerId'>) => void
+  sendInput: (msg: ControllerInput) => void
   disconnect: () => void
   peerId: string
 }> {
@@ -207,7 +216,7 @@ export async function joinRoom(
 
   return {
     peerId,
-    sendInput: (msg) => {
+    sendInput: (msg: ControllerInput) => {
       if (dataChannel?.readyState === 'open')
         dataChannel.send(JSON.stringify({ ...msg, peerId }))
     },

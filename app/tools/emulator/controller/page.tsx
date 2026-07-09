@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { joinRoom } from '@/lib/webrtc'
-import type { InputMessage } from '@/lib/webrtc'
+import type { ControllerInput } from '@/lib/webrtc'
 
 // ── RetroPad standard indices (EmulatorJS) ───────────────────────
 const BTN = {
@@ -86,7 +86,7 @@ function ControllerView({ roomId }: { roomId: string }) {
   const [playerIdx, setPlayerIdx] = useState(0)
   const [isLandscape, setIsLandscape] = useState(false)
   const connRef = useRef<{
-    sendInput: (m: Omit<InputMessage, 'peerId'>) => void
+    sendInput: (m: ControllerInput) => void
     disconnect: () => void
   } | null>(null)
 

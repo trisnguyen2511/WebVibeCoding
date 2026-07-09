@@ -1,5 +1,5 @@
 'use client'
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import JSZip from 'jszip'
 import { ToolShell } from '@/components/tool-shell'
@@ -144,7 +144,6 @@ function generateRoomId() {
 // ── Host page ────────────────────────────────────────────────────
 function EmulatorHost() {
   const [roomId]  = useState(generateRoomId)
-  const { players, playerInputs, kickPlayer } = useGameController(roomId)
 
   const [system,    setSystem]    = useState<System>('nes')
   const [romUrl,    setRomUrl]    = useState<string | null>(null)
@@ -163,6 +162,28 @@ function EmulatorHost() {
   const blobRef    = useRef<string | null>(null)
   const biosBlobRef = useRef<string | null>(null)
   const scriptRef  = useRef<HTMLScriptElement | null>(null)
+
+  // Called by phone controller when player pastes a ROM URL
+  const loadRomFromUrl = useCallback(async (url: string, sys: string) => {
+    const targetSys = SYSTEMS.some((s) => s.value === sys) ? (sys as System) : system
+    setSystem(targetSys)
+    try {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      const nameFromUrl = decodeURIComponent(url.split('/').pop()?.split(/[?#]/)[0] || '')
+      const name = nameFromUrl || 'rom' + (SYSTEMS.find((s) => s.value === targetSys)?.exts.split(' ')[0] ?? '')
+      if (blobRef.current) URL.revokeObjectURL(blobRef.current)
+      setRomName(name)
+      setGameReady(false)
+      ejsRef.current = null
+      const blobUrl = URL.createObjectURL(blob)
+      blobRef.current = blobUrl
+      setRomUrl(blobUrl)
+    } catch { /* silent fail — phone user sees no error UI on host */ }
+  }, [system])
+
+  const { players, playerInputs, kickPlayer } = useGameController(roomId, loadRomFromUrl)
 
   const controllerUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/tools/game-controller?room=${roomId}`
