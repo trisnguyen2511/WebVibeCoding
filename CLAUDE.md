@@ -57,11 +57,10 @@ feature/xxx  →  staging  →  master (prod)
 5. After user says "lên prod" / "lên production" / "merge to master": merge `staging` → `master`
 
 ### HARD DEPLOY RULES — never break these
-- **NEVER** merge to `master` in the same command as merging to `staging`
-- **NEVER** merge `staging` → `master` unless the user's message explicitly says to go to prod
-- After every task: push to `staging`, tell the user it's ready for review, then STOP
-- "lên prod" from the user is the ONLY trigger to merge to `master`
+- **Default for every task**: push to `staging` only, notify the user, then STOP
+- **NEVER** merge `staging` → `master` unless the user explicitly says "lên prod" (or equivalent)
 - This applies to every change, no matter how small (typo fix, removing a section, etc.)
+- The user will say if they want an exception — otherwise always stop at staging
 
 ## Commit format
 
