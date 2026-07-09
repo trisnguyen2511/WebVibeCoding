@@ -517,32 +517,6 @@ function EmulatorHost() {
                   </div>
                 )}
 
-                {/* Free homebrew list — no legal free ROMs exist for arcade */}
-                {system !== 'arcade' && (
-                  <div>
-                    <p className="mb-2 font-mono text-xs uppercase tracking-widest text-muted">
-                      ROM miễn phí hợp pháp — tải về rồi upload
-                    </p>
-                    <div className="space-y-1.5">
-                      {FREE_ROMS.map((r) => (
-                        <a
-                          key={r.name}
-                          href={r.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 text-xs transition-colors hover:border-accent/30 hover:bg-accent/5"
-                        >
-                          <span className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-xs ${system === r.system ? 'border border-accent/40 bg-accent/10 text-accent-soft' : 'border border-border text-muted'}`}>
-                            {r.system.toUpperCase()}
-                          </span>
-                          <span className="font-medium text-white">{r.name}</span>
-                          <span className="hidden flex-1 text-muted sm:block">{r.desc}</span>
-                          <span className="ml-auto shrink-0 text-accent-soft">↗</span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             ) : (
               <div className="overflow-hidden rounded-xl border border-border bg-black">
