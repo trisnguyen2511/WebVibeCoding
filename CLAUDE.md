@@ -53,11 +53,15 @@ feature/xxx  →  staging  →  master (prod)
 1. Develop on `claude/<feature>` branch
 2. Merge `claude/<feature>` → `staging` (auto-deploy to Vercel Preview)
 3. Notify the user that the feature is on staging and ready for review
-4. **Wait for user approval** — do NOT merge to `master` without explicit user confirmation
-5. After user approves: merge `staging` → `master` to go live
+4. **STOP and wait** — do NOT touch `master` until the user explicitly says so
+5. After user says "lên prod" / "lên production" / "merge to master": merge `staging` → `master`
 
-Never merge a feature branch directly into `master`.
-Never merge `staging` → `master` without the user explicitly saying so.
+### HARD DEPLOY RULES — never break these
+- **NEVER** merge to `master` in the same command as merging to `staging`
+- **NEVER** merge `staging` → `master` unless the user's message explicitly says to go to prod
+- After every task: push to `staging`, tell the user it's ready for review, then STOP
+- "lên prod" from the user is the ONLY trigger to merge to `master`
+- This applies to every change, no matter how small (typo fix, removing a section, etc.)
 
 ## Commit format
 
