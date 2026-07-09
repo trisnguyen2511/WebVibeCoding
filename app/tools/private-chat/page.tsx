@@ -898,7 +898,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 backdrop-blur-sm"
+        className="min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 backdrop-blur-sm"
         style={otherMoodColor ? { boxShadow: `inset 0 0 80px ${otherMoodColor}18` } : undefined}
       >
         {initialLoading ? (
@@ -991,7 +991,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                           Tin nhắn hẹn giờ, mở lúc {m.reveal_at ? formatTime(m.reveal_at) : '...'}
                         </span>
                       ) : isJournal ? (
-                        <div className="w-full border-l-2 border-accent/40 py-1 pl-4">
+                        <div className="w-full overflow-x-auto border-l-2 border-accent/40 py-1 pl-4">
                           {m.image_url && (
                             <a href={m.image_url} target="_blank" rel="noreferrer" className="mb-2 block max-w-md">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1022,8 +1022,8 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                             </a>
                           )}
                           {m.content && (
-                            <span
-                              className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${tailClass} ${
+                            <div
+                              className={`max-w-[75%] overflow-x-auto rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${tailClass} ${
                                 mine
                                   ? 'bg-gradient-to-br from-accent to-[#5b21b6] text-white shadow-[0_2px_16px_rgba(124,58,237,0.35)]'
                                   : 'border border-white/[0.08] bg-white/[0.06] text-white backdrop-blur-sm'
@@ -1036,7 +1036,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                               }}
                             >
                               {m.content}
-                            </span>
+                            </div>
                           )}
                         </>
                       )}
