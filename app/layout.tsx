@@ -4,6 +4,7 @@ import { Inter, Space_Grotesk, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import { CommandPalette } from '@/components/command-palette'
 import { RegisterServiceWorker } from '@/components/register-service-worker'
+import { Agentation } from 'agentation'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space-grotesk' })
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <RegisterServiceWorker />
         <CommandPalette />
         {children}
+        {process.env.NEXT_PUBLIC_ENABLE_AGENTATION === 'true' && <Agentation />}
       </body>
     </html>
   )

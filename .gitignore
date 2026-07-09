@@ -39,4 +39,6 @@ next-env.d.ts
 public/sw.js
 public/workbox-*.js
 public/worker-*.js
-.claude/
+.claude/*
+!.claude/skills
+**/__pycache__/
