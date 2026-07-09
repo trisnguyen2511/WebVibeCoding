@@ -654,14 +654,6 @@ function EmulatorHost() {
               </div>
             </div>
 
-            {/* Legal note */}
-            <div className="rounded-xl border border-border/50 bg-surface/60 p-3 space-y-1 text-xs text-muted">
-              <p className="font-medium text-white">Lưu ý pháp lý</p>
-              <p>Phần mềm emulator hoàn toàn hợp pháp. ROM (và BIOS) do bạn tự cung cấp — không lưu trên server, không upload lên internet.</p>
-              {system === 'arcade' && (
-                <p>Khác với NES/GBA, game Arcade (CP1/CP2/Neo Geo) hầu hết là thương mại có bản quyền — không có homebrew miễn phí hợp pháp tương đương, bạn tự chịu trách nhiệm về nguồn ROM.</p>
-              )}
-            </div>
 
             {/* Multiplayer tips */}
             <div className="rounded-xl border border-border/50 bg-surface/60 p-3 space-y-1.5 text-xs text-muted">
