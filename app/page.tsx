@@ -123,9 +123,22 @@ export default function HomePage() {
       {/* ── Footer ───────────────────────────────────────────── */}
       <footer className="border-t border-white/[0.05]">
         <div className="mx-auto max-w-5xl px-6 py-5">
-          <p className="text-center font-mono text-[11px] text-muted">
-            Built with Next.js · Everything runs in your browser · No data ever leaves your device
-          </p>
+          <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+            <p className="font-mono text-[11px] text-muted">
+              Built with Next.js · Runs entirely in your browser · No data leaves your device
+            </p>
+            <p className="font-mono text-[11px] text-muted">
+              Made by{' '}
+              <a
+                href="https://trisnguyen2511.github.io/CVHTML/Index/index.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent-soft transition-colors hover:text-white"
+              >
+                Tris
+              </a>
+            </p>
+          </div>
         </div>
       </footer>
 
