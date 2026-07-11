@@ -168,6 +168,9 @@ function EmulatorHost() {
   const cleanCache = async () => {
     setCacheStatus('cleaning')
     try {
+      // Release the emulator core's own IndexedDB connection first — otherwise
+      // the deleteDatabase calls below are far more likely to get "blocked".
+      if (romUrl) resetRom()
       if ('caches' in window) {
         const keys = await caches.keys()
         await Promise.all(keys.map((k) => caches.delete(k)))
@@ -176,8 +179,15 @@ function EmulatorHost() {
         const dbs = await indexedDB.databases()
         await Promise.all(dbs.map((db) => db.name ? new Promise<void>((res) => {
           const req = indexedDB.deleteDatabase(db.name!)
-          req.onsuccess = () => res()
-          req.onerror   = () => res()
+          const finish = () => res()
+          req.onsuccess = finish
+          req.onerror   = finish
+          // Fires instead of onsuccess/onerror when something (e.g. the
+          // emulator core, or another tab) still holds an open connection
+          // to this database — deletion stays queued and completes once
+          // that connection closes, but we shouldn't block the UI on it.
+          req.onblocked = finish
+          setTimeout(finish, 3000)
         }) : Promise.resolve()))
       }
       localStorage.clear()
