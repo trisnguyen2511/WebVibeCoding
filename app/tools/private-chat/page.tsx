@@ -1,10 +1,18 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { LogOut, Pin, Reply, SmilePlus, Clock, Image as ImageIcon, Type, Send, MessageCircle, BookOpen, X, Plus, Lock } from 'lucide-react'
+import { LogOut, Pin, Reply, SmilePlus, Clock, Image as ImageIcon, Type, Send, MessageCircle, BookOpen, X, Plus, Lock, Paperclip, FileIcon } from 'lucide-react'
 import { ToolShell } from '@/components/tool-shell'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { compressImageToDataUrl } from '@/lib/compress-image'
+import { CHAT_MAX_FILE_SIZE_BYTES, CHAT_MAX_FILE_SIZE_MB, CHAT_OVERSIZE_DISMISS_DAYS } from '@/lib/chat-limits'
+
+const OVERSIZE_DISMISS_KEY = 'wv-chat-oversize-dismissed-at'
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+  return `${Math.ceil(bytes / 1024)}KB`
+}
 
 const SESSION_KEY = 'wv-chat-session'
 const DEVICE_KEY = 'wv-chat-device-id'
@@ -40,6 +48,10 @@ type ChatMessage = {
   clientId?: string
   pending?: boolean
   failed?: boolean
+  file_url?: string | null
+  file_bytes?: number | null
+  file_name?: string | null
+  file_resource_type?: string | null
 }
 
 type PinnedMessage = { id: string; device_id: string; nickname: string; content: string | null; image_url?: string | null }
@@ -170,6 +182,34 @@ function formatDayLabel(iso: string): string {
   if (sameDay(date, today)) return 'Hôm nay'
   if (sameDay(date, yesterday)) return 'Hôm qua'
   return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+function FileAttachment({ message }: { message: ChatMessage }) {
+  if (!message.file_url) return null
+  if (message.file_resource_type === 'video') {
+    return (
+      <video
+        controls
+        src={message.file_url}
+        className="mb-1.5 max-h-64 max-w-full rounded-xl border border-white/[0.08] shadow-lg"
+      />
+    )
+  }
+  return (
+    <a
+      href={message.file_url}
+      target="_blank"
+      rel="noreferrer"
+      download={message.file_name ?? undefined}
+      className="mb-1.5 flex max-w-[75%] items-center gap-2.5 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3.5 py-2.5 text-sm text-white transition-colors hover:bg-white/[0.08]"
+    >
+      <FileIcon size={18} className="shrink-0 text-accent-soft" />
+      <span className="min-w-0 flex-1 truncate">{message.file_name ?? 'File'}</span>
+      {typeof message.file_bytes === 'number' && (
+        <span className="shrink-0 text-xs text-muted">{formatFileSize(message.file_bytes)}</span>
+      )}
+    </a>
+  )
 }
 
 function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
@@ -361,11 +401,18 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [showGesturePicker, setShowGesturePicker] = useState(false)
   const [gestureOverlay, setGestureOverlay] = useState<{ emoji: string; nickname: string; label: string } | null>(null)
   const [showToolsMenu, setShowToolsMenu] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [fileUploadStatus, setFileUploadStatus] = useState<'idle' | 'uploading' | 'error'>('idle')
+  const [fileError, setFileError] = useState('')
+  const [oversizePassword, setOversizePassword] = useState('')
+  const [oversizePasswordError, setOversizePasswordError] = useState('')
+  const [verifyingPassword, setVerifyingPassword] = useState(false)
 
   const deviceId = useRef(getDeviceId())
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
   const initialLoadDone = useRef(false)
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabaseBrowser>['channel']> | null>(null)
   const typingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -749,6 +796,122 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     }
   }
 
+  const pickAttachment = () => attachmentInputRef.current?.click()
+
+  const isOversizeRecentlyDismissed = () => {
+    const raw = localStorage.getItem(OVERSIZE_DISMISS_KEY)
+    if (!raw) return false
+    const elapsedMs = Date.now() - new Date(raw).getTime()
+    return elapsedMs < CHAT_OVERSIZE_DISMISS_DAYS * 24 * 60 * 60 * 1000
+  }
+
+  const uploadAndSendFile = async (file: File, adminPassword?: string) => {
+    setFileUploadStatus('uploading')
+    setFileError('')
+    try {
+      const signRes = await fetch('/api/chat/upload-sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: session.roomId, deviceId: deviceId.current }),
+      })
+      if (!signRes.ok) throw new Error('sign failed')
+      const { signature, timestamp, apiKey, cloudName, folder } = await signRes.json()
+
+      const form = new FormData()
+      form.append('file', file)
+      form.append('api_key', apiKey)
+      form.append('timestamp', String(timestamp))
+      form.append('signature', signature)
+      form.append('folder', folder)
+
+      const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+        method: 'POST',
+        body: form,
+      })
+      const uploaded = await uploadRes.json()
+      if (!uploadRes.ok || !uploaded.secure_url) throw new Error(uploaded.error?.message || 'upload failed')
+
+      const res = await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId: session.roomId,
+          deviceId: deviceId.current,
+          file: {
+            url: uploaded.secure_url,
+            publicId: uploaded.public_id,
+            bytes: uploaded.bytes,
+            name: file.name,
+            resourceType: uploaded.resource_type,
+          },
+          adminPassword,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'send failed')
+      }
+      setFileUploadStatus('idle')
+    } catch {
+      setFileUploadStatus('error')
+      setFileError('Gửi file thất bại — thử lại nhé')
+    }
+  }
+
+  const onAttachmentSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setFileError('')
+
+    if (file.size <= CHAT_MAX_FILE_SIZE_BYTES) {
+      uploadAndSendFile(file)
+      return
+    }
+
+    if (isOversizeRecentlyDismissed()) {
+      setFileError(`Vượt quá giới hạn ${CHAT_MAX_FILE_SIZE_MB}MB, không thể tải lên.`)
+      return
+    }
+
+    setPendingFile(file)
+    setOversizePassword('')
+    setOversizePasswordError('')
+  }
+
+  const confirmOversizePassword = async () => {
+    if (!pendingFile || !oversizePassword) return
+    setVerifyingPassword(true)
+    setOversizePasswordError('')
+    try {
+      const res = await fetch('/api/chat/verify-admin-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: oversizePassword }),
+      })
+      const data = await res.json()
+      if (!data.ok) {
+        setOversizePasswordError('Sai mật khẩu')
+        return
+      }
+      const file = pendingFile
+      const password = oversizePassword
+      setPendingFile(null)
+      setOversizePassword('')
+      uploadAndSendFile(file, password)
+    } catch {
+      setOversizePasswordError('Lỗi kết nối — thử lại nhé')
+    } finally {
+      setVerifyingPassword(false)
+    }
+  }
+
+  const dismissOversizePrompt = () => {
+    localStorage.setItem(OVERSIZE_DISMISS_KEY, new Date().toISOString())
+    setPendingFile(null)
+    setFileError(`Vượt quá giới hạn ${CHAT_MAX_FILE_SIZE_MB}MB, không thể tải lên.`)
+  }
+
   const leave = () => {
     localStorage.removeItem(SESSION_KEY)
     onLeave()
@@ -969,6 +1132,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                         </span>
                       ) : isJournal ? (
                         <div className="w-full overflow-x-auto border-l-2 border-accent/40 py-1 pl-4">
+                          <FileAttachment message={m} />
                           {m.image_url && (
                             <a href={m.image_url} target="_blank" rel="noreferrer" className="mb-2 block max-w-md">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -992,6 +1156,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                         </div>
                       ) : (
                         <>
+                          <FileAttachment message={m} />
                           {m.image_url && (
                             <a href={m.image_url} target="_blank" rel="noreferrer" className="mb-1 block max-w-[75%]">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1130,6 +1295,50 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {imageError && <p className="mt-2 text-xs text-red-400">{imageError}</p>}
 
+      {fileUploadStatus === 'uploading' && (
+        <div className="mt-2 flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2.5 text-xs text-muted">
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-muted border-t-transparent" />
+          Đang tải file lên...
+        </div>
+      )}
+      {fileError && <p className="mt-2 text-xs text-red-400">{fileError}</p>}
+
+      {pendingFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[#111119] p-5 shadow-2xl">
+            <p className="font-display font-semibold text-white">File vượt quá {CHAT_MAX_FILE_SIZE_MB}MB</p>
+            <p className="mt-1 text-xs text-muted">
+              &quot;{pendingFile.name}&quot; ({formatFileSize(pendingFile.size)}) vượt giới hạn. Nhập mật khẩu admin để vẫn gửi.
+            </p>
+            <input
+              type="password"
+              value={oversizePassword}
+              onChange={(e) => setOversizePassword(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') confirmOversizePassword() }}
+              placeholder="Mật khẩu admin"
+              autoFocus
+              className="mt-3 w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-base text-white outline-none placeholder-muted focus:border-accent/60 sm:text-sm"
+            />
+            {oversizePasswordError && <p className="mt-1.5 text-xs text-red-400">{oversizePasswordError}</p>}
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={dismissOversizePrompt}
+                className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] py-2.5 text-sm text-muted transition-colors hover:text-white"
+              >
+                Bỏ qua
+              </button>
+              <button
+                onClick={confirmOversizePassword}
+                disabled={verifyingPassword || !oversizePassword}
+                className="flex-1 rounded-xl bg-accent py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-40"
+              >
+                {verifyingPassword ? 'Đang kiểm tra...' : 'Xác nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Typing indicator ────────────────────────────────────── */}
       {typingUsers.size > 0 && (
         <div className="mt-2 flex w-fit items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-xs text-muted animate-panel-in">
@@ -1249,6 +1458,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       {/* ── Input bar ───────────────────────────────────────────── */}
       <div className="relative mt-3 flex items-center gap-2">
         <input ref={fileInputRef} type="file" accept="image/*" onChange={onImageSelected} className="hidden" />
+        <input ref={attachmentInputRef} type="file" onChange={onAttachmentSelected} className="hidden" />
 
         <button
           onClick={() => setShowToolsMenu((v) => !v)}
@@ -1297,6 +1507,13 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               }`}
             >
               <span className="text-base">🤗</span>
+            </button>
+            <button
+              onClick={() => { pickAttachment(); setShowToolsMenu(false) }}
+              title={`Gửi file/video (tối đa ${CHAT_MAX_FILE_SIZE_MB}MB)`}
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition-all hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white"
+            >
+              <Paperclip size={16} />
             </button>
           </div>
         )}
