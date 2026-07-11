@@ -140,13 +140,13 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  const { data: room } = await supabase.from('chat_rooms').select('name').eq('id', roomId).maybeSingle()
+  const { data: room } = await supabase.from('chat_rooms').select('name, icon_url').eq('id', roomId).maybeSingle()
   const notifyBody = isLocked
     ? `${sender.nickname} đã gửi một tin nhắn hẹn giờ 🕰️`
     : message.image_url
       ? `${sender.nickname}: [Hình ảnh]${message.content ? ` ${message.content}` : ''}`
       : `${sender.nickname}: ${message.content}`
-  await pushToRoom(supabase, roomId, deviceId, room?.name ?? 'Tin nhắn mới', notifyBody)
+  await pushToRoom(supabase, roomId, deviceId, room?.name ?? 'Tin nhắn mới', notifyBody, room?.icon_url)
 
   if (uploadedImage) {
     await enforceStorageQuota()

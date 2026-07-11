@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdminRequest } from '@/lib/chat-admin-auth'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { deleteChatImages, uploadChatImage } from '@/lib/cloudinary'
 
 export async function GET(req: NextRequest) {
   if (!isAdminRequest(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
@@ -8,7 +9,7 @@ export async function GET(req: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { data: rooms, error } = await supabase
     .from('chat_rooms')
-    .select('id, pin, name, type, anniversary_date, created_at')
+    .select('id, pin, name, type, anniversary_date, icon_url, created_at')
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -65,13 +66,41 @@ export async function PATCH(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'invalid request body' }, { status: 400 })
   }
-  const { anniversaryDate } = body as { anniversaryDate?: string | null }
+  const { anniversaryDate, iconDataUrl, removeIcon } = body as {
+    anniversaryDate?: string | null
+    iconDataUrl?: string
+    removeIcon?: boolean
+  }
 
   const supabase = getSupabaseAdmin()
-  const { error } = await supabase
-    .from('chat_rooms')
-    .update({ anniversary_date: anniversaryDate || null })
-    .eq('id', id)
+  const update: { anniversary_date?: string | null; icon_url?: string | null; icon_public_id?: string | null } = {}
+
+  if (anniversaryDate !== undefined) {
+    update.anniversary_date = anniversaryDate || null
+  }
+
+  if (iconDataUrl || removeIcon) {
+    const { data: existing } = await supabase.from('chat_rooms').select('icon_public_id').eq('id', id).maybeSingle()
+    if (existing?.icon_public_id) {
+      await deleteChatImages([existing.icon_public_id]).catch(() => {})
+    }
+    if (iconDataUrl) {
+      try {
+        const uploaded = await uploadChatImage(iconDataUrl)
+        update.icon_url = uploaded.url
+        update.icon_public_id = uploaded.publicId
+      } catch {
+        return NextResponse.json({ error: 'icon upload failed' }, { status: 502 })
+      }
+    } else {
+      update.icon_url = null
+      update.icon_public_id = null
+    }
+  }
+
+  if (Object.keys(update).length === 0) return NextResponse.json({ ok: true })
+
+  const { error } = await supabase.from('chat_rooms').update(update).eq('id', id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }

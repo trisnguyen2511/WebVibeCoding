@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { LogOut, Pin, Reply, SmilePlus, Clock, Image as ImageIcon, Type, Send, MessageCircle, BookOpen, X, Plus, Lock } from 'lucide-react'
 import { ToolShell } from '@/components/tool-shell'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
+import { compressImageToDataUrl } from '@/lib/compress-image'
 
 const SESSION_KEY = 'wv-chat-session'
 const DEVICE_KEY = 'wv-chat-device-id'
@@ -15,6 +16,7 @@ type Session = {
   nickname: string
   roomType: 'group' | 'solo'
   anniversaryDate?: string | null
+  roomIconUrl?: string | null
 }
 
 type Reaction = { device_id: string; emoji: string }
@@ -88,36 +90,6 @@ function loadSavedStyle(): MessageStyle {
   }
 }
 
-const MAX_IMAGE_DIMENSION = 1600
-const IMAGE_QUALITY = 0.75
-
-function compressImageToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error('read failed'))
-    reader.onload = () => {
-      const img = new Image()
-      img.onerror = () => reject(new Error('decode failed'))
-      img.onload = () => {
-        let { width, height } = img
-        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
-          const scale = MAX_IMAGE_DIMENSION / Math.max(width, height)
-          width = Math.round(width * scale)
-          height = Math.round(height * scale)
-        }
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        if (!ctx) { reject(new Error('canvas unsupported')); return }
-        ctx.drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', IMAGE_QUALITY))
-      }
-      img.src = reader.result as string
-    }
-    reader.readAsDataURL(file)
-  })
-}
 
 function getDeviceId(): string {
   let id = localStorage.getItem(DEVICE_KEY)
@@ -229,6 +201,7 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         nickname: nicknameValue.trim() || 'my pal',
         roomType: data.roomType === 'solo' ? 'solo' : 'group',
         anniversaryDate: data.anniversaryDate ?? null,
+        roomIconUrl: data.roomIconUrl ?? null,
       }
       localStorage.setItem(SESSION_KEY, JSON.stringify(session))
       onJoined(session)
@@ -821,11 +794,15 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Header ──────────────────────────────────────────────── */}
       <div className="mb-3 flex items-center gap-3 border-b border-white/[0.06] pb-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/[0.10] shadow-[0_0_14px_rgba(124,58,237,0.2)]">
-          {session.roomType === 'solo'
-            ? <BookOpen size={17} className="text-accent-soft" />
-            : <MessageCircle size={17} className="text-accent-soft" />
-          }
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-accent/30 bg-accent/[0.10] shadow-[0_0_14px_rgba(124,58,237,0.2)]">
+          {session.roomIconUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={session.roomIconUrl} alt="" className="h-full w-full object-cover" />
+          ) : session.roomType === 'solo' ? (
+            <BookOpen size={17} className="text-accent-soft" />
+          ) : (
+            <MessageCircle size={17} className="text-accent-soft" />
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate font-display font-semibold text-white">{session.roomName}</p>

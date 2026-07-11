@@ -1,6 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { ToolShell } from '@/components/tool-shell'
+import { compressImageToDataUrl } from '@/lib/compress-image'
 
 type Room = {
   id: string
@@ -8,6 +9,7 @@ type Room = {
   name: string
   type: 'group' | 'solo'
   anniversary_date: string | null
+  icon_url: string | null
   created_at: string
   deviceCount: number
 }
@@ -109,6 +111,33 @@ function AdminPanel() {
     load()
   }
 
+  const [uploadingIconFor, setUploadingIconFor] = useState<string | null>(null)
+  const iconInputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
+
+  const uploadIcon = async (id: string, file: File) => {
+    setUploadingIconFor(id)
+    try {
+      const iconDataUrl = await compressImageToDataUrl(file, 256, 0.85)
+      await fetch(`/api/chat/admin/rooms?id=${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ iconDataUrl }),
+      })
+      load()
+    } finally {
+      setUploadingIconFor(null)
+    }
+  }
+
+  const removeIcon = async (id: string) => {
+    await fetch(`/api/chat/admin/rooms?id=${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ removeIcon: true }),
+    })
+    load()
+  }
+
   const logout = async () => {
     await fetch('/api/chat/admin/logout', { method: 'POST' })
     window.location.reload()
@@ -164,23 +193,57 @@ function AdminPanel() {
       <div className="space-y-2">
         {rooms.length === 0 && <p className="text-center text-sm text-muted">Chưa có phòng nào</p>}
         {rooms.map((r) => (
-          <div key={r.id} className="flex items-center justify-between rounded-xl border border-border bg-surface p-4">
-            <div>
-              <p className="font-medium text-white">
-                {r.name}
-                {r.type === 'solo' && (
-                  <span className="ml-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-normal text-rose-400">độc thoại</span>
-                )}
-              </p>
-              <p className="font-mono text-xs text-muted">PIN: {r.pin} · {r.deviceCount} thiết bị</p>
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-xs text-muted">💞 Ngày bắt đầu yêu:</span>
+          <div key={r.id} className="flex items-start justify-between rounded-xl border border-border bg-surface p-4">
+            <div className="flex items-start gap-3">
+              <div className="shrink-0">
                 <input
-                  type="date"
-                  defaultValue={r.anniversary_date ?? ''}
-                  onBlur={(e) => setAnniversary(r.id, e.target.value)}
-                  className="rounded-lg border border-border bg-background px-2 py-1 text-base text-white outline-none focus:border-accent sm:text-xs"
+                  ref={(el) => { if (el) iconInputRefs.current.set(r.id, el) }}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (file) uploadIcon(r.id, file)
+                  }}
                 />
+                <button
+                  onClick={() => iconInputRefs.current.get(r.id)?.click()}
+                  title="Đổi icon phòng"
+                  className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-border bg-background text-muted hover:border-accent/50 hover:text-white"
+                >
+                  {uploadingIconFor === r.id ? (
+                    <span className="text-xs">...</span>
+                  ) : r.icon_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={r.icon_url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-lg">🖼️</span>
+                  )}
+                </button>
+                {r.icon_url && (
+                  <button onClick={() => removeIcon(r.id)} className="mt-1 block w-full text-center text-[10px] text-muted hover:text-red-400">
+                    Xóa icon
+                  </button>
+                )}
+              </div>
+              <div>
+                <p className="font-medium text-white">
+                  {r.name}
+                  {r.type === 'solo' && (
+                    <span className="ml-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-normal text-rose-400">độc thoại</span>
+                  )}
+                </p>
+                <p className="font-mono text-xs text-muted">PIN: {r.pin} · {r.deviceCount} thiết bị</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-xs text-muted">💞 Ngày bắt đầu yêu:</span>
+                  <input
+                    type="date"
+                    defaultValue={r.anniversary_date ?? ''}
+                    onBlur={(e) => setAnniversary(r.id, e.target.value)}
+                    className="rounded-lg border border-border bg-background px-2 py-1 text-base text-white outline-none focus:border-accent sm:text-xs"
+                  />
+                </div>
               </div>
             </div>
             <button onClick={() => remove(r.id)} className="text-xs text-red-400 hover:text-red-300">Xóa</button>

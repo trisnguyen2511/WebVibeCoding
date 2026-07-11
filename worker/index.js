@@ -10,7 +10,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.body || '',
-      icon: '/icons/icon-192x192.png',
+      icon: data.icon || '/icons/icon-192x192.png',
       badge: '/icons/icon-72x72.png',
       data: { roomId: data.roomId },
     })
