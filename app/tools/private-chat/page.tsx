@@ -423,6 +423,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const scrollRef = useRef<HTMLDivElement>(null)
   const mediaInputRef = useRef<HTMLInputElement>(null)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
+  const messageInputRef = useRef<HTMLTextAreaElement>(null)
   const initialLoadDone = useRef(false)
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabaseBrowser>['channel']> | null>(null)
   const typingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -677,6 +678,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     const revealAt = capsuleAt ? new Date(capsuleAt).toISOString() : undefined
     const sentStyle = style
     setInput('')
+    if (messageInputRef.current) messageInputRef.current.style.height = 'auto'
     setReplyingTo(null)
     setCapsuleAt('')
     setShowCapsulePicker(false)
@@ -801,15 +803,27 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     setFileUploadStatus('uploading')
     setFileError('')
     const caption = input.trim()
+
+    let signature: string, timestamp: number, apiKey: string, cloudName: string, folder: string
     try {
       const signRes = await fetch('/api/chat/upload-sign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId: session.roomId, deviceId: deviceId.current }),
       })
-      if (!signRes.ok) throw new Error('sign failed')
-      const { signature, timestamp, apiKey, cloudName, folder } = await signRes.json()
+      const signData = await signRes.json().catch(() => ({}))
+      if (!signRes.ok) throw new Error(signData.error || 'sign failed')
+      ;({ signature, timestamp, apiKey, cloudName, folder } = signData)
+      if (!signature || !cloudName || !apiKey) throw new Error('sign response missing fields')
+    } catch (err) {
+      console.error('[chat upload] sign step failed', err)
+      setFileUploadStatus('error')
+      setFileError('Không thể chuẩn bị tải lên — thử lại nhé')
+      return
+    }
 
+    let uploaded: { secure_url?: string; public_id?: string; bytes?: number; resource_type?: string; error?: { message?: string } }
+    try {
       const form = new FormData()
       form.append('file', file)
       form.append('api_key', apiKey)
@@ -821,9 +835,16 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         method: 'POST',
         body: form,
       })
-      const uploaded = await uploadRes.json()
-      if (!uploadRes.ok || !uploaded.secure_url) throw new Error(uploaded.error?.message || 'upload failed')
+      uploaded = await uploadRes.json()
+      if (!uploadRes.ok || !uploaded.secure_url) throw new Error(uploaded.error?.message || `upload failed (${uploadRes.status})`)
+    } catch (err) {
+      console.error('[chat upload] cloudinary upload failed', err)
+      setFileUploadStatus('error')
+      setFileError('Tải file lên thất bại — thử lại nhé')
+      return
+    }
 
+    try {
       const res = await fetch('/api/chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -846,10 +867,12 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         throw new Error(data.error || 'send failed')
       }
       setInput('')
+      if (messageInputRef.current) messageInputRef.current.style.height = 'auto'
       setFileUploadStatus('idle')
-    } catch {
+    } catch (err) {
+      console.error('[chat upload] send step failed', err)
       setFileUploadStatus('error')
-      setFileError('Gửi file thất bại — thử lại nhé')
+      setFileError('Đã tải file lên nhưng gửi tin nhắn thất bại — thử lại nhé')
     }
   }
 
@@ -1484,19 +1507,32 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           </div>
         )}
 
-        <input
+        <textarea
+          ref={messageInputRef}
           value={input}
-          onChange={(e) => handleInputChange(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') send() }}
+          onChange={(e) => {
+            handleInputChange(e.target.value)
+            const el = e.target
+            el.style.height = 'auto'
+            el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' || e.shiftKey) return
+            const isCoarsePointer = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
+            if (isCoarsePointer) return // let the keyboard insert a newline instead
+            e.preventDefault()
+            send()
+          }}
           onFocus={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 300)}
           placeholder="Nhắn gì đó..."
+          rows={1}
           style={{
             ...fontStyleFor(style.font),
             color: style.color ?? undefined,
             fontWeight: style.bold ? 700 : undefined,
             fontStyle: style.italic ? 'italic' : undefined,
           }}
-          className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-base text-white outline-none transition-all placeholder-muted focus:border-accent/60 focus:bg-white/[0.05] focus:ring-2 focus:ring-accent/20 sm:text-sm"
+          className="max-h-[120px] flex-1 resize-none overflow-y-auto rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-base text-white outline-none transition-all placeholder-muted focus:border-accent/60 focus:bg-white/[0.05] focus:ring-2 focus:ring-accent/20 sm:text-sm"
         />
 
         <button
