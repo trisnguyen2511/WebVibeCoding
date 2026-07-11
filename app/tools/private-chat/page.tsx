@@ -818,7 +818,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     } catch (err) {
       console.error('[chat upload] sign step failed', err)
       setFileUploadStatus('error')
-      setFileError('Không thể chuẩn bị tải lên — thử lại nhé')
+      setFileError(`Không thể chuẩn bị tải lên: ${err instanceof Error ? err.message : String(err)}`)
       return
     }
 
@@ -840,7 +840,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     } catch (err) {
       console.error('[chat upload] cloudinary upload failed', err)
       setFileUploadStatus('error')
-      setFileError('Tải file lên thất bại — thử lại nhé')
+      setFileError(`Tải file lên Cloudinary thất bại: ${err instanceof Error ? err.message : String(err)}`)
       return
     }
 
@@ -872,7 +872,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     } catch (err) {
       console.error('[chat upload] send step failed', err)
       setFileUploadStatus('error')
-      setFileError('Đã tải file lên nhưng gửi tin nhắn thất bại — thử lại nhé')
+      setFileError(`Đã tải file lên nhưng gửi tin nhắn thất bại: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
