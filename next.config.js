@@ -4,6 +4,11 @@ const withPWA = require('next-pwa')({
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
+  // app-build-manifest.json is an internal Next.js App Router file that
+  // isn't actually served as a static asset — precaching it 404s and fails
+  // the whole service worker install (which then never activates), so it
+  // must be excluded from the precache list.
+  buildExcludes: [/app-build-manifest\.json$/],
   runtimeCaching: [
     {
       urlPattern: /^https:\/\/fonts\.(?:googleapis|gstatic)\.com\/.*/i,
