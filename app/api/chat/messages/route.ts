@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('chat_messages')
     .select(
-      'id, device_id, nickname, content, image_url, text_color, font_family, bold, italic, reply_to_id, reply_to_nickname, reply_to_content, reveal_at, created_at, chat_message_reactions(device_id, emoji)'
+      'id, device_id, nickname, content, image_url, text_color, font_family, bold, italic, reply_to_id, reply_to_nickname, reply_to_content, reveal_at, file_url, file_bytes, file_name, file_resource_type, created_at, chat_message_reactions(device_id, emoji)'
     )
     .eq('room_id', roomId)
     .order('created_at', { ascending: false })

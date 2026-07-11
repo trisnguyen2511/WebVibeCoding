@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
-import { uploadChatImage } from '@/lib/cloudinary'
 import { pushToRoom } from '@/lib/chat-notify'
 import { enforceStorageQuota } from '@/lib/chat-storage-quota'
+import { verifyAdminPassword } from '@/lib/chat-admin-auth'
+import { CHAT_MAX_FILE_SIZE_BYTES } from '@/lib/chat-limits'
 
-const MAX_IMAGE_DATA_URL_LENGTH = 8 * 1024 * 1024 // ~6MB image after base64 overhead
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/
 const FONT_FAMILIES = new Set(['sans', 'display', 'mono', 'cursive'])
 const REPLY_PREVIEW_MAX_LENGTH = 140
@@ -23,11 +23,12 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'invalid request body' }, { status: 400 })
   }
-  const { roomId, deviceId, content, image, style, replyTo, revealAt, gesture, clientId } = body as {
+  const { roomId, deviceId, content, file, adminPassword, style, replyTo, revealAt, gesture, clientId } = body as {
     roomId?: string
     deviceId?: string
     content?: string
-    image?: { dataUrl?: string }
+    file?: { url?: string; publicId?: string; bytes?: number; name?: string; resourceType?: string }
+    adminPassword?: string
     style?: { color?: string; font?: string; bold?: boolean; italic?: boolean }
     replyTo?: { id?: string; nickname?: string; content?: string }
     revealAt?: string
@@ -38,12 +39,13 @@ export async function POST(req: NextRequest) {
 
   const gestureText = gesture && GESTURES[gesture] ? GESTURES[gesture] : null
   const trimmedContent = gestureText ? '' : typeof content === 'string' ? content.trim() : ''
-  const imageDataUrl = gestureText ? undefined : image?.dataUrl
-  if (!trimmedContent && !imageDataUrl && !gestureText) {
-    return NextResponse.json({ error: 'content or image is required' }, { status: 400 })
+  if (!trimmedContent && !gestureText && !file?.url) {
+    return NextResponse.json({ error: 'content or file is required' }, { status: 400 })
   }
-  if (imageDataUrl && imageDataUrl.length > MAX_IMAGE_DATA_URL_LENGTH) {
-    return NextResponse.json({ error: 'image too large' }, { status: 413 })
+  if (file?.url && typeof file.bytes === 'number' && file.bytes > CHAT_MAX_FILE_SIZE_BYTES) {
+    if (!adminPassword || !verifyAdminPassword(adminPassword)) {
+      return NextResponse.json({ error: 'file exceeds the size limit' }, { status: 413 })
+    }
   }
 
   let revealAtIso: string | null = null
@@ -68,9 +70,6 @@ export async function POST(req: NextRequest) {
     device_id: string
     nickname: string
     content: string | null
-    image_url?: string
-    image_public_id?: string
-    image_bytes?: number
     text_color?: string | null
     font_family?: string | null
     bold?: boolean
@@ -79,6 +78,11 @@ export async function POST(req: NextRequest) {
     reply_to_nickname?: string | null
     reply_to_content?: string | null
     reveal_at?: string | null
+    file_url?: string
+    file_public_id?: string
+    file_bytes?: number
+    file_name?: string
+    file_resource_type?: string
   } = {
     room_id: roomId,
     device_id: deviceId,
@@ -97,24 +101,19 @@ export async function POST(req: NextRequest) {
     insertPayload.reply_to_content = (replyTo.content ?? '').slice(0, REPLY_PREVIEW_MAX_LENGTH)
   }
 
-  let uploadedImage = false
-  if (imageDataUrl) {
-    try {
-      const uploaded = await uploadChatImage(imageDataUrl)
-      insertPayload.image_url = uploaded.url
-      insertPayload.image_public_id = uploaded.publicId
-      insertPayload.image_bytes = uploaded.bytes
-      uploadedImage = true
-    } catch {
-      return NextResponse.json({ error: 'image upload failed' }, { status: 502 })
-    }
+  if (file?.url) {
+    insertPayload.file_url = file.url
+    if (file.publicId) insertPayload.file_public_id = file.publicId
+    if (typeof file.bytes === 'number') insertPayload.file_bytes = file.bytes
+    if (file.name) insertPayload.file_name = file.name
+    insertPayload.file_resource_type = file.resourceType || 'raw'
   }
 
   const { data: message, error } = await supabase
     .from('chat_messages')
     .insert(insertPayload)
     .select(
-      'id, device_id, nickname, content, image_url, text_color, font_family, bold, italic, reply_to_id, reply_to_nickname, reply_to_content, reveal_at, created_at'
+      'id, device_id, nickname, content, image_url, text_color, font_family, bold, italic, reply_to_id, reply_to_nickname, reply_to_content, reveal_at, file_url, file_bytes, file_name, file_resource_type, created_at'
     )
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -143,12 +142,14 @@ export async function POST(req: NextRequest) {
   const { data: room } = await supabase.from('chat_rooms').select('name, icon_url').eq('id', roomId).maybeSingle()
   const notifyBody = isLocked
     ? `${sender.nickname} đã gửi một tin nhắn hẹn giờ 🕰️`
-    : message.image_url
-      ? `${sender.nickname}: [Hình ảnh]${message.content ? ` ${message.content}` : ''}`
+    : message.file_url
+      ? `${sender.nickname}: [${
+          message.file_resource_type === 'image' ? 'Hình ảnh' : message.file_resource_type === 'video' ? 'Video' : 'File'
+        }]${message.content ? ` ${message.content}` : ''}`
       : `${sender.nickname}: ${message.content}`
   await pushToRoom(supabase, roomId, deviceId, room?.name ?? 'Tin nhắn mới', notifyBody, room?.icon_url)
 
-  if (uploadedImage) {
+  if (file?.url) {
     await enforceStorageQuota()
   }
 
