@@ -46,10 +46,10 @@ export function createChatUploadSignature(): { signature: string; timestamp: num
   }
 }
 
-export async function deleteChatImages(publicIds: string[]): Promise<void> {
+export async function deleteChatImages(publicIds: string[], resourceType: string = 'image'): Promise<void> {
   if (publicIds.length === 0) return
   const client = getClient()
-  await client.api.delete_resources(publicIds)
+  await client.api.delete_resources(publicIds, { resource_type: resourceType })
 }
 
 export async function getCloudinaryUsageBytes(): Promise<number> {
