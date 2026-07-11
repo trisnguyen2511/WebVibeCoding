@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { LogOut, Pin, Reply, SmilePlus, Clock, Image as ImageIcon, Type, Send, MessageCircle, BookOpen, X, Plus, Lock, Paperclip, FileIcon } from 'lucide-react'
 import { ToolShell } from '@/components/tool-shell'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
-import { compressImageToDataUrl } from '@/lib/compress-image'
 import { CHAT_MAX_FILE_SIZE_BYTES, CHAT_MAX_FILE_SIZE_MB, CHAT_OVERSIZE_DISMISS_DAYS } from '@/lib/chat-limits'
 
 const OVERSIZE_DISMISS_KEY = 'wv-chat-oversize-dismissed-at'
@@ -185,19 +184,32 @@ function formatDayLabel(iso: string): string {
 }
 
 function FileAttachment({ message }: { message: ChatMessage }) {
-  if (!message.file_url) return null
-  if (message.file_resource_type === 'video') {
+  // image_url is the legacy column from before image/video/file uploads were
+  // unified onto one direct-to-Cloudinary path — old messages still use it.
+  const url = message.file_url ?? message.image_url ?? null
+  if (!url) return null
+  const resourceType = message.file_url ? message.file_resource_type : 'image'
+
+  if (resourceType === 'video') {
     return (
       <video
         controls
-        src={message.file_url}
+        src={url}
         className="mb-1.5 max-h-64 max-w-full rounded-xl border border-white/[0.08] shadow-lg"
       />
     )
   }
+  if (resourceType === 'image') {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" className="mb-1.5 block max-w-[75%]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt="" className="max-h-64 rounded-xl border border-white/[0.08] object-cover shadow-lg" />
+      </a>
+    )
+  }
   return (
     <a
-      href={message.file_url}
+      href={url}
       target="_blank"
       rel="noreferrer"
       download={message.file_name ?? undefined}
@@ -384,8 +396,6 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
-  const [pendingImage, setPendingImage] = useState<{ dataUrl: string } | null>(null)
-  const [imageError, setImageError] = useState('')
   const [style, setStyle] = useState<MessageStyle>(DEFAULT_STYLE)
   const [showStylePicker, setShowStylePicker] = useState(false)
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map())
@@ -411,7 +421,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const deviceId = useRef(getDeviceId())
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const mediaInputRef = useRef<HTMLInputElement>(null)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const initialLoadDone = useRef(false)
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabaseBrowser>['channel']> | null>(null)
@@ -662,13 +672,11 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
   const send = useCallback(() => {
     const content = input.trim()
-    if (!content && !pendingImage) return
-    const imageToSend = pendingImage
+    if (!content) return
     const reply = replyingTo
     const revealAt = capsuleAt ? new Date(capsuleAt).toISOString() : undefined
     const sentStyle = style
     setInput('')
-    setPendingImage(null)
     setReplyingTo(null)
     setCapsuleAt('')
     setShowCapsulePicker(false)
@@ -678,7 +686,6 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       roomId: session.roomId,
       deviceId: deviceId.current,
       content,
-      image: imageToSend ? { dataUrl: imageToSend.dataUrl } : undefined,
       style: { color: sentStyle.color, font: sentStyle.font, bold: sentStyle.bold, italic: sentStyle.italic },
       replyTo: reply ? { id: reply.id, nickname: reply.nickname, content: reply.preview } : undefined,
       revealAt,
@@ -694,7 +701,6 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         device_id: deviceId.current,
         nickname: session.nickname,
         content: content || null,
-        image_url: imageToSend?.dataUrl ?? null,
         text_color: sentStyle.color,
         font_family: sentStyle.font,
         bold: sentStyle.bold,
@@ -710,7 +716,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     ])
 
     performSend(clientId, payload)
-  }, [input, pendingImage, style, replyingTo, capsuleAt, session.roomId, session.nickname, performSend])
+  }, [input, style, replyingTo, capsuleAt, session.roomId, session.nickname, performSend])
 
   const sendGesture = async (gestureId: string) => {
     setShowGesturePicker(false)
@@ -781,21 +787,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     }
   }
 
-  const pickImage = () => fileInputRef.current?.click()
-
-  const onImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    setImageError('')
-    try {
-      const dataUrl = await compressImageToDataUrl(file)
-      setPendingImage({ dataUrl })
-    } catch {
-      setImageError('Không đọc được ảnh này — thử ảnh khác nhé')
-    }
-  }
-
+  const pickMedia = () => mediaInputRef.current?.click()
   const pickAttachment = () => attachmentInputRef.current?.click()
 
   const isOversizeRecentlyDismissed = () => {
@@ -808,6 +800,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const uploadAndSendFile = async (file: File, adminPassword?: string) => {
     setFileUploadStatus('uploading')
     setFileError('')
+    const caption = input.trim()
     try {
       const signRes = await fetch('/api/chat/upload-sign', {
         method: 'POST',
@@ -837,6 +830,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         body: JSON.stringify({
           roomId: session.roomId,
           deviceId: deviceId.current,
+          content: caption || undefined,
           file: {
             url: uploaded.secure_url,
             publicId: uploaded.public_id,
@@ -851,6 +845,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'send failed')
       }
+      setInput('')
       setFileUploadStatus('idle')
     } catch {
       setFileUploadStatus('error')
@@ -1133,12 +1128,6 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       ) : isJournal ? (
                         <div className="w-full overflow-x-auto border-l-2 border-accent/40 py-1 pl-4">
                           <FileAttachment message={m} />
-                          {m.image_url && (
-                            <a href={m.image_url} target="_blank" rel="noreferrer" className="mb-2 block max-w-md">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={m.image_url} alt="" className="rounded-xl border border-white/[0.08] object-cover" />
-                            </a>
-                          )}
                           {m.content && (
                             <p
                               className="text-[15px] leading-relaxed text-white"
@@ -1157,12 +1146,6 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       ) : (
                         <>
                           <FileAttachment message={m} />
-                          {m.image_url && (
-                            <a href={m.image_url} target="_blank" rel="noreferrer" className="mb-1 block max-w-[75%]">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={m.image_url} alt="" className="max-h-64 rounded-xl border border-white/[0.08] object-cover shadow-lg" />
-                            </a>
-                          )}
                           {m.content && (
                             <div
                               className={`max-w-[75%] overflow-x-auto rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${tailClass} ${
@@ -1277,23 +1260,6 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           </button>
         </div>
       )}
-
-      {/* ── Pending image preview ───────────────────────────────── */}
-      {pendingImage && (
-        <div className="mt-2 flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={pendingImage.dataUrl} alt="" className="h-12 w-12 rounded-xl border border-white/[0.08] object-cover" />
-          <span className="flex-1 text-xs text-muted">Ảnh sẽ được gửi kèm tin nhắn</span>
-          <button
-            onClick={() => setPendingImage(null)}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-muted transition-colors hover:text-white"
-          >
-            <X size={12} />
-          </button>
-        </div>
-      )}
-
-      {imageError && <p className="mt-2 text-xs text-red-400">{imageError}</p>}
 
       {fileUploadStatus === 'uploading' && (
         <div className="mt-2 flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2.5 text-xs text-muted">
@@ -1457,7 +1423,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Input bar ───────────────────────────────────────────── */}
       <div className="relative mt-3 flex items-center gap-2">
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={onImageSelected} className="hidden" />
+        <input ref={mediaInputRef} type="file" accept="image/*,video/*" onChange={onAttachmentSelected} className="hidden" />
         <input ref={attachmentInputRef} type="file" onChange={onAttachmentSelected} className="hidden" />
 
         <button
@@ -1475,8 +1441,8 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         {showToolsMenu && (
           <div className="absolute bottom-full left-0 mb-2 flex animate-panel-in gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.06] p-2 shadow-2xl backdrop-blur-xl">
             <button
-              onClick={() => { pickImage(); setShowToolsMenu(false) }}
-              title="Gửi ảnh"
+              onClick={() => { pickMedia(); setShowToolsMenu(false) }}
+              title="Gửi ảnh/video"
               className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition-all hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white"
             >
               <ImageIcon size={17} />
@@ -1535,7 +1501,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
         <button
           onClick={send}
-          disabled={!input.trim() && !pendingImage}
+          disabled={!input.trim()}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent text-white shadow-[0_4px_16px_rgba(124,58,237,0.4)] transition-all hover:bg-accent/90 hover:shadow-[0_6px_24px_rgba(124,58,237,0.55)] active:scale-95 disabled:opacity-40 disabled:shadow-none"
         >
           <Send size={16} />

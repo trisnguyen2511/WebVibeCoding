@@ -16,7 +16,7 @@ export async function enforceStorageQuota(): Promise<void> {
     const usageBytes = await getCloudinaryUsageBytes()
 
     if (usageBytes >= HARD_THRESHOLD_BYTES) {
-      await reclaimOldestImages(supabase, RECLAIM_TARGET_BYTES)
+      await reclaimOldestAttachments(supabase, RECLAIM_TARGET_BYTES)
     }
     if (usageBytes >= WARN_THRESHOLD_BYTES) {
       await warnAllRoomsIfDue(supabase, usageBytes)
@@ -61,41 +61,63 @@ async function warnAllRoomsIfDue(
   await supabase.from('chat_system_state').update({ storage_warned_at: new Date().toISOString() }).eq('id', true)
 }
 
-async function reclaimOldestImages(
+// Covers both the legacy image_* columns (old messages, sent before the
+// image/video/file upload paths were unified) and the current file_* columns
+// used by every attachment sent since — the cloud-storage cleanup mechanism
+// must always account for everything actually taking up Cloudinary space,
+// not just images.
+async function reclaimOldestAttachments(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   targetBytes: number
 ): Promise<void> {
-  const { data: images } = await supabase
+  const { data: rows } = await supabase
     .from('chat_messages')
-    .select('id, image_public_id, image_bytes')
-    .not('image_public_id', 'is', null)
+    .select('id, image_public_id, image_bytes, file_public_id, file_bytes, file_resource_type')
+    .or('image_public_id.not.is.null,file_public_id.not.is.null')
     .order('created_at', { ascending: true })
     .limit(500)
 
-  if (!images || images.length === 0) return
+  if (!rows || rows.length === 0) return
 
   let reclaimed = 0
-  const toDelete: typeof images = []
-  for (const img of images) {
+  const toDelete: { id: string; publicId: string; resourceType: string }[] = []
+  for (const row of rows) {
     if (reclaimed >= targetBytes) break
-    toDelete.push(img)
-    reclaimed += img.image_bytes ?? 0
+    const publicId = row.file_public_id ?? row.image_public_id
+    if (!publicId) continue
+    const bytes = row.file_public_id ? row.file_bytes : row.image_bytes
+    const resourceType = row.file_public_id ? row.file_resource_type ?? 'raw' : 'image'
+    toDelete.push({ id: row.id, publicId, resourceType })
+    reclaimed += bytes ?? 0
   }
   if (toDelete.length === 0) return
 
-  await deleteChatImages(toDelete.map((d) => d.image_public_id as string))
+  const publicIdsByType = new Map<string, string[]>()
+  for (const item of toDelete) {
+    const list = publicIdsByType.get(item.resourceType) ?? []
+    list.push(item.publicId)
+    publicIdsByType.set(item.resourceType, list)
+  }
+  await Promise.all(
+    Array.from(publicIdsByType.entries()).map(([resourceType, publicIds]) => deleteChatImages(publicIds, resourceType))
+  )
 
   await Promise.all(
-    toDelete.map((img) =>
+    toDelete.map((item) =>
       supabase
         .from('chat_messages')
         .update({
-          content: '[Ảnh đã bị tự động xoá để tiết kiệm dung lượng]',
+          content: '[Tệp đính kèm đã bị tự động xoá để tiết kiệm dung lượng]',
           image_url: null,
           image_public_id: null,
           image_bytes: null,
+          file_url: null,
+          file_public_id: null,
+          file_bytes: null,
+          file_name: null,
+          file_resource_type: null,
         })
-        .eq('id', img.id)
+        .eq('id', item.id)
     )
   )
 }
