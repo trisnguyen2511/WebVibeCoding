@@ -163,6 +163,15 @@ function EmulatorHost() {
   const blobRef    = useRef<string | null>(null)
   const biosBlobRef = useRef<string | null>(null)
   const scriptRef  = useRef<HTMLScriptElement | null>(null)
+  const screenRef  = useRef<HTMLDivElement | null>(null)
+
+  // Browsers only honor a fullscreen request while there's still an active
+  // user gesture — by the time the ROM/core finishes loading that gesture
+  // has usually expired, so this can silently fail. The manual "⛶" button
+  // below is the reliable fallback when it does.
+  const requestFullscreen = useCallback(() => {
+    screenRef.current?.requestFullscreen?.().catch(() => { /* no active user gesture — use the manual button */ })
+  }, [])
 
   // Clear all browser storage used by EmulatorJS (Cache API cores, IndexedDB saves, localStorage)
   const cleanCache = async () => {
@@ -331,6 +340,7 @@ function EmulatorHost() {
         try { gm?.setControllerPortDevice(port, RETRO_DEVICE_JOYPAD) } catch { /* core doesn't support this many players */ }
       }
       setGameReady(true)
+      requestFullscreen()
     }
 
     const s  = document.createElement('script')
@@ -345,7 +355,7 @@ function EmulatorHost() {
         scriptRef.current = null
       }
     }
-  }, [romUrl, romName, system, biosUrl])
+  }, [romUrl, romName, system, biosUrl, requestFullscreen])
 
   // Revoke blobs on unmount
   useEffect(() => () => {
@@ -519,7 +529,7 @@ function EmulatorHost() {
 
               </div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-border bg-black">
+              <div ref={screenRef} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-black">
                 <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-2">
                   <span className="font-mono text-xs text-muted truncate max-w-xs">{romName}</span>
                   <div className="flex shrink-0 items-center gap-3">
@@ -533,6 +543,15 @@ function EmulatorHost() {
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
                         Loading...
                       </span>
+                    )}
+                    {gameReady && (
+                      <button
+                        onClick={requestFullscreen}
+                        title="Toàn màn hình"
+                        className="text-xs text-muted transition-colors hover:text-white"
+                      >
+                        ⛶ Fullscreen
+                      </button>
                     )}
                     <button
                       onClick={() => { setShowRomSwap((v) => !v); setUrlError(null) }}
@@ -581,7 +600,7 @@ function EmulatorHost() {
                 )}
 
                 {/* EJS mounts here — do NOT conditionally render this div */}
-                <div id="ejs-mount" style={{ width: '100%', minHeight: 400 }} />
+                <div id="ejs-mount" className="w-full min-h-[400px] group-[:fullscreen]:min-h-0 group-[:fullscreen]:flex-1" />
               </div>
             )}
           </div>
