@@ -1,6 +1,6 @@
 {
   "name": "WebVibe Tools",
-  "short_name": "WebVibe",
+  "short_name": "Messages",
   "description": "Personal toolkit — calculators, converters, generators and more",
   "start_url": "/",
   "display": "standalone",
