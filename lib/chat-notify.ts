@@ -7,7 +7,8 @@ export async function pushToRoom(
   excludeDeviceId: string | null,
   title: string,
   body: string,
-  icon?: string | null
+  icon?: string | null,
+  messageId?: string | null
 ): Promise<void> {
   let query = supabase
     .from('chat_devices')
@@ -27,7 +28,7 @@ export async function pushToRoom(
   }
 
   const webpush = getWebPush()
-  const payload = JSON.stringify({ title, body, roomId, icon: icon || undefined })
+  const payload = JSON.stringify({ title, body, roomId, icon: icon || undefined, messageId: messageId || undefined })
   await Promise.all(
     devices.map(async (d) => {
       try {

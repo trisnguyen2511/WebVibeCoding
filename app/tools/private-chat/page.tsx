@@ -416,8 +416,11 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [oversizePassword, setOversizePassword] = useState('')
   const [oversizePasswordError, setOversizePasswordError] = useState('')
   const [verifyingPassword, setVerifyingPassword] = useState(false)
+  const [newMessageCount, setNewMessageCount] = useState(0)
+  const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null)
 
   const deviceId = useRef(getDeviceId())
+  const nearBottomRef = useRef(true)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const mediaInputRef = useRef<HTMLInputElement>(null)
@@ -502,6 +505,22 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     saveCachedMessages(session.roomId, messages)
   }, [messages, session.roomId])
 
+  // A notification click deep-links to the message it was about
+  // (?messageId=...) — jump straight to it and flash it so it's obvious
+  // which one just arrived, instead of dropping the user at the bottom to
+  // hunt for it.
+  useEffect(() => {
+    if (!initialLoadDone.current) return
+    const targetId = new URLSearchParams(window.location.search).get('messageId')
+    if (!targetId) return
+    const el = scrollRef.current?.querySelector(`[data-message-id="${targetId}"]`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setHighlightMessageId(targetId)
+    setTimeout(() => setHighlightMessageId(null), 2000)
+    window.history.replaceState(null, '', window.location.pathname)
+  }, [messages])
+
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || messages.length === 0) return
     setLoadingMore(true)
@@ -530,7 +549,15 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const onScroll = useCallback(() => {
     const container = scrollRef.current
     if (!container) return
-    if (container.scrollTop < 80) loadMore()
+    // Fire well before the user hits the actual top, so older messages are
+    // already in by the time they'd notice the edge — feels endless instead
+    // of "scroll, wait, see a spinner, scroll again".
+    if (container.scrollTop < 350) loadMore()
+
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+    const nearBottom = distanceFromBottom < 150
+    nearBottomRef.current = nearBottom
+    if (nearBottom) setNewMessageCount(0)
   }, [loadMore])
 
   useEffect(() => {
@@ -665,7 +692,8 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   }, [session.roomId])
 
 
-  const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null
+  const lastMessageId = lastMessage?.id ?? null
   const lastMessageIdRef = useRef<string | null>(null)
   const hasScrolledOnceRef = useRef(false)
   useEffect(() => {
@@ -673,12 +701,21 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     if (lastMessageId !== lastMessageIdRef.current) {
       const isFirstScroll = !hasScrolledOnceRef.current
       hasScrolledOnceRef.current = true
-      requestAnimationFrame(() => {
-        bottomRef.current?.scrollIntoView({ behavior: isFirstScroll ? 'auto' : 'smooth' })
-      })
+      const isOwnMessage = lastMessage?.device_id === deviceId.current
+      // Always jump to your own outgoing message. Otherwise, only auto-scroll
+      // if the user was already near the bottom — if they're reading back
+      // through older messages, an incoming message shouldn't yank them away.
+      if (isFirstScroll || isOwnMessage || nearBottomRef.current) {
+        requestAnimationFrame(() => {
+          bottomRef.current?.scrollIntoView({ behavior: isFirstScroll ? 'auto' : 'smooth' })
+        })
+        setNewMessageCount(0)
+      } else {
+        setNewMessageCount((n) => n + 1)
+      }
     }
     lastMessageIdRef.current = lastMessageId
-  }, [lastMessageId])
+  }, [lastMessageId, lastMessage])
 
   const performSend = useCallback(async (clientId: string, payload: Record<string, unknown>) => {
     setMessages((prev) => prev.map((m) => (m.clientId === clientId ? { ...m, pending: true, failed: false } : m)))
@@ -1094,10 +1131,11 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       )}
 
       {/* ── Message list ────────────────────────────────────────── */}
+      <div className="relative min-h-0 flex-1">
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 backdrop-blur-sm"
+        className="h-full space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 backdrop-blur-sm"
         style={otherMoodColor ? { boxShadow: `inset 0 0 80px ${otherMoodColor}18` } : undefined}
       >
         {initialLoading ? (
@@ -1124,7 +1162,16 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         ) : (
           <>
             {loadingMore && (
-              <p className="text-center text-xs text-muted animate-pulse">Đang tải tin nhắn cũ...</p>
+              <div className="mb-2 space-y-2" aria-hidden>
+                {[68, 44, 56].map((w, i) => (
+                  <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
+                    <div
+                      className="h-9 animate-pulse rounded-2xl bg-white/[0.05]"
+                      style={{ width: `${w}%` }}
+                    />
+                  </div>
+                ))}
+              </div>
             )}
             {messages.map((m, i) => {
               const prev = messages[i - 1]
@@ -1132,7 +1179,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
               if (m.device_id === 'system') {
                 return (
-                  <div key={m.id}>
+                  <div key={m.id} data-message-id={m.id} className={highlightMessageId === m.id ? 'rounded-2xl transition-colors duration-1000 bg-accent/10' : 'rounded-2xl transition-colors duration-1000'}>
                     {showDayDivider && (
                       <div className="mb-3 flex items-center gap-3 text-[10px] font-medium uppercase tracking-widest text-muted">
                         <span className="h-px flex-1 bg-white/[0.06]" />
@@ -1159,7 +1206,11 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               const tailClass = isJournal ? '' : mine ? 'rounded-br-md' : 'rounded-bl-md'
 
               return (
-                <div key={m.id}>
+                <div
+                  key={m.id}
+                  data-message-id={m.id}
+                  className={`rounded-2xl transition-colors duration-1000 ${highlightMessageId === m.id ? 'bg-accent/10' : ''}`}
+                >
                   {showDayDivider && (
                     <div className="mb-3 flex items-center gap-3 text-[10px] font-medium uppercase tracking-widest text-muted">
                       <span className="h-px flex-1 bg-white/[0.06]" />
@@ -1307,6 +1358,19 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             <div ref={bottomRef} />
           </>
         )}
+      </div>
+
+      {newMessageCount > 0 && (
+        <button
+          onClick={() => {
+            bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+            setNewMessageCount(0)
+          }}
+          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-accent/30 bg-accent px-3.5 py-1.5 text-xs font-medium text-white shadow-lg shadow-accent/30 transition-transform hover:scale-105 animate-panel-in"
+        >
+          ↓ {newMessageCount} tin nhắn mới
+        </button>
+      )}
       </div>
 
       {/* ── Reply bar ───────────────────────────────────────────── */}
