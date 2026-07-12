@@ -483,6 +483,13 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     fetch(`/api/chat/pin?roomId=${session.roomId}`)
       .then((r) => r.json())
       .then((data) => { if (!cancelled) setPinnedMessage(data.message ?? null) })
+    fetch(`/api/chat/mood?roomId=${session.roomId}&deviceId=${deviceId.current}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return
+        setOwnMood(data.ownMood ?? null)
+        setOtherMood(data.otherMood ?? null)
+      })
     return () => { cancelled = true }
   }, [session.roomId, markSeen])
 
@@ -563,9 +570,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
   useEffect(() => {
     const supabase = getSupabaseBrowser()
-    const channel = supabase.channel(`chat-room-${session.roomId}`, {
-      config: { presence: { key: deviceId.current } },
-    })
+    const channel = supabase.channel(`chat-room-${session.roomId}`)
     channel.on('broadcast', { event: 'message' }, (payload) => {
       const message = payload.payload as ChatMessage
       setMessages((prev) => {
@@ -635,21 +640,12 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       if ('vibrate' in navigator) navigator.vibrate([150, 80, 150])
       setTimeout(() => setGestureOverlay(null), 2500)
     })
-    channel.on('presence', { event: 'sync' }, () => {
-      const state = channel.presenceState() as Record<string, { mood?: string }[]>
-      let found: string | null = null
-      for (const [key, entries] of Object.entries(state)) {
-        if (key === deviceId.current) continue
-        const mood = entries[0]?.mood
-        if (mood) found = mood
-      }
-      setOtherMood(found)
+    channel.on('broadcast', { event: 'mood' }, (payload) => {
+      const { deviceId: fromDeviceId, mood } = payload.payload as { deviceId: string; mood: string | null }
+      if (fromDeviceId === deviceId.current) return
+      setOtherMood(mood)
     })
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        channel.track({ mood: ownMood })
-      }
-    })
+    channel.subscribe()
     channelRef.current = channel
     return () => {
       supabase.removeChannel(channel)
@@ -663,9 +659,6 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.roomId])
 
-  useEffect(() => {
-    channelRef.current?.track({ mood: ownMood })
-  }, [ownMood])
 
   const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null
   const lastMessageIdRef = useRef<string | null>(null)
@@ -803,6 +796,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const changeMood = async (mood: string | null) => {
     setOwnMood(mood)
     setShowMoodPicker(false)
+    channelRef.current?.send({ type: 'broadcast', event: 'mood', payload: { deviceId: deviceId.current, mood } })
     await fetch('/api/chat/mood', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
