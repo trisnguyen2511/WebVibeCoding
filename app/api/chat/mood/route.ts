@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { pushToRoom } from '@/lib/chat-notify'
+import { DEFAULT_MOOD_OPTIONS } from '@/lib/chat-defaults'
 
 // Moods are persisted per device so they survive reloads and are visible to
 // the other party even if that party isn't currently connected to the
@@ -35,6 +37,20 @@ export async function POST(req: NextRequest) {
     .eq('room_id', roomId)
     .eq('device_id', deviceId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Only notify when a mood is actually set — clearing it back to neutral
+  // isn't interesting enough to interrupt the other person for.
+  if (mood) {
+    const [{ data: sender }, { data: room }] = await Promise.all([
+      supabase.from('chat_devices').select('nickname').eq('room_id', roomId).eq('device_id', deviceId).maybeSingle(),
+      supabase.from('chat_rooms').select('name, icon_url, mood_options').eq('id', roomId).maybeSingle(),
+    ])
+    const moodOptions = room?.mood_options && room.mood_options.length > 0 ? room.mood_options : DEFAULT_MOOD_OPTIONS
+    const option = moodOptions.find((m: { id: string; emoji: string; label: string }) => m.id === mood)
+    const moodText = option ? `${option.emoji} ${option.label}` : mood
+    const notifyBody = `${sender?.nickname ?? 'Ai đó'} vừa đổi trạng thái: ${moodText}`
+    await pushToRoom(supabase, roomId, deviceId, room?.name ?? 'Trạng thái mới', notifyBody, room?.icon_url)
+  }
 
   return NextResponse.json({ ok: true })
 }
