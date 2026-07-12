@@ -1,5 +1,11 @@
 'use client'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useEffect } from 'react'
+
+// Read by the home page to jump straight back into whichever tool was last
+// open, instead of always landing on the tool picker.
+export const LAST_TOOL_KEY = 'wv-last-tool'
 
 interface ToolShellProps {
   name: string
@@ -18,6 +24,11 @@ interface ToolShellProps {
 
 export function ToolShell({ name, icon, description, children, wide = false, fullBleed = false }: ToolShellProps) {
   const maxW = wide ? 'max-w-6xl' : 'max-w-4xl'
+  const pathname = usePathname()
+
+  useEffect(() => {
+    if (pathname) localStorage.setItem(LAST_TOOL_KEY, pathname)
+  }, [pathname])
 
   return (
     <div

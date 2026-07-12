@@ -5,6 +5,8 @@ import { LogOut, Pin, Reply, SmilePlus, Clock, Image as ImageIcon, Type, Send, M
 import { ToolShell } from '@/components/tool-shell'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { CHAT_MAX_FILE_SIZE_BYTES, CHAT_MAX_FILE_SIZE_MB, CHAT_OVERSIZE_DISMISS_DAYS } from '@/lib/chat-limits'
+import { loadCachedMessages, saveCachedMessages } from '@/lib/chat-cache'
+import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, type MoodOption } from '@/lib/chat-defaults'
 
 const OVERSIZE_DISMISS_KEY = 'wv-chat-oversize-dismissed-at'
 
@@ -24,6 +26,8 @@ type Session = {
   roomType: 'group' | 'solo'
   anniversaryDate?: string | null
   roomIconUrl?: string | null
+  moodOptions?: MoodOption[] | null
+  reactionEmojis?: string[] | null
 }
 
 type Reaction = { device_id: string; emoji: string }
@@ -69,16 +73,6 @@ const FONT_OPTIONS: { id: FontId; label: string; style: React.CSSProperties }[] 
   { id: 'cursive', label: 'Viết tay', style: { fontFamily: 'cursive' } },
 ]
 
-const REACTION_EMOJIS = ['❤️', '👍', '😂', '😮', '😢', '🎉']
-
-const MOOD_OPTIONS: { id: string; emoji: string; label: string; color: string }[] = [
-  { id: 'happy', emoji: '😄', label: 'Vui', color: '#FBBF24' },
-  { id: 'love', emoji: '🥰', label: 'Yêu đời', color: '#F472B6' },
-  { id: 'calm', emoji: '😌', label: 'Bình yên', color: '#34D399' },
-  { id: 'tired', emoji: '😴', label: 'Mệt', color: '#60A5FA' },
-  { id: 'sad', emoji: '😢', label: 'Buồn', color: '#818CF8' },
-  { id: 'angry', emoji: '😤', label: 'Bực', color: '#F87171' },
-]
 
 const GESTURE_OPTIONS: { id: string; emoji: string; label: string }[] = [
   { id: 'hug', emoji: '🤗', label: 'Ôm' },
@@ -254,6 +248,8 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         roomType: data.roomType === 'solo' ? 'solo' : 'group',
         anniversaryDate: data.anniversaryDate ?? null,
         roomIconUrl: data.roomIconUrl ?? null,
+        moodOptions: data.moodOptions ?? null,
+        reactionEmojis: data.reactionEmojis ?? null,
       }
       localStorage.setItem(SESSION_KEY, JSON.stringify(session))
       onJoined(session)
@@ -391,6 +387,9 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
 }
 
 function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => void }) {
+  const moodOptions = session.moodOptions && session.moodOptions.length > 0 ? session.moodOptions : DEFAULT_MOOD_OPTIONS
+  const reactionEmojis = session.reactionEmojis && session.reactionEmojis.length > 0 ? session.reactionEmojis : DEFAULT_REACTION_EMOJIS
+
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [hasMore, setHasMore] = useState(false)
@@ -417,8 +416,11 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [oversizePassword, setOversizePassword] = useState('')
   const [oversizePasswordError, setOversizePasswordError] = useState('')
   const [verifyingPassword, setVerifyingPassword] = useState(false)
+  const [newMessageCount, setNewMessageCount] = useState(0)
+  const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null)
 
   const deviceId = useRef(getDeviceId())
+  const nearBottomRef = useRef(true)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const mediaInputRef = useRef<HTMLInputElement>(null)
@@ -441,12 +443,40 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
   useEffect(() => {
     let cancelled = false
-    fetch(`/api/chat/messages?roomId=${session.roomId}&deviceId=${deviceId.current}`)
+
+    // Render instantly from the last locally-cached snapshot, then quietly
+    // ask the server only for what arrived since — avoids blocking the UI on
+    // a full refetch every time the room is opened, while still always
+    // reconciling with the server on load.
+    const cached = loadCachedMessages<ChatMessage>(session.roomId)
+    if (cached) {
+      setMessages(cached)
+      setHasMore(true)
+      initialLoadDone.current = true
+      setInitialLoading(false)
+      markSeen()
+    }
+    const since = cached ? cached[cached.length - 1].created_at : undefined
+    const url = since
+      ? `/api/chat/messages?roomId=${session.roomId}&deviceId=${deviceId.current}&after=${encodeURIComponent(since)}`
+      : `/api/chat/messages?roomId=${session.roomId}&deviceId=${deviceId.current}`
+
+    fetch(url)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled || !data.messages) return
-        setMessages(data.messages)
-        setHasMore(Boolean(data.hasMore))
+        if (since) {
+          if (data.messages.length > 0) {
+            setMessages((prev) => {
+              const known = new Set(prev.map((m: ChatMessage) => m.id))
+              const fresh = (data.messages as ChatMessage[]).filter((m) => !known.has(m.id))
+              return fresh.length > 0 ? [...prev, ...fresh] : prev
+            })
+          }
+        } else {
+          setMessages(data.messages)
+          setHasMore(Boolean(data.hasMore))
+        }
         initialLoadDone.current = true
         markSeen()
       })
@@ -454,8 +484,42 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     fetch(`/api/chat/pin?roomId=${session.roomId}`)
       .then((r) => r.json())
       .then((data) => { if (!cancelled) setPinnedMessage(data.message ?? null) })
+    fetch(`/api/chat/mood?roomId=${session.roomId}&deviceId=${deviceId.current}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return
+        if (session.roomType === 'solo') {
+          // Solo rooms are one person across possibly several devices — there
+          // is no "yours vs theirs", just one shared mood.
+          setOwnMood(data.ownMood ?? data.otherMood ?? null)
+        } else {
+          setOwnMood(data.ownMood ?? null)
+          setOtherMood(data.otherMood ?? null)
+        }
+      })
     return () => { cancelled = true }
   }, [session.roomId, markSeen])
+
+  useEffect(() => {
+    if (!initialLoadDone.current) return
+    saveCachedMessages(session.roomId, messages)
+  }, [messages, session.roomId])
+
+  // A notification click deep-links to the message it was about
+  // (?messageId=...) — jump straight to it and flash it so it's obvious
+  // which one just arrived, instead of dropping the user at the bottom to
+  // hunt for it.
+  useEffect(() => {
+    if (!initialLoadDone.current) return
+    const targetId = new URLSearchParams(window.location.search).get('messageId')
+    if (!targetId) return
+    const el = scrollRef.current?.querySelector(`[data-message-id="${targetId}"]`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setHighlightMessageId(targetId)
+    setTimeout(() => setHighlightMessageId(null), 2000)
+    window.history.replaceState(null, '', window.location.pathname)
+  }, [messages])
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || messages.length === 0) return
@@ -485,7 +549,15 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const onScroll = useCallback(() => {
     const container = scrollRef.current
     if (!container) return
-    if (container.scrollTop < 80) loadMore()
+    // Fire well before the user hits the actual top, so older messages are
+    // already in by the time they'd notice the edge — feels endless instead
+    // of "scroll, wait, see a spinner, scroll again".
+    if (container.scrollTop < 350) loadMore()
+
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+    const nearBottom = distanceFromBottom < 150
+    nearBottomRef.current = nearBottom
+    if (nearBottom) setNewMessageCount(0)
   }, [loadMore])
 
   useEffect(() => {
@@ -529,9 +601,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
   useEffect(() => {
     const supabase = getSupabaseBrowser()
-    const channel = supabase.channel(`chat-room-${session.roomId}`, {
-      config: { presence: { key: deviceId.current } },
-    })
+    const channel = supabase.channel(`chat-room-${session.roomId}`)
     channel.on('broadcast', { event: 'message' }, (payload) => {
       const message = payload.payload as ChatMessage
       setMessages((prev) => {
@@ -601,21 +671,13 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       if ('vibrate' in navigator) navigator.vibrate([150, 80, 150])
       setTimeout(() => setGestureOverlay(null), 2500)
     })
-    channel.on('presence', { event: 'sync' }, () => {
-      const state = channel.presenceState() as Record<string, { mood?: string }[]>
-      let found: string | null = null
-      for (const [key, entries] of Object.entries(state)) {
-        if (key === deviceId.current) continue
-        const mood = entries[0]?.mood
-        if (mood) found = mood
-      }
-      setOtherMood(found)
+    channel.on('broadcast', { event: 'mood' }, (payload) => {
+      const { deviceId: fromDeviceId, mood } = payload.payload as { deviceId: string; mood: string | null }
+      if (fromDeviceId === deviceId.current) return
+      if (session.roomType === 'solo') setOwnMood(mood)
+      else setOtherMood(mood)
     })
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        channel.track({ mood: ownMood })
-      }
-    })
+    channel.subscribe()
     channelRef.current = channel
     return () => {
       supabase.removeChannel(channel)
@@ -629,11 +691,9 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.roomId])
 
-  useEffect(() => {
-    channelRef.current?.track({ mood: ownMood })
-  }, [ownMood])
 
-  const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null
+  const lastMessageId = lastMessage?.id ?? null
   const lastMessageIdRef = useRef<string | null>(null)
   const hasScrolledOnceRef = useRef(false)
   useEffect(() => {
@@ -641,12 +701,21 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     if (lastMessageId !== lastMessageIdRef.current) {
       const isFirstScroll = !hasScrolledOnceRef.current
       hasScrolledOnceRef.current = true
-      requestAnimationFrame(() => {
-        bottomRef.current?.scrollIntoView({ behavior: isFirstScroll ? 'auto' : 'smooth' })
-      })
+      const isOwnMessage = lastMessage?.device_id === deviceId.current
+      // Always jump to your own outgoing message. Otherwise, only auto-scroll
+      // if the user was already near the bottom — if they're reading back
+      // through older messages, an incoming message shouldn't yank them away.
+      if (isFirstScroll || isOwnMessage || nearBottomRef.current) {
+        requestAnimationFrame(() => {
+          bottomRef.current?.scrollIntoView({ behavior: isFirstScroll ? 'auto' : 'smooth' })
+        })
+        setNewMessageCount(0)
+      } else {
+        setNewMessageCount((n) => n + 1)
+      }
     }
     lastMessageIdRef.current = lastMessageId
-  }, [lastMessageId])
+  }, [lastMessageId, lastMessage])
 
   const performSend = useCallback(async (clientId: string, payload: Record<string, unknown>) => {
     setMessages((prev) => prev.map((m) => (m.clientId === clientId ? { ...m, pending: true, failed: false } : m)))
@@ -769,6 +838,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const changeMood = async (mood: string | null) => {
     setOwnMood(mood)
     setShowMoodPicker(false)
+    channelRef.current?.send({ type: 'broadcast', event: 'mood', payload: { deviceId: deviceId.current, mood } })
     await fetch('/api/chat/mood', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -935,7 +1005,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     onLeave()
   }
 
-  const otherMoodColor = MOOD_OPTIONS.find((m) => m.id === otherMood)?.color
+  const otherMoodColor = moodOptions.find((m) => m.id === otherMood)?.color
   const showSeenIndicator = session.roomType !== 'solo'
   const lastMineId = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -996,6 +1066,14 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {otherMood && (
+            <span
+              title={`Đối phương đang: ${moodOptions.find((m) => m.id === otherMood)?.label ?? ''}`}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-lg"
+            >
+              {moodOptions.find((m) => m.id === otherMood)?.emoji}
+            </span>
+          )}
           <button
             onClick={() => setShowMoodPicker((v) => !v)}
             title="Trạng thái cảm xúc"
@@ -1003,7 +1081,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               showMoodPicker ? 'border border-accent/30 bg-accent/[0.12]' : 'hover:bg-white/[0.06]'
             }`}
           >
-            {MOOD_OPTIONS.find((m) => m.id === ownMood)?.emoji ?? '🙂'}
+            {moodOptions.find((m) => m.id === ownMood)?.emoji ?? '🙂'}
           </button>
           <button
             onClick={leave}
@@ -1018,7 +1096,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       {/* ── Mood picker ─────────────────────────────────────────── */}
       {showMoodPicker && (
         <div className="mb-2 flex flex-wrap gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
-          {MOOD_OPTIONS.map((m) => (
+          {moodOptions.map((m) => (
             <button
               key={m.id}
               onClick={() => changeMood(ownMood === m.id ? null : m.id)}
@@ -1053,10 +1131,11 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       )}
 
       {/* ── Message list ────────────────────────────────────────── */}
+      <div className="relative min-h-0 flex-1">
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 backdrop-blur-sm"
+        className="h-full space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 backdrop-blur-sm"
         style={otherMoodColor ? { boxShadow: `inset 0 0 80px ${otherMoodColor}18` } : undefined}
       >
         {initialLoading ? (
@@ -1083,7 +1162,16 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         ) : (
           <>
             {loadingMore && (
-              <p className="text-center text-xs text-muted animate-pulse">Đang tải tin nhắn cũ...</p>
+              <div className="mb-2 space-y-2" aria-hidden>
+                {[68, 44, 56].map((w, i) => (
+                  <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
+                    <div
+                      className="h-9 animate-pulse rounded-2xl bg-white/[0.05]"
+                      style={{ width: `${w}%` }}
+                    />
+                  </div>
+                ))}
+              </div>
             )}
             {messages.map((m, i) => {
               const prev = messages[i - 1]
@@ -1091,7 +1179,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
               if (m.device_id === 'system') {
                 return (
-                  <div key={m.id}>
+                  <div key={m.id} data-message-id={m.id} className={highlightMessageId === m.id ? 'rounded-2xl transition-colors duration-1000 bg-accent/10' : 'rounded-2xl transition-colors duration-1000'}>
                     {showDayDivider && (
                       <div className="mb-3 flex items-center gap-3 text-[10px] font-medium uppercase tracking-widest text-muted">
                         <span className="h-px flex-1 bg-white/[0.06]" />
@@ -1118,7 +1206,11 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               const tailClass = isJournal ? '' : mine ? 'rounded-br-md' : 'rounded-bl-md'
 
               return (
-                <div key={m.id}>
+                <div
+                  key={m.id}
+                  data-message-id={m.id}
+                  className={`rounded-2xl transition-colors duration-1000 ${highlightMessageId === m.id ? 'bg-accent/10' : ''}`}
+                >
                   {showDayDivider && (
                     <div className="mb-3 flex items-center gap-3 text-[10px] font-medium uppercase tracking-widest text-muted">
                       <span className="h-px flex-1 bg-white/[0.06]" />
@@ -1244,7 +1336,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
                     {reactionPickerFor === m.id && (
                       <div className={`mt-1.5 flex animate-panel-in gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.06] px-3 py-2 shadow-xl backdrop-blur-xl ${isJournal ? 'ml-4' : ''}`}>
-                        {REACTION_EMOJIS.map((emoji) => (
+                        {reactionEmojis.map((emoji) => (
                           <button
                             key={emoji}
                             onClick={() => toggleReaction(m.id, emoji)}
@@ -1266,6 +1358,19 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             <div ref={bottomRef} />
           </>
         )}
+      </div>
+
+      {newMessageCount > 0 && (
+        <button
+          onClick={() => {
+            bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+            setNewMessageCount(0)
+          }}
+          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-accent/30 bg-accent px-3.5 py-1.5 text-xs font-medium text-white shadow-lg shadow-accent/30 transition-transform hover:scale-105 animate-panel-in"
+        >
+          ↓ {newMessageCount} tin nhắn mới
+        </button>
+      )}
       </div>
 
       {/* ── Reply bar ───────────────────────────────────────────── */}
