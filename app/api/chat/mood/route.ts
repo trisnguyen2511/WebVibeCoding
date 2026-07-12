@@ -12,12 +12,18 @@ export async function GET(req: NextRequest) {
   if (!roomId || !deviceId) return NextResponse.json({ error: 'roomId and deviceId are required' }, { status: 400 })
 
   const supabase = getSupabaseAdmin()
-  const { data, error } = await supabase.from('chat_devices').select('device_id, mood').eq('room_id', roomId)
+  const [{ data, error }, { data: room }] = await Promise.all([
+    supabase.from('chat_devices').select('device_id, mood').eq('room_id', roomId),
+    supabase.from('chat_rooms').select('type').eq('id', roomId).maybeSingle(),
+  ])
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const ownMood = data?.find((d) => d.device_id === deviceId)?.mood ?? null
   const otherMood = data?.find((d) => d.device_id !== deviceId && d.mood)?.mood ?? null
-  return NextResponse.json({ ownMood, otherMood })
+  // Returned so the client isn't relying solely on its own (possibly stale,
+  // cached-from-an-older-session) idea of the room type to decide whether
+  // mood is a single shared state (solo) or yours-vs-theirs (group).
+  return NextResponse.json({ ownMood, otherMood, roomType: room?.type ?? 'group' })
 }
 
 export async function POST(req: NextRequest) {
