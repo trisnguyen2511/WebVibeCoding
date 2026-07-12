@@ -67,7 +67,8 @@ export async function PATCH(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'invalid request body' }, { status: 400 })
   }
-  const { anniversaryDate, iconDataUrl, removeIcon, moodOptions, reactionEmojis, fontOptions } = body as {
+  const { name, anniversaryDate, iconDataUrl, removeIcon, moodOptions, reactionEmojis, fontOptions } = body as {
+    name?: string
     anniversaryDate?: string | null
     iconDataUrl?: string
     removeIcon?: boolean
@@ -78,6 +79,7 @@ export async function PATCH(req: NextRequest) {
 
   const supabase = getSupabaseAdmin()
   const update: {
+    name?: string
     anniversary_date?: string | null
     icon_url?: string | null
     icon_public_id?: string | null
@@ -85,6 +87,11 @@ export async function PATCH(req: NextRequest) {
     reaction_emojis?: string[] | null
     font_options?: { id: string; label: string }[] | null
   } = {}
+
+  if (name !== undefined) {
+    if (!name.trim()) return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 })
+    update.name = name.trim()
+  }
 
   if (anniversaryDate !== undefined) {
     update.anniversary_date = anniversaryDate || null

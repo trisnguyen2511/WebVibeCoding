@@ -147,6 +147,16 @@ function AdminPanel() {
     load()
   }
 
+  const renameRoom = async (id: string, name: string) => {
+    if (!name.trim()) return
+    await fetch(`/api/chat/admin/rooms?id=${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim() }),
+    })
+    load()
+  }
+
   const setAnniversary = async (id: string, date: string) => {
     await fetch(`/api/chat/admin/rooms?id=${id}`, {
       method: 'PATCH',
@@ -322,12 +332,17 @@ function AdminPanel() {
                 )}
               </div>
               <div>
-                <p className="font-medium text-fg">
-                  {r.name}
+                <div className="flex items-center gap-2">
+                  <input
+                    defaultValue={r.name}
+                    onBlur={(e) => renameRoom(r.id, e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                    className="rounded-lg border border-transparent bg-transparent px-1.5 py-0.5 font-medium text-fg outline-none transition-colors hover:border-border focus:border-accent focus:bg-background"
+                  />
                   {r.type === 'solo' && (
-                    <span className="ml-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-normal text-rose-400">độc thoại</span>
+                    <span className="shrink-0 rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-normal text-rose-400">độc thoại</span>
                   )}
-                </p>
+                </div>
                 <p className="font-mono text-xs text-muted">PIN: {r.pin} · {r.deviceCount} thiết bị</p>
                 <div className="mt-2 flex items-center gap-2">
                   <span className="text-xs text-muted">💞 Ngày bắt đầu yêu:</span>
