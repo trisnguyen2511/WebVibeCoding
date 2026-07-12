@@ -1305,7 +1305,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                           Tin nhắn hẹn giờ, mở lúc {m.reveal_at ? formatTime(m.reveal_at) : '...'}
                         </span>
                       ) : isJournal ? (
-                        <div className="w-full overflow-x-auto border-l-2 border-accent/40 py-1 pl-4">
+                        <div className="w-full overflow-x-auto border-l-2 border-accent/40 py-1 pl-4" style={{ touchAction: 'pan-y' }}>
                           <FileAttachment message={m} />
                           {m.content && (
                             <p
