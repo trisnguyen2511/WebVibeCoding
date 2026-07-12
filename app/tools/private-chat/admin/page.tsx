@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ToolShell } from '@/components/tool-shell'
 import { compressImageToDataUrl } from '@/lib/compress-image'
-import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, type MoodOption } from '@/lib/chat-defaults'
+import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, FONT_CATALOG, type MoodOption, type FontOption } from '@/lib/chat-defaults'
 
 type Room = {
   id: string
@@ -13,6 +13,7 @@ type Room = {
   icon_url: string | null
   mood_options: MoodOption[] | null
   reaction_emojis: string[] | null
+  font_options: FontOption[] | null
   created_at: string
   deviceCount: number
 }
@@ -202,6 +203,34 @@ function AdminPanel() {
     load()
   }
 
+  const toggleFont = async (room: Room, fontId: FontOption['id']) => {
+    const current = room.font_options && room.font_options.length > 0 ? room.font_options : FONT_CATALOG
+    const isEnabled = current.some((f) => f.id === fontId)
+    const next = isEnabled
+      ? current.filter((f) => f.id !== fontId)
+      : [...current, FONT_CATALOG.find((f) => f.id === fontId)!].sort(
+          (a, b) => FONT_CATALOG.findIndex((f) => f.id === a.id) - FONT_CATALOG.findIndex((f) => f.id === b.id)
+        )
+    await fetch(`/api/chat/admin/rooms?id=${room.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fontOptions: next.length > 0 ? next : null }),
+    })
+    load()
+  }
+
+  const saveFontLabel = async (room: Room, fontId: FontOption['id'], label: string) => {
+    const current = room.font_options && room.font_options.length > 0 ? room.font_options : FONT_CATALOG
+    if (!current.some((f) => f.id === fontId)) return
+    const next = current.map((f) => (f.id === fontId ? { ...f, label: label.trim() || f.label } : f))
+    await fetch(`/api/chat/admin/rooms?id=${room.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fontOptions: next }),
+    })
+    load()
+  }
+
   const logout = async () => {
     await fetch('/api/chat/admin/logout', { method: 'POST' })
     window.location.reload()
@@ -333,6 +362,32 @@ function AdminPanel() {
                 placeholder="❤️ 👍 😂 😮 😢 😡 🎉"
                 className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-1.5 font-mono text-base text-white outline-none placeholder-muted focus:border-accent sm:text-xs"
               />
+            </div>
+            <div className="sm:col-span-2">
+              <span className="text-xs text-muted">🔤 Font chữ hiển thị trong picker (tick để bật, sửa tên bên cạnh)</span>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1.5">
+                {FONT_CATALOG.map((f) => {
+                  const current = r.font_options && r.font_options.length > 0 ? r.font_options : FONT_CATALOG
+                  const opt = current.find((o) => o.id === f.id)
+                  const enabled = Boolean(opt)
+                  return (
+                    <label key={f.id} className="flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={enabled}
+                        onChange={() => toggleFont(r, f.id)}
+                        className="h-3.5 w-3.5 accent-accent"
+                      />
+                      <input
+                        defaultValue={opt?.label ?? f.label}
+                        onBlur={(e) => saveFontLabel(r, f.id, e.target.value)}
+                        disabled={!enabled}
+                        className="w-24 rounded-lg border border-border bg-background px-2 py-1 text-xs text-white outline-none focus:border-accent disabled:opacity-40"
+                      />
+                    </label>
+                  )
+                })}
+              </div>
             </div>
           </div>
           </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAdminRequest } from '@/lib/chat-admin-auth'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { deleteChatImages, uploadChatImage } from '@/lib/cloudinary'
+import { FONT_CATALOG } from '@/lib/chat-defaults'
 
 export async function GET(req: NextRequest) {
   if (!isAdminRequest(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { data: rooms, error } = await supabase
     .from('chat_rooms')
-    .select('id, pin, name, type, anniversary_date, icon_url, mood_options, reaction_emojis, created_at')
+    .select('id, pin, name, type, anniversary_date, icon_url, mood_options, reaction_emojis, font_options, created_at')
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -66,12 +67,13 @@ export async function PATCH(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'invalid request body' }, { status: 400 })
   }
-  const { anniversaryDate, iconDataUrl, removeIcon, moodOptions, reactionEmojis } = body as {
+  const { anniversaryDate, iconDataUrl, removeIcon, moodOptions, reactionEmojis, fontOptions } = body as {
     anniversaryDate?: string | null
     iconDataUrl?: string
     removeIcon?: boolean
     moodOptions?: { id: string; emoji: string; label: string; color: string }[] | null
     reactionEmojis?: string[] | null
+    fontOptions?: { id: string; label: string }[] | null
   }
 
   const supabase = getSupabaseAdmin()
@@ -81,6 +83,7 @@ export async function PATCH(req: NextRequest) {
     icon_public_id?: string | null
     mood_options?: { id: string; emoji: string; label: string; color: string }[] | null
     reaction_emojis?: string[] | null
+    font_options?: { id: string; label: string }[] | null
   } = {}
 
   if (anniversaryDate !== undefined) {
@@ -96,6 +99,14 @@ export async function PATCH(req: NextRequest) {
 
   if (reactionEmojis !== undefined) {
     update.reaction_emojis = reactionEmojis && reactionEmojis.length > 0 ? reactionEmojis.filter(Boolean) : null
+  }
+
+  if (fontOptions !== undefined) {
+    // Font ids are fixed in code (each is a real pre-loaded font) — only
+    // accept ids from the known catalog, admin can only pick a subset/relabel.
+    const catalogIds = new Set(FONT_CATALOG.map((f) => f.id))
+    const valid = (fontOptions ?? []).filter((f) => f.id && f.label && catalogIds.has(f.id as (typeof FONT_CATALOG)[number]['id']))
+    update.font_options = valid.length > 0 ? valid : null
   }
 
   if (iconDataUrl || removeIcon) {
