@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
           message.file_resource_type === 'image' ? 'Hình ảnh' : message.file_resource_type === 'video' ? 'Video' : 'File'
         }]${message.content ? ` ${message.content}` : ''}`
       : `${sender.nickname}: ${message.content}`
-  await pushToRoom(supabase, roomId, deviceId, room?.name ?? 'Tin nhắn mới', notifyBody, room?.icon_url)
+  await pushToRoom(supabase, roomId, deviceId, room?.name ?? 'Tin nhắn mới', notifyBody, room?.icon_url, message.id)
 
   if (file?.url) {
     await enforceStorageQuota()
