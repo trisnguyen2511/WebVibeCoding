@@ -40,14 +40,14 @@ export default function DecryptPage() {
           onChange={e => setText(e.target.value)}
           placeholder="Enter text to encrypt or decrypt..."
           rows={4}
-          className="w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-white outline-none placeholder-muted focus:border-accent"
+          className="w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-fg outline-none placeholder-muted focus:border-accent"
         />
         <input
           type="password"
           value={password}
           onChange={e => setPassword(e.target.value)}
           placeholder="Password"
-          className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-white outline-none placeholder-muted focus:border-accent"
+          className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-fg outline-none placeholder-muted focus:border-accent"
         />
         <div className="flex gap-3">
           <button
@@ -72,7 +72,7 @@ export default function DecryptPage() {
         )}
         {result && (
           <div className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface p-4">
-            <p className="break-all font-mono text-sm text-white">{result}</p>
+            <p className="break-all font-mono text-sm text-fg">{result}</p>
             <button onClick={() => result && copy(result)} className="shrink-0 text-xs text-muted hover:text-accent-soft">
               {copied ? '✓' : 'Copy'}
             </button>

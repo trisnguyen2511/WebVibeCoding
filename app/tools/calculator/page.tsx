@@ -76,7 +76,7 @@ export default function CalculatorPage() {
       <div className="mx-auto max-w-[22rem]">
 
         {/* ── Display ─────────────────────────────────────────── */}
-        <div className="relative mb-4 overflow-hidden rounded-3xl border border-white/[0.07] bg-white/[0.03] px-6 py-5 backdrop-blur-2xl">
+        <div className="relative mb-4 overflow-hidden rounded-3xl border border-overlay/[0.07] bg-overlay/[0.03] px-6 py-5 backdrop-blur-2xl">
           {/* ambient glow */}
           <div className="pointer-events-none absolute -top-10 left-1/2 h-28 w-56 -translate-x-1/2 rounded-full bg-accent/25 blur-3xl" />
 
@@ -88,7 +88,7 @@ export default function CalculatorPage() {
           {/* main number */}
           <p
             className={`text-right font-mono font-light leading-none tracking-tighter transition-all duration-150 truncate ${numSize} ${
-              isError ? 'text-red-400' : 'text-white'
+              isError ? 'text-red-400' : 'text-fg'
             }`}
           >
             {display}
@@ -151,7 +151,7 @@ function Btn({ label, onClick, kind, active, wide }: BtnProps) {
 
   const kindClass = {
     utility:
-      'bg-white/[0.08] text-[#A1A1AA] hover:bg-white/[0.14] border border-white/[0.06]',
+      'bg-overlay/[0.08] text-[#A1A1AA] hover:bg-overlay/[0.14] border border-overlay/[0.06]',
     op: active
       ? 'bg-accent/30 text-accent-soft border border-accent/50 shadow-[0_0_16px_rgba(124,58,237,0.35)]'
       : 'bg-accent/[0.10] text-accent-soft hover:bg-accent/[0.22] border border-accent/[0.12]',
@@ -159,7 +159,7 @@ function Btn({ label, onClick, kind, active, wide }: BtnProps) {
       'bg-accent text-white hover:bg-accent/85 ' +
       'shadow-[0_4px_24px_rgba(124,58,237,0.45)] hover:shadow-[0_6px_32px_rgba(124,58,237,0.60)]',
     default:
-      'bg-white/[0.06] text-white hover:bg-white/[0.13] border border-white/[0.05]',
+      'bg-overlay/[0.06] text-fg hover:bg-overlay/[0.13] border border-overlay/[0.05]',
   }
 
   const wideClass = wide ? 'col-span-2 justify-start pl-7' : ''

@@ -43,7 +43,7 @@ export default function HashPage() {
           onChange={e => setText(e.target.value)}
           placeholder="Enter text to hash..."
           rows={4}
-          className="w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-white outline-none placeholder-muted focus:border-accent"
+          className="w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-fg outline-none placeholder-muted focus:border-accent"
         />
         <div className="flex flex-wrap gap-2">
           {ALGORITHMS.map(alg => (
@@ -53,7 +53,7 @@ export default function HashPage() {
               className={`rounded-lg border px-3 py-1.5 font-mono text-xs transition-colors ${
                 algorithm === alg
                   ? 'border-accent bg-accent/20 text-accent-soft'
-                  : 'border-border bg-surface text-muted hover:border-accent/40 hover:text-white'
+                  : 'border-border bg-surface text-muted hover:border-accent/40 hover:text-fg'
               }`}
             >
               {alg.toUpperCase()}
@@ -74,7 +74,7 @@ export default function HashPage() {
         )}
         {result && (
           <div className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface p-4">
-            <p className="break-all font-mono text-sm text-white">{result}</p>
+            <p className="break-all font-mono text-sm text-fg">{result}</p>
             <button onClick={() => result && copy(result)} className="shrink-0 text-xs text-muted hover:text-accent-soft">
               {copied ? '✓' : 'Copy'}
             </button>

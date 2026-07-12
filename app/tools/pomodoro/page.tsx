@@ -98,7 +98,7 @@ export default function PomodoroPage() {
         <div className="flex gap-1 rounded-xl border border-border bg-surface p-1">
           {(Object.keys(MODE_LABELS) as Mode[]).map((m) => (
             <button key={m} onClick={() => switchMode(m)}
-              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${mode === m ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-white'}`}>
+              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${mode === m ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
               {MODE_LABELS[m]}
             </button>
           ))}
@@ -106,7 +106,7 @@ export default function PomodoroPage() {
 
         {/* Timer */}
         <div className="rounded-2xl border border-border bg-surface p-8 text-center space-y-4">
-          <p className="font-mono text-7xl font-bold tracking-widest text-white">{mm}:{ss}</p>
+          <p className="font-mono text-7xl font-bold tracking-widest text-fg">{mm}:{ss}</p>
           {/* Progress bar */}
           <div className="h-1.5 rounded-full bg-border overflow-hidden">
             <div className="h-full rounded-full bg-accent transition-all duration-1000"
@@ -118,7 +118,7 @@ export default function PomodoroPage() {
               {running ? '⏸ Pause' : '▶ Start'}
             </button>
             <button onClick={() => resetTimer(mode)}
-              className="rounded-xl border border-border bg-background px-4 py-3 text-muted hover:text-white transition-colors">
+              className="rounded-xl border border-border bg-background px-4 py-3 text-muted hover:text-fg transition-colors">
               ↺
             </button>
           </div>
@@ -129,7 +129,7 @@ export default function PomodoroPage() {
 
         {/* Settings toggle */}
         <button onClick={() => setShowSettings((v) => !v)}
-          className="text-xs text-muted hover:text-white transition-colors">
+          className="text-xs text-muted hover:text-fg transition-colors">
           {showSettings ? '▲ Hide' : '▼'} Settings
         </button>
         {showSettings && (
@@ -144,7 +144,7 @@ export default function PomodoroPage() {
                     setDurations(next)
                     if (m === mode) resetTimer(m, next)
                   }}
-                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-1.5 font-mono text-sm text-white outline-none focus:border-accent" />
+                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-1.5 font-mono text-sm text-fg outline-none focus:border-accent" />
               </div>
             ))}
           </div>
@@ -156,7 +156,7 @@ export default function PomodoroPage() {
           <form onSubmit={addTask} className="flex gap-2">
             <input value={newTask} onChange={(e) => setNewTask(e.target.value)}
               placeholder="Add a task..."
-              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-white outline-none placeholder-muted focus:border-accent" />
+              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg outline-none placeholder-muted focus:border-accent" />
             <button type="submit"
               className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white hover:bg-accent/80 transition-colors">+</button>
           </form>
@@ -166,9 +166,9 @@ export default function PomodoroPage() {
               <div key={t.id} className="flex items-center gap-3">
                 <button onClick={() => setTasks((ts) => ts.map((x) => x.id === t.id ? { ...x, done: !x.done } : x))}
                   className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors ${t.done ? 'border-accent bg-accent' : 'border-border bg-background hover:border-accent'}`}>
-                  {t.done && <span className="text-[9px] text-white">✓</span>}
+                  {t.done && <span className="text-[9px] text-fg">✓</span>}
                 </button>
-                <span className={`flex-1 text-sm ${t.done ? 'line-through text-muted' : 'text-white'}`}>{t.text}</span>
+                <span className={`flex-1 text-sm ${t.done ? 'line-through text-muted' : 'text-fg'}`}>{t.text}</span>
                 <button onClick={() => setTasks((ts) => ts.filter((x) => x.id !== t.id))}
                   className="text-xs text-muted hover:text-red-400 transition-colors">✕</button>
               </div>
@@ -176,7 +176,7 @@ export default function PomodoroPage() {
           </div>
           {tasks.some((t) => t.done) && (
             <button onClick={() => setTasks((ts) => ts.filter((t) => !t.done))}
-              className="text-xs text-muted hover:text-white transition-colors">Clear completed</button>
+              className="text-xs text-muted hover:text-fg transition-colors">Clear completed</button>
           )}
         </div>
       </div>

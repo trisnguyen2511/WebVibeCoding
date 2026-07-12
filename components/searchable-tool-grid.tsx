@@ -52,12 +52,12 @@ export function SearchableToolGrid({ tools }: { tools: Tool[] }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search tools..."
-          className="w-full rounded-xl border border-border bg-surface py-3 pl-10 pr-10 text-sm text-white placeholder-muted outline-none transition-all focus:border-accent focus:ring-1 focus:ring-accent/15"
+          className="w-full rounded-xl border border-border bg-surface py-3 pl-10 pr-10 text-sm text-fg placeholder-muted outline-none transition-all focus:border-accent focus:ring-1 focus:ring-accent/15"
         />
         {query && (
           <button
             onClick={() => setQuery('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted transition-colors hover:text-white"
+            className="absolute right-3 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted transition-colors hover:text-fg"
           >
             ✕
           </button>
@@ -76,7 +76,7 @@ export function SearchableToolGrid({ tools }: { tools: Tool[] }) {
               className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-150 ${
                 isActive
                   ? `${styles.pill} shadow-sm`
-                  : 'border-border bg-surface text-muted hover:border-border/80 hover:text-white'
+                  : 'border-border bg-surface text-muted hover:border-border/80 hover:text-fg'
               }`}
             >
               <span>{cat.icon}</span>
@@ -118,7 +118,7 @@ export function SearchableToolGrid({ tools }: { tools: Tool[] }) {
                     {tool.icon}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-display font-semibold leading-tight text-white">{tool.name}</p>
+                    <p className="font-display font-semibold leading-tight text-fg">{tool.name}</p>
                     <p className="mt-1 text-sm leading-snug text-muted">{tool.description}</p>
                   </div>
                   <span className="mt-0.5 shrink-0 text-muted transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-accent-soft">

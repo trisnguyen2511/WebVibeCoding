@@ -20,7 +20,7 @@ export default function ColorPickerPage() {
     <div key={label} className="flex items-center justify-between rounded-lg border border-border bg-surface p-3">
       <span className="text-xs uppercase tracking-widest text-muted">{label}</span>
       <div className="flex items-center gap-2">
-        <span className="font-mono text-sm text-white">{value}</span>
+        <span className="font-mono text-sm text-fg">{value}</span>
         <button
           onClick={() => copy(value, label)}
           className="text-xs text-muted transition-colors hover:text-accent-soft"
@@ -50,7 +50,7 @@ export default function ColorPickerPage() {
             value={hex}
             onChange={e => setHex(e.target.value)}
             placeholder="#000000"
-            className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm text-white outline-none focus:border-accent"
+            className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm text-fg outline-none focus:border-accent"
           />
         </div>
         <div className="space-y-2">

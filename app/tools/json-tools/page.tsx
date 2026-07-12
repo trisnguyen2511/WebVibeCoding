@@ -64,7 +64,7 @@ function FormatTab() {
     <div className="space-y-4">
       <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={8}
         placeholder='Paste JSON here... {"key": "value"}'
-        className={`w-full resize-none rounded-xl border bg-surface p-4 font-mono text-sm text-white outline-none placeholder-muted transition-colors ${error ? 'border-red-500/60' : 'border-border focus:border-accent'}`} />
+        className={`w-full resize-none rounded-xl border bg-surface p-4 font-mono text-sm text-fg outline-none placeholder-muted transition-colors ${error ? 'border-red-500/60' : 'border-border focus:border-accent'}`} />
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 font-mono text-xs text-red-400">
           ✕ {error}
@@ -75,7 +75,7 @@ function FormatTab() {
           <div className="mb-3 flex items-center justify-between">
             <span className="text-xs font-medium text-green-400">✓ Valid JSON</span>
             <button onClick={() => copy(formatted)}
-              className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-muted hover:text-white transition-colors">
+              className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-muted hover:text-fg transition-colors">
               {copied ? '✓ Copied' : 'Copy'}
             </button>
           </div>
@@ -109,7 +109,7 @@ function DiffTab() {
       <p className="mb-1.5 text-xs text-muted">JSON A</p>
       <textarea value={a} onChange={(e) => setA(e.target.value)}
         placeholder='{"a": 1}'
-        className="flex-1 w-full resize-none rounded-xl border border-border bg-surface p-3 font-mono text-xs text-white outline-none placeholder-muted focus:border-accent"
+        className="flex-1 w-full resize-none rounded-xl border border-border bg-surface p-3 font-mono text-xs text-fg outline-none placeholder-muted focus:border-accent"
         style={{ minHeight: '180px' }} />
     </div>
   )
@@ -119,7 +119,7 @@ function DiffTab() {
       <p className="mb-1.5 text-xs text-muted">JSON B</p>
       <textarea value={b} onChange={(e) => setB(e.target.value)}
         placeholder='{"a": 2}'
-        className="flex-1 w-full resize-none rounded-xl border border-border bg-surface p-3 font-mono text-xs text-white outline-none placeholder-muted focus:border-accent"
+        className="flex-1 w-full resize-none rounded-xl border border-border bg-surface p-3 font-mono text-xs text-fg outline-none placeholder-muted focus:border-accent"
         style={{ minHeight: '180px' }} />
     </div>
   )
@@ -141,13 +141,13 @@ function DiffTab() {
           <p className="mb-1.5 text-xs text-muted">JSON A</p>
           <textarea value={a} onChange={(e) => setA(e.target.value)} rows={7}
             placeholder='{"a": 1}'
-            className="w-full resize-none rounded-xl border border-border bg-surface p-3 font-mono text-xs text-white outline-none placeholder-muted focus:border-accent" />
+            className="w-full resize-none rounded-xl border border-border bg-surface p-3 font-mono text-xs text-fg outline-none placeholder-muted focus:border-accent" />
         </div>
         <div>
           <p className="mb-1.5 text-xs text-muted">JSON B</p>
           <textarea value={b} onChange={(e) => setB(e.target.value)} rows={7}
             placeholder='{"a": 2}'
-            className="w-full resize-none rounded-xl border border-border bg-surface p-3 font-mono text-xs text-white outline-none placeholder-muted focus:border-accent" />
+            className="w-full resize-none rounded-xl border border-border bg-surface p-3 font-mono text-xs text-fg outline-none placeholder-muted focus:border-accent" />
         </div>
       </div>
 
@@ -185,7 +185,7 @@ export default function JsonToolsPage() {
         <div className="flex gap-1 rounded-xl border border-border bg-surface p-1">
           {(['format', 'diff'] as Tab[]).map((t) => (
             <button key={t} onClick={() => setTab(t)}
-              className={`flex-1 rounded-lg py-2 text-sm font-medium capitalize transition-colors ${tab === t ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-white'}`}>
+              className={`flex-1 rounded-lg py-2 text-sm font-medium capitalize transition-colors ${tab === t ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
               {t}
             </button>
           ))}

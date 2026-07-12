@@ -23,10 +23,10 @@ function Swatch({ hex }: { hex: string }) {
       className="group relative flex flex-col items-center gap-1.5"
     >
       <div
-        className="w-full rounded-xl border border-white/10 transition-transform group-hover:scale-105"
+        className="w-full rounded-xl border border-overlay/10 transition-transform group-hover:scale-105"
         style={{ backgroundColor: hex, aspectRatio: '1' }}
       />
-      <span className="font-mono text-[10px] text-muted group-hover:text-white transition-colors">
+      <span className="font-mono text-[10px] text-muted group-hover:text-fg transition-colors">
         {copied ? '✓' : hex}
       </span>
     </button>
@@ -70,10 +70,10 @@ export default function ColorPalettePage() {
             value={seed}
             onChange={(e) => setSeed(e.target.value)}
             maxLength={7}
-            className={`flex-1 rounded-xl border bg-surface px-4 py-2.5 font-mono text-sm text-white outline-none transition-colors ${isValidHex(seed) ? 'border-border focus:border-accent' : 'border-red-500/60'}`}
+            className={`flex-1 rounded-xl border bg-surface px-4 py-2.5 font-mono text-sm text-fg outline-none transition-colors ${isValidHex(seed) ? 'border-border focus:border-accent' : 'border-red-500/60'}`}
           />
           <div
-            className="h-12 w-12 rounded-xl border border-white/10 shrink-0"
+            className="h-12 w-12 rounded-xl border border-overlay/10 shrink-0"
             style={{ backgroundColor: isValidHex(seed) ? seed : '#7C3AED' }}
           />
         </div>
@@ -82,7 +82,7 @@ export default function ColorPalettePage() {
         <div className="flex gap-2 flex-wrap">
           {PALETTE_TYPES.map((t) => (
             <button key={t.id} onClick={() => setActive(t.id)}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${active === t.id ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-white'}`}>
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${active === t.id ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-fg'}`}>
               {t.label}
               <span className="ml-1 opacity-60">{t.desc}</span>
             </button>
@@ -102,7 +102,7 @@ export default function ColorPalettePage() {
             </div>
             <div className="mt-4 flex justify-end">
               <button onClick={exportCss}
-                className="rounded-lg border border-border bg-surface px-4 py-2 text-xs text-muted hover:text-white transition-colors">
+                className="rounded-lg border border-border bg-surface px-4 py-2 text-xs text-muted hover:text-fg transition-colors">
                 Copy as CSS variables
               </button>
             </div>
