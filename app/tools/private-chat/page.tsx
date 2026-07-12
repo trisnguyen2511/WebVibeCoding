@@ -1375,10 +1375,13 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                     )}
 
                     <div
-                      className={`mt-1.5 flex items-center gap-0.5 rounded-full border border-white/[0.08] bg-white/[0.05] p-1 backdrop-blur-sm transition-all duration-150 ease-out ${isJournal ? 'ml-4' : ''} ${
-                        activeActionsFor === m.id
-                          ? 'translate-y-0 opacity-100'
-                          : 'pointer-events-none -translate-y-1 opacity-0 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100'
+                      className={`overflow-hidden transition-all duration-200 ease-out ${
+                        activeActionsFor === m.id ? 'mt-1.5 max-h-10' : 'mt-0 max-h-0 group-hover:mt-1.5 group-hover:max-h-10'
+                      }`}
+                    >
+                    <div
+                      className={`flex items-center gap-0.5 rounded-full border border-white/[0.08] bg-white/[0.05] p-1 backdrop-blur-sm transition-opacity duration-150 ${isJournal ? 'ml-4' : ''} ${
+                        activeActionsFor === m.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                       }`}
                     >
                       <button
@@ -1410,6 +1413,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       >
                         <Pin size={13} />
                       </button>
+                    </div>
                     </div>
 
                     {reactionPickerFor === m.id && (
