@@ -1067,6 +1067,11 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   }
 
   const leave = () => {
+    fetch('/api/chat/leave', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId: session.roomId, deviceId: deviceId.current }),
+    }).catch(() => {})
     localStorage.removeItem(SESSION_KEY)
     onLeave()
   }
