@@ -2,8 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ToolShell } from '@/components/tool-shell'
 import { compressImageToDataUrl } from '@/lib/compress-image'
-
-type MoodOption = { id: string; emoji: string; label: string; color: string }
+import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, type MoodOption } from '@/lib/chat-defaults'
 
 type Room = {
   id: string
@@ -42,8 +41,17 @@ function parseMoodOptionsInput(text: string): MoodOption[] {
   })
 }
 
+// Falls back to the app's built-in defaults when a room hasn't customized
+// its own set yet, so the admin edits from a filled-in starting point
+// instead of typing the whole list from scratch.
 function moodOptionsToText(options: MoodOption[] | null): string {
-  return (options ?? []).map((m) => `${m.emoji} ${m.label}`).join('\n')
+  const source = options && options.length > 0 ? options : DEFAULT_MOOD_OPTIONS
+  return source.map((m) => `${m.emoji} ${m.label}`).join('\n')
+}
+
+function reactionEmojisToText(emojis: string[] | null): string {
+  const source = emojis && emojis.length > 0 ? emojis : DEFAULT_REACTION_EMOJIS
+  return source.join(' ')
 }
 
 function parseReactionInput(text: string): string[] {
@@ -320,7 +328,7 @@ function AdminPanel() {
             <div>
               <span className="text-xs text-muted">👍 Emoji react nhanh (cách nhau bằng khoảng trắng, để trống = mặc định)</span>
               <input
-                defaultValue={(r.reaction_emojis ?? []).join(' ')}
+                defaultValue={reactionEmojisToText(r.reaction_emojis)}
                 onBlur={(e) => saveReactionEmojis(r.id, e.target.value)}
                 placeholder="❤️ 👍 😂 😮 😢 😡 🎉"
                 className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-1.5 font-mono text-base text-white outline-none placeholder-muted focus:border-accent sm:text-xs"
