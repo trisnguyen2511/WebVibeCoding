@@ -562,21 +562,30 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     saveCachedMessages(session.roomId, messages)
   }, [messages, session.roomId])
 
+  // Jumps to a message currently in the loaded/rendered window and briefly
+  // flashes it — used both for the notification deep-link and for tapping a
+  // reply preview to find the message it quotes. No-ops if the message isn't
+  // loaded (e.g. further back than the current pagination window).
+  const scrollToMessage = useCallback((id: string) => {
+    const el = scrollRef.current?.querySelector(`[data-message-id="${id}"]`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setHighlightMessageId(id)
+    setTimeout(() => setHighlightMessageId(null), 2000)
+  }, [])
+
   // A notification click deep-links to the message it was about
-  // (?messageId=...) — jump straight to it and flash it so it's obvious
-  // which one just arrived, instead of dropping the user at the bottom to
-  // hunt for it.
+  // (?messageId=...) — jump straight to it so it's obvious which one just
+  // arrived, instead of dropping the user at the bottom to hunt for it.
   useEffect(() => {
     if (!initialLoadDone.current) return
     const targetId = new URLSearchParams(window.location.search).get('messageId')
     if (!targetId) return
     const el = scrollRef.current?.querySelector(`[data-message-id="${targetId}"]`)
     if (!el) return
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    setHighlightMessageId(targetId)
-    setTimeout(() => setHighlightMessageId(null), 2000)
+    scrollToMessage(targetId)
     window.history.replaceState(null, '', window.location.pathname)
-  }, [messages])
+  }, [messages, scrollToMessage])
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || messages.length === 0) return
@@ -1285,7 +1294,10 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                     )}
 
                     {m.reply_to_id && (
-                      <div className={`mb-1.5 ${bubbleMaxWidth} flex items-start gap-1.5 rounded-xl border-l-2 border-accent/40 bg-white/[0.04] px-2.5 py-1.5 text-xs text-muted backdrop-blur-sm ${mine ? 'text-right' : ''}`}>
+                      <div
+                        onClick={() => scrollToMessage(m.reply_to_id!)}
+                        className={`mb-1.5 ${bubbleMaxWidth} flex cursor-pointer items-start gap-1.5 rounded-xl border-l-2 border-accent/40 bg-white/[0.04] px-2.5 py-1.5 text-xs text-muted backdrop-blur-sm transition-colors hover:bg-white/[0.07] ${mine ? 'text-right' : ''}`}
+                      >
                         <Reply size={10} className="mt-0.5 shrink-0 text-accent-soft/70" />
                         <span className="min-w-0 truncate">
                           <b className="text-accent-soft">{m.reply_to_nickname}</b>: {m.reply_to_content}
