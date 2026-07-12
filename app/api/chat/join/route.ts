@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { data: room, error: roomError } = await supabase
     .from('chat_rooms')
-    .select('id, name, type, anniversary_date, icon_url, mood_options, reaction_emojis')
+    .select('id, name, type, anniversary_date, icon_url, mood_options, reaction_emojis, font_options')
     .eq('pin', pin.trim())
     .maybeSingle()
 
@@ -44,5 +44,6 @@ export async function POST(req: NextRequest) {
     roomIconUrl: room.icon_url,
     moodOptions: room.mood_options,
     reactionEmojis: room.reaction_emojis,
+    fontOptions: room.font_options,
   })
 }

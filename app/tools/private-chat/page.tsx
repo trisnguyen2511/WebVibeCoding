@@ -6,7 +6,18 @@ import { ToolShell } from '@/components/tool-shell'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { CHAT_MAX_FILE_SIZE_BYTES, CHAT_MAX_FILE_SIZE_MB, CHAT_OVERSIZE_DISMISS_DAYS } from '@/lib/chat-limits'
 import { loadCachedMessages, saveCachedMessages } from '@/lib/chat-cache'
-import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, type MoodOption } from '@/lib/chat-defaults'
+import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, FONT_CATALOG, type MoodOption, type FontId, type FontOption } from '@/lib/chat-defaults'
+import { Dancing_Script, Baloo_2, Noto_Serif, Pacifico, Anton, Mali, Lobster } from 'next/font/google'
+
+// Scoped to this page only (not the global layout) so other tools' bundles
+// stay untouched. All support the Vietnamese subset.
+const dancingScript = Dancing_Script({ subsets: ['vietnamese', 'latin'], weight: '700', variable: '--font-dancing-script' })
+const baloo2 = Baloo_2({ subsets: ['vietnamese', 'latin'], weight: '600', variable: '--font-baloo-2' })
+const notoSerif = Noto_Serif({ subsets: ['vietnamese', 'latin'], weight: ['400', '700'], variable: '--font-noto-serif' })
+const pacifico = Pacifico({ subsets: ['vietnamese', 'latin'], weight: '400', variable: '--font-pacifico' })
+const anton = Anton({ subsets: ['vietnamese', 'latin'], weight: '400', variable: '--font-anton' })
+const mali = Mali({ subsets: ['vietnamese', 'latin'], weight: '600', variable: '--font-mali' })
+const lobster = Lobster({ subsets: ['vietnamese', 'latin'], weight: '400', variable: '--font-lobster' })
 
 const OVERSIZE_DISMISS_KEY = 'wv-chat-oversize-dismissed-at'
 
@@ -28,6 +39,7 @@ type Session = {
   roomIconUrl?: string | null
   moodOptions?: MoodOption[] | null
   reactionEmojis?: string[] | null
+  fontOptions?: FontOption[] | null
 }
 
 type Reaction = { device_id: string; emoji: string }
@@ -59,20 +71,12 @@ type ChatMessage = {
 
 type PinnedMessage = { id: string; device_id: string; nickname: string; content: string | null; image_url?: string | null }
 
-type FontId = 'sans' | 'display' | 'mono' | 'cursive'
 type MessageStyle = { color: string | null; font: FontId | null; bold: boolean; italic: boolean }
 
 const STYLE_KEY = 'wv-chat-style'
 const DEFAULT_STYLE: MessageStyle = { color: null, font: null, bold: false, italic: false }
 
 const COLOR_PRESETS = ['#FAFAFA', '#F87171', '#FBBF24', '#34D399', '#60A5FA', '#A78BFA', '#F472B6']
-const FONT_OPTIONS: { id: FontId; label: string; style: React.CSSProperties }[] = [
-  { id: 'sans', label: 'Mặc định', style: {} },
-  { id: 'display', label: 'Tiêu đề', style: { fontFamily: 'var(--font-space-grotesk), sans-serif' } },
-  { id: 'mono', label: 'Mono', style: { fontFamily: 'var(--font-jetbrains-mono), monospace' } },
-  { id: 'cursive', label: 'Viết tay', style: { fontFamily: 'cursive' } },
-]
-
 
 const GESTURE_OPTIONS: { id: string; emoji: string; label: string }[] = [
   { id: 'hug', emoji: '🤗', label: 'Ôm' },
@@ -81,8 +85,33 @@ const GESTURE_OPTIONS: { id: string; emoji: string; label: string }[] = [
   { id: 'kiss', emoji: '😘', label: 'Hôn' },
 ]
 
+// Fixed mapping of every font id that can ever be stored on a message — kept
+// separate from FONT_CATALOG (which is just id+label metadata a room can
+// pick a subset of) so old messages always render correctly regardless of
+// the room's *current* picker configuration.
 function fontStyleFor(font?: string | null): React.CSSProperties {
-  return FONT_OPTIONS.find((f) => f.id === font)?.style ?? {}
+  switch (font) {
+    case 'display':
+      return { fontFamily: 'var(--font-space-grotesk), sans-serif' }
+    case 'mono':
+      return { fontFamily: 'var(--font-jetbrains-mono), monospace' }
+    case 'cursive':
+      return { fontFamily: 'var(--font-dancing-script), cursive' }
+    case 'rounded':
+      return { fontFamily: 'var(--font-baloo-2), sans-serif' }
+    case 'serif':
+      return { fontFamily: 'var(--font-noto-serif), serif' }
+    case 'script':
+      return { fontFamily: 'var(--font-pacifico), cursive' }
+    case 'impact':
+      return { fontFamily: 'var(--font-anton), sans-serif' }
+    case 'cute':
+      return { fontFamily: 'var(--font-mali), sans-serif' }
+    case 'funky':
+      return { fontFamily: 'var(--font-lobster), cursive' }
+    default:
+      return {}
+  }
 }
 
 function loadSavedStyle(): MessageStyle {
@@ -306,6 +335,7 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         roomIconUrl: data.roomIconUrl ?? null,
         moodOptions: data.moodOptions ?? null,
         reactionEmojis: data.reactionEmojis ?? null,
+        fontOptions: data.fontOptions ?? null,
       }
       localStorage.setItem(SESSION_KEY, JSON.stringify(session))
       onJoined(session)
@@ -445,6 +475,7 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
 function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => void }) {
   const moodOptions = session.moodOptions && session.moodOptions.length > 0 ? session.moodOptions : DEFAULT_MOOD_OPTIONS
   const reactionEmojis = session.reactionEmojis && session.reactionEmojis.length > 0 ? session.reactionEmojis : DEFAULT_REACTION_EMOJIS
+  const fontOptions = session.fontOptions && session.fontOptions.length > 0 ? session.fontOptions : FONT_CATALOG
 
   // A locally-cached session (from an older app version, or corrupted) can
   // have a stale/wrong roomType — the mood endpoint always returns the
@@ -483,6 +514,29 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [verifyingPassword, setVerifyingPassword] = useState(false)
   const [newMessageCount, setNewMessageCount] = useState(0)
   const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null)
+
+  // Closes any open popover (tools menu + its style/capsule/gesture panels,
+  // mood picker, per-message reaction/actions) when tapping/clicking outside
+  // it — elements belonging to a popover are tagged with
+  // data-popover-group so clicks inside them don't close their own group.
+  useEffect(() => {
+    const handler = (e: PointerEvent) => {
+      const target = e.target as Element
+      if (!target.closest('[data-popover-group="tools"]')) {
+        setShowToolsMenu(false)
+        setShowStylePicker(false)
+        setShowCapsulePicker(false)
+        setShowGesturePicker(false)
+      }
+      if (!target.closest('[data-popover-group="mood"]')) setShowMoodPicker(false)
+      if (!target.closest('[data-popover-group="actions"]')) {
+        setReactionPickerFor(null)
+        setActiveActionsFor(null)
+      }
+    }
+    document.addEventListener('pointerdown', handler)
+    return () => document.removeEventListener('pointerdown', handler)
+  }, [])
 
   const deviceId = useRef(getDeviceId())
   const nearBottomRef = useRef(true)
@@ -1164,6 +1218,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             </span>
           )}
           <button
+            data-popover-group="mood"
             onClick={() => setShowMoodPicker((v) => !v)}
             title="Trạng thái cảm xúc"
             className={`flex h-9 w-9 items-center justify-center rounded-xl text-lg transition-all hover:scale-110 ${
@@ -1184,7 +1239,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Mood picker ─────────────────────────────────────────── */}
       {showMoodPicker && (
-        <div className="mb-2 flex flex-wrap gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
+        <div data-popover-group="mood" className="mb-2 flex flex-wrap gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
           {moodOptions.map((m) => (
             <button
               key={m.id}
@@ -1333,6 +1388,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       onReply={() => setReplyingTo({ id: m.id, nickname: m.nickname, preview: m.content ?? '[Hình ảnh]' })}
                     >
                     <div
+                      data-popover-group="actions"
                       onClick={() => setActiveActionsFor((id) => (id === m.id ? null : m.id))}
                       className={`flex flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'} ${m.pending || m.failed ? 'opacity-50' : ''} transition-opacity`}
                     >
@@ -1566,7 +1622,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Time capsule picker ─────────────────────────────────── */}
       {showCapsulePicker && (
-        <div className="mt-2 flex items-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
+        <div data-popover-group="tools" className="mt-2 flex items-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
           <Clock size={14} className="shrink-0 text-accent-soft" />
           <span className="text-xs text-muted">Mở lúc</span>
           <input
@@ -1586,7 +1642,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Gesture picker ──────────────────────────────────────── */}
       {showGesturePicker && (
-        <div className="mt-2 grid grid-cols-4 gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
+        <div data-popover-group="tools" className="mt-2 grid grid-cols-4 gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
           {GESTURE_OPTIONS.map((g) => (
             <button
               key={g.id}
@@ -1602,7 +1658,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Style picker ────────────────────────────────────────── */}
       {showStylePicker && (
-        <div className="mt-2 space-y-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 backdrop-blur-xl animate-panel-in">
+        <div data-popover-group="tools" className="mt-2 space-y-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 backdrop-blur-xl animate-panel-in">
           <div className="flex items-center gap-3">
             <span className="w-16 shrink-0 text-xs text-muted">Màu chữ</span>
             <div className="flex flex-wrap gap-2">
@@ -1623,13 +1679,13 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           </div>
           <div className="flex items-center gap-3">
             <span className="w-16 shrink-0 text-xs text-muted">Font chữ</span>
-            <div className="flex flex-wrap gap-1.5">
-              {FONT_OPTIONS.map((f) => (
+            <div className="flex flex-1 gap-1.5 overflow-x-auto pb-1">
+              {fontOptions.map((f) => (
                 <button
                   key={f.id}
                   onClick={() => updateStyle({ font: f.id === 'sans' ? null : f.id })}
-                  style={f.style}
-                  className={`rounded-xl border px-3 py-1 text-xs transition-all ${
+                  style={fontStyleFor(f.id)}
+                  className={`shrink-0 rounded-xl border px-3 py-1 text-xs transition-all ${
                     (style.font ?? 'sans') === f.id
                       ? 'border-accent bg-accent/[0.15] text-accent-soft shadow-[0_0_12px_rgba(124,58,237,0.2)]'
                       : 'border-white/[0.08] bg-white/[0.03] text-muted hover:text-white'
@@ -1674,7 +1730,18 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         <input ref={attachmentInputRef} type="file" onChange={onAttachmentSelected} className="hidden" />
 
         <button
-          onClick={() => setShowToolsMenu((v) => !v)}
+          data-popover-group="tools"
+          onClick={() => {
+            const anyOpen = showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker
+            if (anyOpen) {
+              setShowToolsMenu(false)
+              setShowStylePicker(false)
+              setShowCapsulePicker(false)
+              setShowGesturePicker(false)
+            } else {
+              setShowToolsMenu(true)
+            }
+          }}
           title="Thêm"
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all ${
             showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker
@@ -1686,7 +1753,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         </button>
 
         {showToolsMenu && (
-          <div className="absolute bottom-full left-0 mb-2 flex animate-panel-in gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.06] p-2 shadow-2xl backdrop-blur-xl">
+          <div data-popover-group="tools" className="absolute bottom-full left-0 mb-2 flex animate-panel-in gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.06] p-2 shadow-2xl backdrop-blur-xl">
             <button
               onClick={() => { pickMedia(); setShowToolsMenu(false) }}
               title="Gửi ảnh/video"
@@ -1783,13 +1850,17 @@ export default function PrivateChatPage() {
 
   return (
     <ToolShell name="Private Chat" icon="💬" description="Đoạn chat riêng tư bằng mã PIN" fullBleed>
-      {session === undefined ? null : session ? (
-        <ChatScreen session={session} onLeave={() => setSession(null)} />
-      ) : (
-        <div className="flex h-full items-center justify-center overflow-y-auto p-4">
-          <JoinScreen onJoined={setSession} />
-        </div>
-      )}
+      <div
+        className={`contents ${dancingScript.variable} ${baloo2.variable} ${notoSerif.variable} ${pacifico.variable} ${anton.variable} ${mali.variable} ${lobster.variable}`}
+      >
+        {session === undefined ? null : session ? (
+          <ChatScreen session={session} onLeave={() => setSession(null)} />
+        ) : (
+          <div className="flex h-full items-center justify-center overflow-y-auto p-4">
+            <JoinScreen onJoined={setSession} />
+          </div>
+        )}
+      </div>
     </ToolShell>
   )
 }
