@@ -88,10 +88,10 @@ function CompressTab() {
           <div className="flex items-center gap-4 rounded-xl border border-border bg-surface p-4">
             <img src={img.url} alt="" className="h-16 w-16 rounded-lg object-cover" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-white">{img.name}</p>
+              <p className="text-sm font-medium text-fg">{img.name}</p>
               <p className="text-xs text-muted">{img.w} × {img.h} · {fmt(img.size)}</p>
             </div>
-            <button onClick={() => setOutput(null)} className="text-xs text-muted hover:text-white">Change</button>
+            <button onClick={() => setOutput(null)} className="text-xs text-muted hover:text-fg">Change</button>
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -108,7 +108,7 @@ function CompressTab() {
           {output && (
             <div className="rounded-xl border border-border bg-surface p-4 space-y-3">
               <div className="flex gap-6 text-sm">
-                <span className="text-muted">Before: <span className="text-white font-mono">{fmt(img.size)}</span></span>
+                <span className="text-muted">Before: <span className="text-fg font-mono">{fmt(img.size)}</span></span>
                 <span className="text-muted">After: <span className="text-green-400 font-mono">{fmt(output.size)}</span></span>
                 <span className="text-muted">Saved: <span className="text-accent-soft font-mono">{Math.round((1 - output.size / img.size) * 100)}%</span></span>
               </div>
@@ -166,7 +166,7 @@ function ResizeTab() {
           <div className="flex items-center gap-4 rounded-xl border border-border bg-surface p-4">
             <img src={img.url} alt="" className="h-16 w-16 rounded-lg object-cover" />
             <div>
-              <p className="text-sm font-medium text-white">{img.name}</p>
+              <p className="text-sm font-medium text-fg">{img.name}</p>
               <p className="text-xs text-muted">{img.w} × {img.h}</p>
             </div>
           </div>
@@ -174,7 +174,7 @@ function ResizeTab() {
             <div className="flex-1">
               <label className="text-xs text-muted">Width (px)</label>
               <input type="number" value={w || img.w} min={1} onChange={(e) => updateW(Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm text-white outline-none focus:border-accent" />
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm text-fg outline-none focus:border-accent" />
             </div>
             <button onClick={() => setLock((v) => !v)}
               className={`mt-5 rounded-lg border p-2 text-sm transition-colors ${lock ? 'border-accent text-accent-soft' : 'border-border text-muted'}`}>
@@ -183,7 +183,7 @@ function ResizeTab() {
             <div className="flex-1">
               <label className="text-xs text-muted">Height (px)</label>
               <input type="number" value={h || img.h} min={1} onChange={(e) => updateH(Number(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm text-white outline-none focus:border-accent" />
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm text-fg outline-none focus:border-accent" />
             </div>
           </div>
           <button onClick={run} disabled={loading}
@@ -235,7 +235,7 @@ function ConvertTab() {
           <div className="flex items-center gap-4 rounded-xl border border-border bg-surface p-4">
             <img src={img.url} alt="" className="h-16 w-16 rounded-lg object-cover" />
             <div>
-              <p className="text-sm font-medium text-white">{img.name}</p>
+              <p className="text-sm font-medium text-fg">{img.name}</p>
               <p className="text-xs text-muted">{img.w} × {img.h} · {fmt(img.size)}</p>
             </div>
           </div>
@@ -244,7 +244,7 @@ function ConvertTab() {
             <div className="flex gap-2">
               {(Object.keys(FORMAT_LABELS) as Format[]).map((f) => (
                 <button key={f} onClick={() => setFormat(f)}
-                  className={`flex-1 rounded-xl border py-2.5 text-sm font-medium transition-colors ${format === f ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-white'}`}>
+                  className={`flex-1 rounded-xl border py-2.5 text-sm font-medium transition-colors ${format === f ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-fg'}`}>
                   {FORMAT_LABELS[f]}
                 </button>
               ))}
@@ -257,7 +257,7 @@ function ConvertTab() {
           {output && (
             <div className="rounded-xl border border-border bg-surface p-4 space-y-3">
               <div className="flex gap-6 text-sm">
-                <span className="text-muted">Before: <span className="text-white font-mono">{fmt(img.size)}</span></span>
+                <span className="text-muted">Before: <span className="text-fg font-mono">{fmt(img.size)}</span></span>
                 <span className="text-muted">After: <span className="text-accent-soft font-mono">{fmt(output.size)}</span></span>
               </div>
               <img src={output.url} alt="converted" className="max-h-48 rounded-lg object-contain mx-auto" />
@@ -282,7 +282,7 @@ export default function ImageToolsPage() {
         <div className="flex gap-1 rounded-xl border border-border bg-surface p-1">
           {(['compress', 'resize', 'convert'] as Tab[]).map((t) => (
             <button key={t} onClick={() => setTab(t)}
-              className={`flex-1 rounded-lg py-2 text-sm font-medium capitalize transition-colors ${tab === t ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-white'}`}>
+              className={`flex-1 rounded-lg py-2 text-sm font-medium capitalize transition-colors ${tab === t ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
               {t}
             </button>
           ))}

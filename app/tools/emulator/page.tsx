@@ -415,7 +415,7 @@ function EmulatorHost() {
                       <button
                         key={s.value}
                         onClick={() => setSystem(s.value)}
-                        className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${system === s.value ? 'border-accent/40 bg-accent/10 text-accent-soft' : 'border-border bg-background text-muted hover:text-white'}`}
+                        className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${system === s.value ? 'border-accent/40 bg-accent/10 text-accent-soft' : 'border-border bg-background text-muted hover:text-fg'}`}
                       >
                         {s.label}
                       </button>
@@ -429,7 +429,7 @@ function EmulatorHost() {
                   <label className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-background p-10 transition-colors hover:border-accent/40 hover:bg-accent/5">
                     <span className="text-4xl">📁</span>
                     <div className="text-center">
-                      <p className="text-sm font-medium text-white">Chọn file ROM</p>
+                      <p className="text-sm font-medium text-fg">Chọn file ROM</p>
                       <p className="mt-0.5 font-mono text-xs text-muted">
                         {SYSTEMS.find((s) => s.value === system)?.exts}
                       </p>
@@ -455,7 +455,7 @@ function EmulatorHost() {
                       onChange={(e) => setRomUrlInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && !urlLoading && void handleRomUrlImport()}
                       placeholder="https://example.com/game.zip"
-                      className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs text-white outline-none placeholder:text-muted focus:border-accent/40"
+                      className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs text-fg outline-none placeholder:text-muted focus:border-accent/40"
                     />
                     <button
                       onClick={() => void handleRomUrlImport()}
@@ -490,7 +490,7 @@ function EmulatorHost() {
                       2. Nếu đã đúng tên mà vẫn lỗi, thử bật/tắt tùy chọn bọc zip bên dưới — chưa chắc
                       chiều nào đúng với bản FBNeo đang chạy, cần thử cả 2.
                     </p>
-                    <label className="flex items-center gap-2 pt-1 text-xs text-white">
+                    <label className="flex items-center gap-2 pt-1 text-xs text-fg">
                       <input
                         type="checkbox"
                         checked={wrapZip}
@@ -510,7 +510,7 @@ function EmulatorHost() {
                     </p>
                     {biosName ? (
                       <div className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3">
-                        <span className="font-mono text-xs text-white truncate">{biosName}</span>
+                        <span className="font-mono text-xs text-fg truncate">{biosName}</span>
                         <button
                           onClick={() => {
                             if (biosBlobRef.current) URL.revokeObjectURL(biosBlobRef.current)
@@ -518,13 +518,13 @@ function EmulatorHost() {
                             setBiosUrl(null)
                             setBiosName(null)
                           }}
-                          className="text-xs text-muted transition-colors hover:text-white"
+                          className="text-xs text-muted transition-colors hover:text-fg"
                         >
                           ✕
                         </button>
                       </div>
                     ) : (
-                      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-background px-4 py-3 text-sm text-muted transition-colors hover:border-accent/40 hover:text-white">
+                      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-background px-4 py-3 text-sm text-muted transition-colors hover:border-accent/40 hover:text-fg">
                         📁 Chọn file BIOS (.zip)
                         <input
                           type="file"
@@ -558,20 +558,20 @@ function EmulatorHost() {
                       <button
                         onClick={requestFullscreen}
                         title="Toàn màn hình"
-                        className="text-xs text-muted transition-colors hover:text-white"
+                        className="text-xs text-muted transition-colors hover:text-fg"
                       >
                         ⛶ Fullscreen
                       </button>
                     )}
                     <button
                       onClick={() => { setShowRomSwap((v) => !v); setUrlError(null) }}
-                      className={`text-xs transition-colors ${showRomSwap ? 'text-accent-soft' : 'text-muted hover:text-white'}`}
+                      className={`text-xs transition-colors ${showRomSwap ? 'text-accent-soft' : 'text-muted hover:text-fg'}`}
                     >
                       🔗 Đổi ROM
                     </button>
                     <button
                       onClick={resetRom}
-                      className="text-xs text-muted transition-colors hover:text-white"
+                      className="text-xs text-muted transition-colors hover:text-fg"
                     >
                       ✕ Reset
                     </button>
@@ -592,7 +592,7 @@ function EmulatorHost() {
                             void handleRomUrlImport(() => setShowRomSwap(false))
                         }}
                         placeholder="https://example.com/game.nes"
-                        className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs text-white outline-none placeholder:text-muted focus:border-accent/40"
+                        className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs text-fg outline-none placeholder:text-muted focus:border-accent/40"
                       />
                       <button
                         onClick={() => void handleRomUrlImport(() => setShowRomSwap(false))}
@@ -635,7 +635,7 @@ function EmulatorHost() {
                     href={controllerUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="break-all text-center font-mono text-xs text-accent-soft underline underline-offset-2 transition-colors hover:text-white"
+                    className="break-all text-center font-mono text-xs text-accent-soft underline underline-offset-2 transition-colors hover:text-fg"
                   >
                     Mở controller →
                   </a>
@@ -686,7 +686,7 @@ function EmulatorHost() {
 
             {/* Multiplayer tips */}
             <div className="rounded-xl border border-border/50 bg-surface/60 p-3 space-y-1.5 text-xs text-muted">
-              <p className="font-medium text-white">Multiplayer</p>
+              <p className="font-medium text-fg">Multiplayer</p>
               <p>→ Tối đa 4 người chơi. Mỗi người scan QR từ điện thoại riêng.</p>
               <p>→ P1 = người join đầu tiên. P2, P3, P4 = lần lượt tiếp theo.</p>
               <p>→ NES/SNES: chọn layout &quot;— Player 1&quot; / &quot;— Player 2&quot; đúng thứ tự join.</p>
@@ -698,7 +698,7 @@ function EmulatorHost() {
             <div className="rounded-xl border border-border/50 bg-surface/60 p-3 space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-white">Dọn cache game</p>
+                  <p className="text-xs font-medium text-fg">Dọn cache game</p>
                   <p className="text-xs text-muted">Xóa file core/WASM, save state, localStorage — dùng sau khi chơi xong để giải phóng bộ nhớ</p>
                 </div>
                 <button
@@ -708,7 +708,7 @@ function EmulatorHost() {
                     cacheStatus === 'done'     ? 'border-green-500/40 bg-green-500/10 text-green-400' :
                     cacheStatus === 'error'    ? 'border-red-500/40   bg-red-500/10   text-red-400'   :
                     cacheStatus === 'cleaning' ? 'border-border bg-background text-muted'              :
-                    'border-border bg-background text-muted hover:border-accent/40 hover:text-white'
+                    'border-border bg-background text-muted hover:border-accent/40 hover:text-fg'
                   }`}
                 >
                   {cacheStatus === 'cleaning' ? 'Đang xóa...' :

@@ -274,7 +274,7 @@ function FileAttachment({ message }: { message: ChatMessage }) {
       <video
         controls
         src={url}
-        className="mb-1.5 max-h-64 max-w-full rounded-xl border border-white/[0.08] shadow-lg"
+        className="mb-1.5 max-h-64 max-w-full rounded-xl border border-overlay/[0.08] shadow-lg"
       />
     )
   }
@@ -282,7 +282,7 @@ function FileAttachment({ message }: { message: ChatMessage }) {
     return (
       <a href={url} target="_blank" rel="noreferrer" className="mb-1.5 block max-w-[75%]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={url} alt="" className="max-h-64 rounded-xl border border-white/[0.08] object-cover shadow-lg" />
+        <img src={url} alt="" className="max-h-64 rounded-xl border border-overlay/[0.08] object-cover shadow-lg" />
       </a>
     )
   }
@@ -292,7 +292,7 @@ function FileAttachment({ message }: { message: ChatMessage }) {
       target="_blank"
       rel="noreferrer"
       download={message.file_name ?? undefined}
-      className="mb-1.5 flex max-w-[75%] items-center gap-2.5 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3.5 py-2.5 text-sm text-white transition-colors hover:bg-white/[0.08]"
+      className="mb-1.5 flex max-w-[75%] items-center gap-2.5 rounded-xl border border-overlay/[0.08] bg-overlay/[0.04] px-3.5 py-2.5 text-sm text-fg transition-colors hover:bg-overlay/[0.08]"
     >
       <FileIcon size={18} className="shrink-0 text-accent-soft" />
       <span className="min-w-0 flex-1 truncate">{message.file_name ?? 'File'}</span>
@@ -380,13 +380,13 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
       <div className="relative mx-auto w-full max-w-sm">
         <div className="pointer-events-none absolute -top-24 left-1/2 h-56 w-72 -translate-x-1/2 rounded-full bg-accent/[0.18] blur-3xl" />
 
-        <div className="relative rounded-3xl border border-white/[0.08] bg-white/[0.03] p-8 backdrop-blur-xl">
+        <div className="relative rounded-3xl border border-overlay/[0.08] bg-overlay/[0.03] p-8 backdrop-blur-xl">
           <div className="mb-7 flex flex-col items-center gap-3">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-accent/30 bg-accent/[0.12] shadow-[0_0_28px_rgba(124,58,237,0.35)]">
               <Lock size={22} className="text-accent-soft" />
             </div>
             <div className="text-center">
-              <h2 className="font-display text-xl font-bold text-white">Private Chat</h2>
+              <h2 className="font-display text-xl font-bold text-fg">Private Chat</h2>
               <p className="mt-1 text-sm text-muted">Nhập mã PIN để tham gia đoạn chat</p>
             </div>
           </div>
@@ -397,7 +397,7 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
             onKeyDown={(e) => { if (e.key === 'Enter') checkPin() }}
             inputMode="numeric"
             placeholder="• • • • • •"
-            className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-4 text-center font-mono text-2xl tracking-[0.5em] text-white outline-none transition-all placeholder-white/20 focus:border-accent/60 focus:bg-white/[0.06] focus:ring-2 focus:ring-accent/20"
+            className="w-full rounded-2xl border border-overlay/[0.08] bg-overlay/[0.04] px-4 py-4 text-center font-mono text-2xl tracking-[0.5em] text-fg outline-none transition-all placeholder-fg/20 focus:border-accent/60 focus:bg-overlay/[0.06] focus:ring-2 focus:ring-accent/20"
           />
 
           {error && (
@@ -428,13 +428,13 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
     <div className="relative mx-auto w-full max-w-sm">
       <div className="pointer-events-none absolute -top-24 left-1/2 h-56 w-72 -translate-x-1/2 rounded-full bg-accent/[0.18] blur-3xl" />
 
-      <div className="relative rounded-3xl border border-white/[0.08] bg-white/[0.03] p-8 backdrop-blur-xl">
+      <div className="relative rounded-3xl border border-overlay/[0.08] bg-overlay/[0.03] p-8 backdrop-blur-xl">
         <div className="mb-7 flex flex-col items-center gap-3">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-accent/30 bg-accent/[0.12] shadow-[0_0_28px_rgba(124,58,237,0.35)]">
             <MessageCircle size={22} className="text-accent-soft" />
           </div>
           <div className="text-center">
-            <h2 className="font-display text-xl font-bold text-white">{room.name}</h2>
+            <h2 className="font-display text-xl font-bold text-fg">{room.name}</h2>
             <p className="mt-1 text-sm text-muted">Nhập tên hiển thị của bạn</p>
           </div>
         </div>
@@ -444,7 +444,7 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
           onChange={(e) => setNickname(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') join() }}
           placeholder="Tên hiển thị"
-          className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3.5 text-base text-white outline-none transition-all placeholder-muted focus:border-accent/60 focus:bg-white/[0.06] focus:ring-2 focus:ring-accent/20"
+          className="w-full rounded-2xl border border-overlay/[0.08] bg-overlay/[0.04] px-4 py-3.5 text-base text-fg outline-none transition-all placeholder-muted focus:border-accent/60 focus:bg-overlay/[0.06] focus:ring-2 focus:ring-accent/20"
         />
 
         {error && (
@@ -463,7 +463,7 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
 
         <button
           onClick={() => { setRoom(null); setError('') }}
-          className="mt-3 w-full text-center text-xs text-muted transition-colors hover:text-white"
+          className="mt-3 w-full text-center text-xs text-muted transition-colors hover:text-fg"
         >
           ← Nhập PIN khác
         </button>
@@ -1175,11 +1175,11 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       {/* ── Gesture overlay ─────────────────────────────────────── */}
       {gestureOverlay && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/60 backdrop-blur-xl animate-[panel-in_0.15s_ease-out]">
-          <div className="flex flex-col items-center gap-4 rounded-3xl border border-white/[0.08] bg-white/[0.05] px-10 py-8 backdrop-blur-xl">
+          <div className="flex flex-col items-center gap-4 rounded-3xl border border-overlay/[0.08] bg-overlay/[0.05] px-10 py-8 backdrop-blur-xl">
             <span className="animate-gesture-burst text-8xl drop-shadow-[0_0_32px_rgba(124,58,237,0.7)]">
               {gestureOverlay.emoji}
             </span>
-            <p className="font-display text-lg font-semibold text-white">
+            <p className="font-display text-lg font-semibold text-fg">
               {gestureOverlay.nickname} đã gửi {gestureOverlay.label.toLowerCase()}!
             </p>
           </div>
@@ -1187,7 +1187,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       )}
 
       {/* ── Header ──────────────────────────────────────────────── */}
-      <div className="mb-3 flex items-center gap-3 border-b border-white/[0.06] pb-3">
+      <div className="mb-3 flex items-center gap-3 border-b border-overlay/[0.06] pb-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-accent/30 bg-accent/[0.10] shadow-[0_0_14px_rgba(124,58,237,0.2)]">
           {session.roomIconUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -1199,7 +1199,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-display font-semibold text-white">{session.roomName}</p>
+          <p className="truncate font-display font-semibold text-fg">{session.roomName}</p>
           {session.anniversaryDate ? (
             <p className="mt-0.5 truncate text-xs font-medium text-accent-soft">
               💞 Yêu nhau được {daysSince(session.anniversaryDate)} ngày
@@ -1212,7 +1212,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           {otherMood && (
             <span
               title={`Đối phương đang: ${moodOptions.find((m) => m.id === otherMood)?.label ?? ''}`}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-lg"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-overlay/[0.08] bg-overlay/[0.04] text-lg"
             >
               {moodOptions.find((m) => m.id === otherMood)?.emoji}
             </span>
@@ -1222,7 +1222,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             onClick={() => setShowMoodPicker((v) => !v)}
             title="Trạng thái cảm xúc"
             className={`flex h-9 w-9 items-center justify-center rounded-xl text-lg transition-all hover:scale-110 ${
-              showMoodPicker ? 'border border-accent/30 bg-accent/[0.12]' : 'hover:bg-white/[0.06]'
+              showMoodPicker ? 'border border-accent/30 bg-accent/[0.12]' : 'hover:bg-overlay/[0.06]'
             }`}
           >
             {moodOptions.find((m) => m.id === ownMood)?.emoji ?? '🙂'}
@@ -1230,7 +1230,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           <button
             onClick={leave}
             title="Rời phòng"
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-muted transition-all hover:bg-white/[0.06] hover:text-white"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-muted transition-all hover:bg-overlay/[0.06] hover:text-fg"
           >
             <LogOut size={15} />
           </button>
@@ -1239,7 +1239,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Mood picker ─────────────────────────────────────────── */}
       {showMoodPicker && (
-        <div data-popover-group="mood" className="mb-2 flex flex-wrap gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
+        <div data-popover-group="mood" className="mb-2 flex flex-wrap gap-1.5 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] p-3 backdrop-blur-xl animate-panel-in">
           {moodOptions.map((m) => (
             <button
               key={m.id}
@@ -1248,7 +1248,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               className={`flex flex-col items-center gap-0.5 rounded-xl border px-3 py-2 transition-all hover:scale-105 ${
                 ownMood === m.id
                   ? 'border-accent bg-accent/[0.15]'
-                  : 'border-white/[0.06] bg-white/[0.03] hover:border-white/[0.14]'
+                  : 'border-overlay/[0.06] bg-overlay/[0.03] hover:border-overlay/[0.14]'
               }`}
             >
               <span className="text-xl">{m.emoji}</span>
@@ -1267,7 +1267,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           </span>
           <button
             onClick={() => pinMessage(null)}
-            className="flex h-5 w-5 items-center justify-center rounded-full text-muted transition-colors hover:text-white"
+            className="flex h-5 w-5 items-center justify-center rounded-full text-muted transition-colors hover:text-fg"
           >
             <X size={10} />
           </button>
@@ -1279,7 +1279,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="h-full space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 backdrop-blur-sm"
+        className="h-full space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-overlay/[0.06] bg-overlay/[0.02] p-4 backdrop-blur-sm"
         style={otherMoodColor ? { boxShadow: `inset 0 0 80px ${otherMoodColor}18` } : undefined}
       >
         {initialLoading ? (
@@ -1287,7 +1287,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className={`flex ${i % 2 ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className="h-9 animate-pulse rounded-2xl bg-white/[0.05]"
+                  className="h-9 animate-pulse rounded-2xl bg-overlay/[0.05]"
                   style={{ width: `${40 + (i * 37) % 35}%` }}
                 />
               </div>
@@ -1295,7 +1295,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           </div>
         ) : messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-white/[0.08] bg-white/[0.03]">
+            <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-overlay/[0.08] bg-overlay/[0.03]">
               <MessageCircle size={28} className="text-muted/60" />
             </div>
             <div>
@@ -1310,7 +1310,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                 {[68, 44, 56].map((w, i) => (
                   <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
                     <div
-                      className="h-9 animate-pulse rounded-2xl bg-white/[0.05]"
+                      className="h-9 animate-pulse rounded-2xl bg-overlay/[0.05]"
                       style={{ width: `${w}%` }}
                     />
                   </div>
@@ -1326,9 +1326,9 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                   <div key={m.id} data-message-id={m.id} className={highlightMessageId === m.id ? 'rounded-2xl transition-colors duration-1000 bg-accent/10' : 'rounded-2xl transition-colors duration-1000'}>
                     {showDayDivider && (
                       <div className="mb-3 flex items-center gap-3 text-[10px] font-medium uppercase tracking-widest text-muted">
-                        <span className="h-px flex-1 bg-white/[0.06]" />
+                        <span className="h-px flex-1 bg-overlay/[0.06]" />
                         {formatDayLabel(m.created_at)}
-                        <span className="h-px flex-1 bg-white/[0.06]" />
+                        <span className="h-px flex-1 bg-overlay/[0.06]" />
                       </div>
                     )}
                     <div className="flex justify-center animate-msg-in">
@@ -1357,9 +1357,9 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                 >
                   {showDayDivider && (
                     <div className="mb-3 flex items-center gap-3 text-[10px] font-medium uppercase tracking-widest text-muted">
-                      <span className="h-px flex-1 bg-white/[0.06]" />
+                      <span className="h-px flex-1 bg-overlay/[0.06]" />
                       {formatDayLabel(m.created_at)}
-                      <span className="h-px flex-1 bg-white/[0.06]" />
+                      <span className="h-px flex-1 bg-overlay/[0.06]" />
                     </div>
                   )}
                   <div
@@ -1374,7 +1374,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                     {m.reply_to_id && (
                       <div
                         onClick={() => scrollToMessage(m.reply_to_id!)}
-                        className={`mb-1.5 ${bubbleMaxWidth} flex cursor-pointer items-start gap-1.5 rounded-xl border-l-2 border-accent/40 bg-white/[0.04] px-2.5 py-1.5 text-xs text-muted backdrop-blur-sm transition-colors hover:bg-white/[0.07] ${mine ? 'text-right' : ''}`}
+                        className={`mb-1.5 ${bubbleMaxWidth} flex cursor-pointer items-start gap-1.5 rounded-xl border-l-2 border-accent/40 bg-overlay/[0.04] px-2.5 py-1.5 text-xs text-muted backdrop-blur-sm transition-colors hover:bg-overlay/[0.07] ${mine ? 'text-right' : ''}`}
                       >
                         <Reply size={10} className="mt-0.5 shrink-0 text-accent-soft/70" />
                         <span className="min-w-0 truncate">
@@ -1393,7 +1393,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       className={`flex flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'} ${m.pending || m.failed ? 'opacity-50' : ''} transition-opacity`}
                     >
                       {m.locked ? (
-                        <span className={`${bubbleMaxWidth} flex items-center gap-2 rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-muted`}>
+                        <span className={`${bubbleMaxWidth} flex items-center gap-2 rounded-2xl border border-dashed border-overlay/[0.08] bg-overlay/[0.03] px-3.5 py-2.5 text-sm text-muted`}>
                           <Lock size={13} className="shrink-0" />
                           Tin nhắn hẹn giờ, mở lúc {m.reveal_at ? formatTime(m.reveal_at) : '...'}
                         </span>
@@ -1402,7 +1402,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                           <FileAttachment message={m} />
                           {m.content && (
                             <p
-                              className="text-[15px] leading-relaxed text-white"
+                              className="text-[15px] leading-relaxed text-fg"
                               style={{
                                 ...fontStyleFor(m.font_family),
                                 color: m.text_color ?? undefined,
@@ -1423,7 +1423,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                               className={`max-w-[75%] overflow-x-auto rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${tailClass} ${
                                 mine
                                   ? 'bg-gradient-to-br from-accent to-[#5b21b6] text-white shadow-[0_2px_16px_rgba(124,58,237,0.35)]'
-                                  : 'border border-white/[0.08] bg-white/[0.06] text-white backdrop-blur-sm'
+                                  : 'border border-overlay/[0.08] bg-overlay/[0.06] text-fg backdrop-blur-sm'
                               }`}
                               style={{
                                 ...fontStyleFor(m.font_family),
@@ -1458,7 +1458,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                             className={`animate-pop-in rounded-full border px-1.5 py-0.5 text-xs transition-transform hover:scale-110 ${
                               myReaction === emoji
                                 ? 'border-accent/40 bg-accent/[0.15]'
-                                : 'border-white/[0.08] bg-white/[0.04]'
+                                : 'border-overlay/[0.08] bg-overlay/[0.04]'
                             }`}
                           >
                             {emoji} {count > 1 ? count : ''}
@@ -1473,14 +1473,14 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       }`}
                     >
                     <div
-                      className={`flex items-center gap-0.5 rounded-full border border-white/[0.08] bg-white/[0.05] p-1 backdrop-blur-sm transition-opacity duration-150 ${isJournal ? 'ml-4' : ''} ${
+                      className={`flex items-center gap-0.5 rounded-full border border-overlay/[0.08] bg-overlay/[0.05] p-1 backdrop-blur-sm transition-opacity duration-150 ${isJournal ? 'ml-4' : ''} ${
                         activeActionsFor === m.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                       }`}
                     >
                       <button
                         title="Thả cảm xúc"
                         onClick={() => setReactionPickerFor(reactionPickerFor === m.id ? null : m.id)}
-                        className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-white/[0.08] hover:text-white"
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-overlay/[0.08] hover:text-fg"
                       >
                         <SmilePlus size={13} />
                       </button>
@@ -1491,7 +1491,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                             setReplyingTo({ id: m.id, nickname: m.nickname, preview: m.content ?? '[Hình ảnh]' })
                             setActiveActionsFor(null)
                           }}
-                          className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-white/[0.08] hover:text-white"
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-overlay/[0.08] hover:text-fg"
                         >
                           <Reply size={13} />
                         </button>
@@ -1502,7 +1502,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                           pinMessage(m.id)
                           setActiveActionsFor(null)
                         }}
-                        className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-white/[0.08] hover:text-white"
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-overlay/[0.08] hover:text-fg"
                       >
                         <Pin size={13} />
                       </button>
@@ -1510,7 +1510,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                     </div>
 
                     {reactionPickerFor === m.id && (
-                      <div className={`mt-1.5 flex animate-panel-in gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.06] px-3 py-2 shadow-xl backdrop-blur-xl ${isJournal ? 'ml-4' : ''}`}>
+                      <div className={`mt-1.5 flex animate-panel-in gap-1.5 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.06] px-3 py-2 shadow-xl backdrop-blur-xl ${isJournal ? 'ml-4' : ''}`}>
                         {reactionEmojis.map((emoji) => (
                           <button
                             key={emoji}
@@ -1550,14 +1550,14 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Reply bar ───────────────────────────────────────────── */}
       {replyingTo && (
-        <div className="mt-2 flex items-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-xs animate-panel-in">
+        <div className="mt-2 flex items-center gap-2.5 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] px-3.5 py-2.5 text-xs animate-panel-in">
           <Reply size={12} className="shrink-0 text-accent-soft" />
           <span className="flex-1 truncate text-muted">
             Trả lời <b className="text-accent-soft">{replyingTo.nickname}</b>: {replyingTo.preview}
           </span>
           <button
             onClick={() => setReplyingTo(null)}
-            className="flex h-5 w-5 items-center justify-center rounded-full text-muted transition-colors hover:text-white"
+            className="flex h-5 w-5 items-center justify-center rounded-full text-muted transition-colors hover:text-fg"
           >
             <X size={10} />
           </button>
@@ -1565,7 +1565,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       )}
 
       {fileUploadStatus === 'uploading' && (
-        <div className="mt-2 flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2.5 text-xs text-muted">
+        <div className="mt-2 flex items-center gap-2 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] p-2.5 text-xs text-muted">
           <span className="h-3 w-3 animate-spin rounded-full border-2 border-muted border-t-transparent" />
           Đang tải file lên...
         </div>
@@ -1574,8 +1574,8 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {pendingFile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[#111119] p-5 shadow-2xl">
-            <p className="font-display font-semibold text-white">File vượt quá {CHAT_MAX_FILE_SIZE_MB}MB</p>
+          <div className="w-full max-w-sm rounded-2xl border border-overlay/[0.08] bg-[#111119] p-5 shadow-2xl">
+            <p className="font-display font-semibold text-fg">File vượt quá {CHAT_MAX_FILE_SIZE_MB}MB</p>
             <p className="mt-1 text-xs text-muted">
               &quot;{pendingFile.name}&quot; ({formatFileSize(pendingFile.size)}) vượt giới hạn. Nhập mật khẩu admin để vẫn gửi.
             </p>
@@ -1586,13 +1586,13 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               onKeyDown={(e) => { if (e.key === 'Enter') confirmOversizePassword() }}
               placeholder="Mật khẩu admin"
               autoFocus
-              className="mt-3 w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-base text-white outline-none placeholder-muted focus:border-accent/60 sm:text-sm"
+              className="mt-3 w-full rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] px-4 py-2.5 text-base text-fg outline-none placeholder-muted focus:border-accent/60 sm:text-sm"
             />
             {oversizePasswordError && <p className="mt-1.5 text-xs text-red-400">{oversizePasswordError}</p>}
             <div className="mt-4 flex gap-2">
               <button
                 onClick={dismissOversizePrompt}
-                className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] py-2.5 text-sm text-muted transition-colors hover:text-white"
+                className="flex-1 rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] py-2.5 text-sm text-muted transition-colors hover:text-fg"
               >
                 Bỏ qua
               </button>
@@ -1610,7 +1610,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Typing indicator ────────────────────────────────────── */}
       {typingUsers.size > 0 && (
-        <div className="mt-2 flex w-fit items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-xs text-muted animate-panel-in">
+        <div className="mt-2 flex w-fit items-center gap-2 rounded-full border border-overlay/[0.06] bg-overlay/[0.03] px-3 py-1.5 text-xs text-muted animate-panel-in">
           <span>{Array.from(typingUsers.values()).join(', ')} đang nhập</span>
           <span className="flex items-center gap-0.5">
             <span className="h-1 w-1 animate-typing-dot rounded-full bg-muted" style={{ animationDelay: '0ms' }} />
@@ -1622,18 +1622,18 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Time capsule picker ─────────────────────────────────── */}
       {showCapsulePicker && (
-        <div data-popover-group="tools" className="mt-2 flex items-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
+        <div data-popover-group="tools" className="mt-2 flex items-center gap-2.5 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] p-3 backdrop-blur-xl animate-panel-in">
           <Clock size={14} className="shrink-0 text-accent-soft" />
           <span className="text-xs text-muted">Mở lúc</span>
           <input
             type="datetime-local"
             value={capsuleAt}
             onChange={(e) => setCapsuleAt(e.target.value)}
-            className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-xs text-white outline-none focus:border-accent/60"
+            className="flex-1 rounded-xl border border-overlay/[0.08] bg-overlay/[0.04] px-2.5 py-1.5 text-xs text-fg outline-none focus:border-accent/60"
           />
           <button
             onClick={() => { setCapsuleAt(''); setShowCapsulePicker(false) }}
-            className="text-xs text-muted transition-colors hover:text-white"
+            className="text-xs text-muted transition-colors hover:text-fg"
           >
             Huỷ
           </button>
@@ -1642,12 +1642,12 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Gesture picker ──────────────────────────────────────── */}
       {showGesturePicker && (
-        <div data-popover-group="tools" className="mt-2 grid grid-cols-4 gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
+        <div data-popover-group="tools" className="mt-2 grid grid-cols-4 gap-2 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] p-3 backdrop-blur-xl animate-panel-in">
           {GESTURE_OPTIONS.map((g) => (
             <button
               key={g.id}
               onClick={() => sendGesture(g.id)}
-              className="flex flex-col items-center gap-1 rounded-xl border border-white/[0.06] bg-white/[0.03] py-2.5 text-xs text-muted transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:bg-accent/[0.07] hover:text-white"
+              className="flex flex-col items-center gap-1 rounded-xl border border-overlay/[0.06] bg-overlay/[0.03] py-2.5 text-xs text-muted transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:bg-accent/[0.07] hover:text-white"
             >
               <span className="text-xl">{g.emoji}</span>
               {g.label}
@@ -1658,7 +1658,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Style picker ────────────────────────────────────────── */}
       {showStylePicker && (
-        <div data-popover-group="tools" className="mt-2 space-y-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 backdrop-blur-xl animate-panel-in">
+        <div data-popover-group="tools" className="mt-2 space-y-3 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] p-4 backdrop-blur-xl animate-panel-in">
           <div className="flex items-center gap-3">
             <span className="w-16 shrink-0 text-xs text-muted">Màu chữ</span>
             <div className="flex flex-wrap gap-2">
@@ -1670,7 +1670,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                   className={`h-7 w-7 rounded-full border-2 transition-all hover:scale-110 ${
                     (style.color ?? COLOR_PRESETS[0]) === c
                       ? 'border-white scale-110 shadow-lg'
-                      : 'border-transparent hover:border-white/40'
+                      : 'border-transparent hover:border-overlay/40'
                   }`}
                   style={{ backgroundColor: c }}
                 />
@@ -1688,7 +1688,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                   className={`shrink-0 rounded-xl border px-3 py-1 text-xs transition-all ${
                     (style.font ?? 'sans') === f.id
                       ? 'border-accent bg-accent/[0.15] text-accent-soft shadow-[0_0_12px_rgba(124,58,237,0.2)]'
-                      : 'border-white/[0.08] bg-white/[0.03] text-muted hover:text-white'
+                      : 'border-overlay/[0.08] bg-overlay/[0.03] text-muted hover:text-fg'
                   }`}
                 >
                   {f.label}
@@ -1704,7 +1704,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                 className={`h-8 w-8 rounded-xl border font-bold text-sm transition-all ${
                   style.bold
                     ? 'border-accent bg-accent/[0.15] text-accent-soft'
-                    : 'border-white/[0.08] bg-white/[0.03] text-muted hover:text-white'
+                    : 'border-overlay/[0.08] bg-overlay/[0.03] text-muted hover:text-fg'
                 }`}
               >
                 B
@@ -1714,7 +1714,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                 className={`h-8 w-8 rounded-xl border text-sm italic transition-all ${
                   style.italic
                     ? 'border-accent bg-accent/[0.15] text-accent-soft'
-                    : 'border-white/[0.08] bg-white/[0.03] text-muted hover:text-white'
+                    : 'border-overlay/[0.08] bg-overlay/[0.03] text-muted hover:text-fg'
                 }`}
               >
                 I
@@ -1746,18 +1746,18 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all ${
             showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker
               ? 'border-accent/40 bg-accent/[0.15] text-accent-soft rotate-45'
-              : 'border-white/[0.08] bg-white/[0.03] text-muted hover:border-white/[0.14] hover:text-white'
+              : 'border-overlay/[0.08] bg-overlay/[0.03] text-muted hover:border-overlay/[0.14] hover:text-fg'
           }`}
         >
           <Plus size={18} />
         </button>
 
         {showToolsMenu && (
-          <div data-popover-group="tools" className="absolute bottom-full left-0 mb-2 flex animate-panel-in gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.06] p-2 shadow-2xl backdrop-blur-xl">
+          <div data-popover-group="tools" className="absolute bottom-full left-0 mb-2 flex animate-panel-in gap-1.5 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.06] p-2 shadow-2xl backdrop-blur-xl">
             <button
               onClick={() => { pickMedia(); setShowToolsMenu(false) }}
               title="Gửi ảnh/video"
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition-all hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white"
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition-all hover:-translate-y-0.5 hover:bg-overlay/[0.08] hover:text-fg"
             >
               <ImageIcon size={17} />
             </button>
@@ -1765,7 +1765,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               onClick={() => { setShowStylePicker((v) => !v); setShowToolsMenu(false) }}
               title="Tùy chỉnh kiểu chữ"
               className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 ${
-                showStylePicker ? 'bg-accent/[0.15] text-accent-soft' : 'text-muted hover:bg-white/[0.08] hover:text-white'
+                showStylePicker ? 'bg-accent/[0.15] text-accent-soft' : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
               }`}
             >
               <Type size={15} />
@@ -1774,7 +1774,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               onClick={() => { setShowCapsulePicker((v) => !v); setShowToolsMenu(false) }}
               title="Tin nhắn hẹn giờ"
               className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 ${
-                showCapsulePicker || capsuleAt ? 'bg-accent/[0.15] text-accent-soft' : 'text-muted hover:bg-white/[0.08] hover:text-white'
+                showCapsulePicker || capsuleAt ? 'bg-accent/[0.15] text-accent-soft' : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
               }`}
             >
               <Clock size={15} />
@@ -1783,7 +1783,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               onClick={() => { setShowGesturePicker((v) => !v); setShowToolsMenu(false) }}
               title="Gửi cử chỉ"
               className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 ${
-                showGesturePicker ? 'bg-accent/[0.15] text-accent-soft' : 'text-muted hover:bg-white/[0.08] hover:text-white'
+                showGesturePicker ? 'bg-accent/[0.15] text-accent-soft' : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
               }`}
             >
               <span className="text-base">🤗</span>
@@ -1791,7 +1791,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             <button
               onClick={() => { pickAttachment(); setShowToolsMenu(false) }}
               title={`Gửi file/video (tối đa ${CHAT_MAX_FILE_SIZE_MB}MB)`}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition-all hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white"
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition-all hover:-translate-y-0.5 hover:bg-overlay/[0.08] hover:text-fg"
             >
               <Paperclip size={16} />
             </button>
@@ -1823,7 +1823,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             fontWeight: style.bold ? 700 : undefined,
             fontStyle: style.italic ? 'italic' : undefined,
           }}
-          className="max-h-[120px] flex-1 resize-none overflow-y-auto rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-base text-white outline-none transition-all placeholder-muted focus:border-accent/60 focus:bg-white/[0.05] focus:ring-2 focus:ring-accent/20 sm:text-sm"
+          className="max-h-[120px] flex-1 resize-none overflow-y-auto rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] px-4 py-2.5 text-base text-fg outline-none transition-all placeholder-muted focus:border-accent/60 focus:bg-overlay/[0.05] focus:ring-2 focus:ring-accent/20 sm:text-sm"
         />
 
         <button
