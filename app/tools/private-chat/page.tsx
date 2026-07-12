@@ -6,6 +6,7 @@ import { ToolShell } from '@/components/tool-shell'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { CHAT_MAX_FILE_SIZE_BYTES, CHAT_MAX_FILE_SIZE_MB, CHAT_OVERSIZE_DISMISS_DAYS } from '@/lib/chat-limits'
 import { loadCachedMessages, saveCachedMessages } from '@/lib/chat-cache'
+import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, type MoodOption } from '@/lib/chat-defaults'
 
 const OVERSIZE_DISMISS_KEY = 'wv-chat-oversize-dismissed-at'
 
@@ -72,20 +73,6 @@ const FONT_OPTIONS: { id: FontId; label: string; style: React.CSSProperties }[] 
   { id: 'cursive', label: 'Viết tay', style: { fontFamily: 'cursive' } },
 ]
 
-type MoodOption = { id: string; emoji: string; label: string; color: string }
-
-// Fallback sets used when a room hasn't customized its own (admin panel can
-// override both per room).
-const DEFAULT_REACTION_EMOJIS = ['❤️', '👍', '😂', '😮', '😢', '😡', '🎉']
-
-const DEFAULT_MOOD_OPTIONS: MoodOption[] = [
-  { id: 'happy', emoji: '😄', label: 'Vui', color: '#FBBF24' },
-  { id: 'love', emoji: '🥰', label: 'Yêu đời', color: '#F472B6' },
-  { id: 'calm', emoji: '😌', label: 'Bình yên', color: '#34D399' },
-  { id: 'tired', emoji: '😴', label: 'Mệt', color: '#60A5FA' },
-  { id: 'sad', emoji: '😢', label: 'Buồn', color: '#818CF8' },
-  { id: 'angry', emoji: '😡', label: 'Bực', color: '#F87171' },
-]
 
 const GESTURE_OPTIONS: { id: string; emoji: string; label: string }[] = [
   { id: 'hug', emoji: '🤗', label: 'Ôm' },
