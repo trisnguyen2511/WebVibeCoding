@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     const moodOptions = room?.mood_options && room.mood_options.length > 0 ? room.mood_options : DEFAULT_MOOD_OPTIONS
     const option = moodOptions.find((m: { id: string; emoji: string; label: string }) => m.id === mood)
     const moodText = option ? `${option.emoji} ${option.label}` : mood
-    const notifyBody = `${sender?.nickname ?? 'Ai đó'} vừa đổi trạng thái: ${moodText}`
+    const notifyBody = `${sender?.nickname ?? 'Ai đó'} đang cảm thấy ${moodText}`
     await pushToRoom(supabase, roomId, deviceId, room?.name ?? 'Trạng thái mới', notifyBody, room?.icon_url)
   }
 
