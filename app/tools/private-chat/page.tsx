@@ -5,6 +5,7 @@ import { LogOut, Pin, Reply, SmilePlus, Clock, Image as ImageIcon, Type, Send, M
 import { ToolShell } from '@/components/tool-shell'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { CHAT_MAX_FILE_SIZE_BYTES, CHAT_MAX_FILE_SIZE_MB, CHAT_OVERSIZE_DISMISS_DAYS } from '@/lib/chat-limits'
+import { loadCachedMessages, saveCachedMessages } from '@/lib/chat-cache'
 
 const OVERSIZE_DISMISS_KEY = 'wv-chat-oversize-dismissed-at'
 
@@ -441,12 +442,40 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
   useEffect(() => {
     let cancelled = false
-    fetch(`/api/chat/messages?roomId=${session.roomId}&deviceId=${deviceId.current}`)
+
+    // Render instantly from the last locally-cached snapshot, then quietly
+    // ask the server only for what arrived since — avoids blocking the UI on
+    // a full refetch every time the room is opened, while still always
+    // reconciling with the server on load.
+    const cached = loadCachedMessages<ChatMessage>(session.roomId)
+    if (cached) {
+      setMessages(cached)
+      setHasMore(true)
+      initialLoadDone.current = true
+      setInitialLoading(false)
+      markSeen()
+    }
+    const since = cached ? cached[cached.length - 1].created_at : undefined
+    const url = since
+      ? `/api/chat/messages?roomId=${session.roomId}&deviceId=${deviceId.current}&after=${encodeURIComponent(since)}`
+      : `/api/chat/messages?roomId=${session.roomId}&deviceId=${deviceId.current}`
+
+    fetch(url)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled || !data.messages) return
-        setMessages(data.messages)
-        setHasMore(Boolean(data.hasMore))
+        if (since) {
+          if (data.messages.length > 0) {
+            setMessages((prev) => {
+              const known = new Set(prev.map((m: ChatMessage) => m.id))
+              const fresh = (data.messages as ChatMessage[]).filter((m) => !known.has(m.id))
+              return fresh.length > 0 ? [...prev, ...fresh] : prev
+            })
+          }
+        } else {
+          setMessages(data.messages)
+          setHasMore(Boolean(data.hasMore))
+        }
         initialLoadDone.current = true
         markSeen()
       })
@@ -456,6 +485,11 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       .then((data) => { if (!cancelled) setPinnedMessage(data.message ?? null) })
     return () => { cancelled = true }
   }, [session.roomId, markSeen])
+
+  useEffect(() => {
+    if (!initialLoadDone.current) return
+    saveCachedMessages(session.roomId, messages)
+  }, [messages, session.roomId])
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || messages.length === 0) return
