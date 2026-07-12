@@ -19,7 +19,7 @@ export const DEFAULT_MOOD_OPTIONS: MoodOption[] = [
 // at build time, chosen for Vietnamese diacritic support) — rooms can only
 // choose which of these show in the picker and relabel them, not add
 // arbitrary font names.
-export type FontId = 'sans' | 'display' | 'mono' | 'cursive' | 'rounded' | 'serif'
+export type FontId = 'sans' | 'display' | 'mono' | 'cursive' | 'rounded' | 'serif' | 'script' | 'impact' | 'cute' | 'funky'
 export type FontOption = { id: FontId; label: string }
 
 export const FONT_CATALOG: FontOption[] = [
@@ -29,4 +29,8 @@ export const FONT_CATALOG: FontOption[] = [
   { id: 'cursive', label: 'Viết tay' },
   { id: 'rounded', label: 'Bo tròn' },
   { id: 'serif', label: 'Cổ điển' },
+  { id: 'script', label: 'Uyển chuyển' },
+  { id: 'impact', label: 'Đậm nét' },
+  { id: 'cute', label: 'Dễ thương' },
+  { id: 'funky', label: 'Phá cách' },
 ]
