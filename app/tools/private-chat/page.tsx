@@ -177,6 +177,62 @@ function formatDayLabel(iso: string): string {
   return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+const SWIPE_REPLY_MAX = 56
+const SWIPE_REPLY_THRESHOLD = 40
+
+// Drag a message bubble rightward to reply to it — the standard mobile chat
+// gesture (Zalo/Messenger/Telegram), since the hover-only reply button below
+// each bubble is unreachable on touch devices.
+function SwipeToReply({ onReply, disabled, children }: { onReply: () => void; disabled?: boolean; children: React.ReactNode }) {
+  const [dragX, setDragX] = useState(0)
+  const startXRef = useRef<number | null>(null)
+  const draggingRef = useRef(false)
+  const triggeredRef = useRef(false)
+
+  const endDrag = () => {
+    if (!draggingRef.current) return
+    draggingRef.current = false
+    if (triggeredRef.current) onReply()
+    setDragX(0)
+    startXRef.current = null
+    triggeredRef.current = false
+  }
+
+  return (
+    <div
+      onPointerDown={(e) => {
+        if (disabled) return
+        startXRef.current = e.clientX
+        draggingRef.current = true
+        triggeredRef.current = false
+      }}
+      onPointerMove={(e) => {
+        if (!draggingRef.current || startXRef.current === null) return
+        const delta = Math.max(0, Math.min(e.clientX - startXRef.current, SWIPE_REPLY_MAX))
+        setDragX(delta)
+        if (delta > SWIPE_REPLY_THRESHOLD && !triggeredRef.current) {
+          triggeredRef.current = true
+          if ('vibrate' in navigator) navigator.vibrate(10)
+        }
+      }}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onPointerLeave={endDrag}
+      className="relative"
+      style={{ touchAction: 'pan-y' }}
+    >
+      <Reply
+        size={16}
+        className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-accent-soft"
+        style={{ opacity: dragX / SWIPE_REPLY_MAX }}
+      />
+      <div style={{ transform: `translateX(${dragX}px)`, transition: draggingRef.current ? 'none' : 'transform 150ms ease-out' }}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
 function FileAttachment({ message }: { message: ChatMessage }) {
   // image_url is the legacy column from before image/video/file uploads were
   // unified onto one direct-to-Cloudinary path — old messages still use it.
@@ -402,6 +458,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [pinnedMessage, setPinnedMessage] = useState<PinnedMessage | null>(null)
   const [seenMap, setSeenMap] = useState<Map<string, string>>(new Map())
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null)
+  const [activeActionsFor, setActiveActionsFor] = useState<string | null>(null)
   const [showCapsulePicker, setShowCapsulePicker] = useState(false)
   const [capsuleAt, setCapsuleAt] = useState('')
   const [ownMood, setOwnMood] = useState<string | null>(null)
@@ -505,21 +562,30 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     saveCachedMessages(session.roomId, messages)
   }, [messages, session.roomId])
 
+  // Jumps to a message currently in the loaded/rendered window and briefly
+  // flashes it — used both for the notification deep-link and for tapping a
+  // reply preview to find the message it quotes. No-ops if the message isn't
+  // loaded (e.g. further back than the current pagination window).
+  const scrollToMessage = useCallback((id: string) => {
+    const el = scrollRef.current?.querySelector(`[data-message-id="${id}"]`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setHighlightMessageId(id)
+    setTimeout(() => setHighlightMessageId(null), 2000)
+  }, [])
+
   // A notification click deep-links to the message it was about
-  // (?messageId=...) — jump straight to it and flash it so it's obvious
-  // which one just arrived, instead of dropping the user at the bottom to
-  // hunt for it.
+  // (?messageId=...) — jump straight to it so it's obvious which one just
+  // arrived, instead of dropping the user at the bottom to hunt for it.
   useEffect(() => {
     if (!initialLoadDone.current) return
     const targetId = new URLSearchParams(window.location.search).get('messageId')
     if (!targetId) return
     const el = scrollRef.current?.querySelector(`[data-message-id="${targetId}"]`)
     if (!el) return
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    setHighlightMessageId(targetId)
-    setTimeout(() => setHighlightMessageId(null), 2000)
+    scrollToMessage(targetId)
     window.history.replaceState(null, '', window.location.pathname)
-  }, [messages])
+  }, [messages, scrollToMessage])
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || messages.length === 0) return
@@ -1219,14 +1285,19 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                     </div>
                   )}
                   <div
-                    className={`group flex animate-msg-in flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'}`}
+                    className={`group flex animate-msg-in flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'} ${
+                      m.reply_to_id ? (mine ? 'mr-3' : 'ml-3') : ''
+                    }`}
                   >
                     {!mine && !isJournal && (
                       <span className="mb-1 text-[10px] font-medium text-muted">{m.nickname}</span>
                     )}
 
                     {m.reply_to_id && (
-                      <div className={`mb-1.5 ${bubbleMaxWidth} flex items-start gap-1.5 rounded-xl border-l-2 border-accent/40 bg-white/[0.04] px-2.5 py-1.5 text-xs text-muted backdrop-blur-sm ${mine ? 'text-right' : ''}`}>
+                      <div
+                        onClick={() => scrollToMessage(m.reply_to_id!)}
+                        className={`mb-1.5 ${bubbleMaxWidth} flex cursor-pointer items-start gap-1.5 rounded-xl border-l-2 border-accent/40 bg-white/[0.04] px-2.5 py-1.5 text-xs text-muted backdrop-blur-sm transition-colors hover:bg-white/[0.07] ${mine ? 'text-right' : ''}`}
+                      >
                         <Reply size={10} className="mt-0.5 shrink-0 text-accent-soft/70" />
                         <span className="min-w-0 truncate">
                           <b className="text-accent-soft">{m.reply_to_nickname}</b>: {m.reply_to_content}
@@ -1234,14 +1305,21 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       </div>
                     )}
 
-                    <div className={`flex flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'} ${m.pending || m.failed ? 'opacity-50' : ''} transition-opacity`}>
+                    <SwipeToReply
+                      disabled={m.locked}
+                      onReply={() => setReplyingTo({ id: m.id, nickname: m.nickname, preview: m.content ?? '[Hình ảnh]' })}
+                    >
+                    <div
+                      onClick={() => setActiveActionsFor((id) => (id === m.id ? null : m.id))}
+                      className={`flex flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'} ${m.pending || m.failed ? 'opacity-50' : ''} transition-opacity`}
+                    >
                       {m.locked ? (
                         <span className={`${bubbleMaxWidth} flex items-center gap-2 rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-muted`}>
                           <Lock size={13} className="shrink-0" />
                           Tin nhắn hẹn giờ, mở lúc {m.reveal_at ? formatTime(m.reveal_at) : '...'}
                         </span>
                       ) : isJournal ? (
-                        <div className="w-full overflow-x-auto border-l-2 border-accent/40 py-1 pl-4">
+                        <div className="w-full overflow-x-auto border-l-2 border-accent/40 py-1 pl-4" style={{ touchAction: 'pan-y' }}>
                           <FileAttachment message={m} />
                           {m.content && (
                             <p
@@ -1281,6 +1359,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                         </>
                       )}
                     </div>
+                    </SwipeToReply>
 
                     {m.failed && (
                       <button
@@ -1309,29 +1388,46 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       </div>
                     )}
 
-                    <div className={`mt-1 hidden items-center gap-1 group-hover:flex ${isJournal ? 'pl-4' : ''}`}>
+                    <div
+                      className={`overflow-hidden transition-all duration-200 ease-out ${
+                        activeActionsFor === m.id ? 'mt-1.5 max-h-10' : 'mt-0 max-h-0 group-hover:mt-1.5 group-hover:max-h-10'
+                      }`}
+                    >
+                    <div
+                      className={`flex items-center gap-0.5 rounded-full border border-white/[0.08] bg-white/[0.05] p-1 backdrop-blur-sm transition-opacity duration-150 ${isJournal ? 'ml-4' : ''} ${
+                        activeActionsFor === m.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                    >
                       <button
+                        title="Thả cảm xúc"
                         onClick={() => setReactionPickerFor(reactionPickerFor === m.id ? null : m.id)}
-                        className="flex h-6 w-6 items-center justify-center rounded-lg text-muted transition-all hover:bg-white/[0.07] hover:text-white"
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-white/[0.08] hover:text-white"
                       >
-                        <SmilePlus size={11} />
+                        <SmilePlus size={13} />
                       </button>
                       {!m.locked && (
                         <button
-                          onClick={() => setReplyingTo({ id: m.id, nickname: m.nickname, preview: m.content ?? '[Hình ảnh]' })}
-                          className="flex h-6 items-center gap-1 rounded-lg px-1.5 text-[10px] text-muted transition-all hover:bg-white/[0.07] hover:text-white"
+                          title="Trả lời"
+                          onClick={() => {
+                            setReplyingTo({ id: m.id, nickname: m.nickname, preview: m.content ?? '[Hình ảnh]' })
+                            setActiveActionsFor(null)
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-white/[0.08] hover:text-white"
                         >
-                          <Reply size={10} />
-                          Trả lời
+                          <Reply size={13} />
                         </button>
                       )}
                       <button
-                        onClick={() => pinMessage(m.id)}
-                        className="flex h-6 items-center gap-1 rounded-lg px-1.5 text-[10px] text-muted transition-all hover:bg-white/[0.07] hover:text-white"
+                        title="Ghim"
+                        onClick={() => {
+                          pinMessage(m.id)
+                          setActiveActionsFor(null)
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-white/[0.08] hover:text-white"
                       >
-                        <Pin size={10} />
-                        Ghim
+                        <Pin size={13} />
                       </button>
+                    </div>
                     </div>
 
                     {reactionPickerFor === m.id && (
