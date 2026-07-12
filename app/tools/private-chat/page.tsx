@@ -177,6 +177,62 @@ function formatDayLabel(iso: string): string {
   return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+const SWIPE_REPLY_MAX = 56
+const SWIPE_REPLY_THRESHOLD = 40
+
+// Drag a message bubble rightward to reply to it — the standard mobile chat
+// gesture (Zalo/Messenger/Telegram), since the hover-only reply button below
+// each bubble is unreachable on touch devices.
+function SwipeToReply({ onReply, disabled, children }: { onReply: () => void; disabled?: boolean; children: React.ReactNode }) {
+  const [dragX, setDragX] = useState(0)
+  const startXRef = useRef<number | null>(null)
+  const draggingRef = useRef(false)
+  const triggeredRef = useRef(false)
+
+  const endDrag = () => {
+    if (!draggingRef.current) return
+    draggingRef.current = false
+    if (triggeredRef.current) onReply()
+    setDragX(0)
+    startXRef.current = null
+    triggeredRef.current = false
+  }
+
+  return (
+    <div
+      onPointerDown={(e) => {
+        if (disabled) return
+        startXRef.current = e.clientX
+        draggingRef.current = true
+        triggeredRef.current = false
+      }}
+      onPointerMove={(e) => {
+        if (!draggingRef.current || startXRef.current === null) return
+        const delta = Math.max(0, Math.min(e.clientX - startXRef.current, SWIPE_REPLY_MAX))
+        setDragX(delta)
+        if (delta > SWIPE_REPLY_THRESHOLD && !triggeredRef.current) {
+          triggeredRef.current = true
+          if ('vibrate' in navigator) navigator.vibrate(10)
+        }
+      }}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onPointerLeave={endDrag}
+      className="relative"
+      style={{ touchAction: 'pan-y' }}
+    >
+      <Reply
+        size={16}
+        className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-accent-soft"
+        style={{ opacity: dragX / SWIPE_REPLY_MAX }}
+      />
+      <div style={{ transform: `translateX(${dragX}px)`, transition: draggingRef.current ? 'none' : 'transform 150ms ease-out' }}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
 function FileAttachment({ message }: { message: ChatMessage }) {
   // image_url is the legacy column from before image/video/file uploads were
   // unified onto one direct-to-Cloudinary path — old messages still use it.
@@ -1234,6 +1290,10 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       </div>
                     )}
 
+                    <SwipeToReply
+                      disabled={m.locked}
+                      onReply={() => setReplyingTo({ id: m.id, nickname: m.nickname, preview: m.content ?? '[Hình ảnh]' })}
+                    >
                     <div className={`flex flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'} ${m.pending || m.failed ? 'opacity-50' : ''} transition-opacity`}>
                       {m.locked ? (
                         <span className={`${bubbleMaxWidth} flex items-center gap-2 rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-muted`}>
@@ -1281,6 +1341,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                         </>
                       )}
                     </div>
+                    </SwipeToReply>
 
                     {m.failed && (
                       <button
