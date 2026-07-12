@@ -1024,6 +1024,14 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {otherMood && (
+            <span
+              title={`Đối phương đang: ${MOOD_OPTIONS.find((m) => m.id === otherMood)?.label ?? ''}`}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-lg"
+            >
+              {MOOD_OPTIONS.find((m) => m.id === otherMood)?.emoji}
+            </span>
+          )}
           <button
             onClick={() => setShowMoodPicker((v) => !v)}
             title="Trạng thái cảm xúc"
