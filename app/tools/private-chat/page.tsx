@@ -6,7 +6,14 @@ import { ToolShell } from '@/components/tool-shell'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { CHAT_MAX_FILE_SIZE_BYTES, CHAT_MAX_FILE_SIZE_MB, CHAT_OVERSIZE_DISMISS_DAYS } from '@/lib/chat-limits'
 import { loadCachedMessages, saveCachedMessages } from '@/lib/chat-cache'
-import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, type MoodOption } from '@/lib/chat-defaults'
+import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, FONT_CATALOG, type MoodOption, type FontId, type FontOption } from '@/lib/chat-defaults'
+import { Dancing_Script, Baloo_2, Noto_Serif } from 'next/font/google'
+
+// Scoped to this page only (not the global layout) so other tools' bundles
+// stay untouched. All three support the Vietnamese subset.
+const dancingScript = Dancing_Script({ subsets: ['vietnamese', 'latin'], weight: '700', variable: '--font-dancing-script' })
+const baloo2 = Baloo_2({ subsets: ['vietnamese', 'latin'], weight: '600', variable: '--font-baloo-2' })
+const notoSerif = Noto_Serif({ subsets: ['vietnamese', 'latin'], weight: ['400', '700'], variable: '--font-noto-serif' })
 
 const OVERSIZE_DISMISS_KEY = 'wv-chat-oversize-dismissed-at'
 
@@ -28,6 +35,7 @@ type Session = {
   roomIconUrl?: string | null
   moodOptions?: MoodOption[] | null
   reactionEmojis?: string[] | null
+  fontOptions?: FontOption[] | null
 }
 
 type Reaction = { device_id: string; emoji: string }
@@ -59,20 +67,12 @@ type ChatMessage = {
 
 type PinnedMessage = { id: string; device_id: string; nickname: string; content: string | null; image_url?: string | null }
 
-type FontId = 'sans' | 'display' | 'mono' | 'cursive'
 type MessageStyle = { color: string | null; font: FontId | null; bold: boolean; italic: boolean }
 
 const STYLE_KEY = 'wv-chat-style'
 const DEFAULT_STYLE: MessageStyle = { color: null, font: null, bold: false, italic: false }
 
 const COLOR_PRESETS = ['#FAFAFA', '#F87171', '#FBBF24', '#34D399', '#60A5FA', '#A78BFA', '#F472B6']
-const FONT_OPTIONS: { id: FontId; label: string; style: React.CSSProperties }[] = [
-  { id: 'sans', label: 'Mặc định', style: {} },
-  { id: 'display', label: 'Tiêu đề', style: { fontFamily: 'var(--font-space-grotesk), sans-serif' } },
-  { id: 'mono', label: 'Mono', style: { fontFamily: 'var(--font-jetbrains-mono), monospace' } },
-  { id: 'cursive', label: 'Viết tay', style: { fontFamily: 'cursive' } },
-]
-
 
 const GESTURE_OPTIONS: { id: string; emoji: string; label: string }[] = [
   { id: 'hug', emoji: '🤗', label: 'Ôm' },
@@ -81,8 +81,25 @@ const GESTURE_OPTIONS: { id: string; emoji: string; label: string }[] = [
   { id: 'kiss', emoji: '😘', label: 'Hôn' },
 ]
 
+// Fixed mapping of every font id that can ever be stored on a message — kept
+// separate from FONT_CATALOG (which is just id+label metadata a room can
+// pick a subset of) so old messages always render correctly regardless of
+// the room's *current* picker configuration.
 function fontStyleFor(font?: string | null): React.CSSProperties {
-  return FONT_OPTIONS.find((f) => f.id === font)?.style ?? {}
+  switch (font) {
+    case 'display':
+      return { fontFamily: 'var(--font-space-grotesk), sans-serif' }
+    case 'mono':
+      return { fontFamily: 'var(--font-jetbrains-mono), monospace' }
+    case 'cursive':
+      return { fontFamily: 'var(--font-dancing-script), cursive' }
+    case 'rounded':
+      return { fontFamily: 'var(--font-baloo-2), sans-serif' }
+    case 'serif':
+      return { fontFamily: 'var(--font-noto-serif), serif' }
+    default:
+      return {}
+  }
 }
 
 function loadSavedStyle(): MessageStyle {
@@ -306,6 +323,7 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         roomIconUrl: data.roomIconUrl ?? null,
         moodOptions: data.moodOptions ?? null,
         reactionEmojis: data.reactionEmojis ?? null,
+        fontOptions: data.fontOptions ?? null,
       }
       localStorage.setItem(SESSION_KEY, JSON.stringify(session))
       onJoined(session)
@@ -445,6 +463,7 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
 function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => void }) {
   const moodOptions = session.moodOptions && session.moodOptions.length > 0 ? session.moodOptions : DEFAULT_MOOD_OPTIONS
   const reactionEmojis = session.reactionEmojis && session.reactionEmojis.length > 0 ? session.reactionEmojis : DEFAULT_REACTION_EMOJIS
+  const fontOptions = session.fontOptions && session.fontOptions.length > 0 ? session.fontOptions : FONT_CATALOG
 
   // A locally-cached session (from an older app version, or corrupted) can
   // have a stale/wrong roomType — the mood endpoint always returns the
@@ -1623,13 +1642,13 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           </div>
           <div className="flex items-center gap-3">
             <span className="w-16 shrink-0 text-xs text-muted">Font chữ</span>
-            <div className="flex flex-wrap gap-1.5">
-              {FONT_OPTIONS.map((f) => (
+            <div className="flex flex-1 gap-1.5 overflow-x-auto pb-1">
+              {fontOptions.map((f) => (
                 <button
                   key={f.id}
                   onClick={() => updateStyle({ font: f.id === 'sans' ? null : f.id })}
-                  style={f.style}
-                  className={`rounded-xl border px-3 py-1 text-xs transition-all ${
+                  style={fontStyleFor(f.id)}
+                  className={`shrink-0 rounded-xl border px-3 py-1 text-xs transition-all ${
                     (style.font ?? 'sans') === f.id
                       ? 'border-accent bg-accent/[0.15] text-accent-soft shadow-[0_0_12px_rgba(124,58,237,0.2)]'
                       : 'border-white/[0.08] bg-white/[0.03] text-muted hover:text-white'
@@ -1783,13 +1802,15 @@ export default function PrivateChatPage() {
 
   return (
     <ToolShell name="Private Chat" icon="💬" description="Đoạn chat riêng tư bằng mã PIN" fullBleed>
-      {session === undefined ? null : session ? (
-        <ChatScreen session={session} onLeave={() => setSession(null)} />
-      ) : (
-        <div className="flex h-full items-center justify-center overflow-y-auto p-4">
-          <JoinScreen onJoined={setSession} />
-        </div>
-      )}
+      <div className={`contents ${dancingScript.variable} ${baloo2.variable} ${notoSerif.variable}`}>
+        {session === undefined ? null : session ? (
+          <ChatScreen session={session} onLeave={() => setSession(null)} />
+        ) : (
+          <div className="flex h-full items-center justify-center overflow-y-auto p-4">
+            <JoinScreen onJoined={setSession} />
+          </div>
+        )}
+      </div>
     </ToolShell>
   )
 }

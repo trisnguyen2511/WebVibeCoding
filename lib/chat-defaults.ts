@@ -14,3 +14,19 @@ export const DEFAULT_MOOD_OPTIONS: MoodOption[] = [
   { id: 'sad', emoji: '😢', label: 'Buồn', color: '#818CF8' },
   { id: 'angry', emoji: '😡', label: 'Bực', color: '#F87171' },
 ]
+
+// The set of font *ids* is fixed in code (each one is a real font pre-loaded
+// at build time, chosen for Vietnamese diacritic support) — rooms can only
+// choose which of these show in the picker and relabel them, not add
+// arbitrary font names.
+export type FontId = 'sans' | 'display' | 'mono' | 'cursive' | 'rounded' | 'serif'
+export type FontOption = { id: FontId; label: string }
+
+export const FONT_CATALOG: FontOption[] = [
+  { id: 'sans', label: 'Mặc định' },
+  { id: 'display', label: 'Tiêu đề' },
+  { id: 'mono', label: 'Mono' },
+  { id: 'cursive', label: 'Viết tay' },
+  { id: 'rounded', label: 'Bo tròn' },
+  { id: 'serif', label: 'Cổ điển' },
+]
