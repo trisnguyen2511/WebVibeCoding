@@ -1276,7 +1276,9 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                     </div>
                   )}
                   <div
-                    className={`group flex animate-msg-in flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'}`}
+                    className={`group flex animate-msg-in flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'} ${
+                      m.reply_to_id ? (mine ? 'mr-3' : 'ml-3') : ''
+                    }`}
                   >
                     {!mine && !isJournal && (
                       <span className="mb-1 text-[10px] font-medium text-muted">{m.nickname}</span>
