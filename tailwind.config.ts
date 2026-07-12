@@ -5,14 +5,21 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: '#08080E',
-        surface:    '#0F0F1A',
-        border:     '#1A1A2E',
+        // Theme-aware — values come from CSS variables set in globals.css,
+        // flipped between :root (dark, default) and [data-theme="light"].
+        background: 'rgb(var(--color-bg) / <alpha-value>)',
+        surface:    'rgb(var(--color-surface) / <alpha-value>)',
+        border:     'rgb(var(--color-border) / <alpha-value>)',
+        muted:      'rgb(var(--color-muted) / <alpha-value>)',
+        // Solid foreground text (replaces literal text-white) and the
+        // translucent highlight/border overlay (replaces bg-white/[x],
+        // border-white/[x]) — both flip white<->near-black with the theme.
+        fg:      'rgb(var(--color-fg) / <alpha-value>)',
+        overlay: 'rgb(var(--color-overlay) / <alpha-value>)',
         accent: {
           DEFAULT: '#7C3AED',
           soft:    '#A78BFA',
         },
-        muted: '#52525B',
       },
       fontFamily: {
         display: ['var(--font-space-grotesk)', 'sans-serif'],

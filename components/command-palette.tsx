@@ -92,7 +92,7 @@ export function CommandPalette() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search tools..."
-            className="flex-1 bg-transparent font-sans text-sm text-white placeholder-muted outline-none"
+            className="flex-1 bg-transparent font-sans text-sm text-fg placeholder-muted outline-none"
           />
           <kbd className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-muted">
             esc
@@ -106,14 +106,14 @@ export function CommandPalette() {
               key={tool.slug}
               onClick={() => navigate(tool.slug)}
               className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                idx === selectedIdx ? 'bg-accent/15' : 'hover:bg-white/4'
+                idx === selectedIdx ? 'bg-accent/15' : 'hover:bg-overlay/[0.04]'
               }`}
             >
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-base">
                 {tool.icon}
               </span>
               <div className="min-w-0 flex-1">
-                <span className="block font-display text-sm text-white">{tool.name}</span>
+                <span className="block font-display text-sm text-fg">{tool.name}</span>
                 <span className="block truncate text-xs text-muted">{tool.description}</span>
               </div>
               <span className={`shrink-0 font-mono text-xs ${CAT_COLORS[tool.category]}`}>

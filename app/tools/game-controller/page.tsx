@@ -187,18 +187,18 @@ function DpadControl({
       </div>
 
       {/* Arrow labels */}
-      <span className={`absolute left-1/2 top-[8%] -translate-x-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.up) ? 'text-white' : 'text-[#52525B]'}`}>↑</span>
-      <span className={`absolute bottom-[8%] left-1/2 -translate-x-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.down) ? 'text-white' : 'text-[#52525B]'}`}>↓</span>
-      <span className={`absolute left-[8%] top-1/2 -translate-y-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.left) ? 'text-white' : 'text-[#52525B]'}`}>←</span>
-      <span className={`absolute right-[8%] top-1/2 -translate-y-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.right) ? 'text-white' : 'text-[#52525B]'}`}>→</span>
+      <span className={`absolute left-1/2 top-[8%] -translate-x-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.up) ? 'text-fg' : 'text-[#52525B]'}`}>↑</span>
+      <span className={`absolute bottom-[8%] left-1/2 -translate-x-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.down) ? 'text-fg' : 'text-[#52525B]'}`}>↓</span>
+      <span className={`absolute left-[8%] top-1/2 -translate-y-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.left) ? 'text-fg' : 'text-[#52525B]'}`}>←</span>
+      <span className={`absolute right-[8%] top-1/2 -translate-y-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.right) ? 'text-fg' : 'text-[#52525B]'}`}>→</span>
 
       {/* Diagonal labels (only when diagonal=true) */}
       {config.diagonal && (
         <>
-          <span className={`absolute left-[14%] top-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.up) && isActive(config.left) ? 'text-white' : 'text-[#1A1A2E]'}`}>↖</span>
-          <span className={`absolute right-[14%] top-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.up) && isActive(config.right) ? 'text-white' : 'text-[#1A1A2E]'}`}>↗</span>
-          <span className={`absolute bottom-[14%] left-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.down) && isActive(config.left) ? 'text-white' : 'text-[#1A1A2E]'}`}>↙</span>
-          <span className={`absolute bottom-[14%] right-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.down) && isActive(config.right) ? 'text-white' : 'text-[#1A1A2E]'}`}>↘</span>
+          <span className={`absolute left-[14%] top-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.up) && isActive(config.left) ? 'text-fg' : 'text-[#1A1A2E]'}`}>↖</span>
+          <span className={`absolute right-[14%] top-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.up) && isActive(config.right) ? 'text-fg' : 'text-[#1A1A2E]'}`}>↗</span>
+          <span className={`absolute bottom-[14%] left-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.down) && isActive(config.left) ? 'text-fg' : 'text-[#1A1A2E]'}`}>↙</span>
+          <span className={`absolute bottom-[14%] right-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.down) && isActive(config.right) ? 'text-fg' : 'text-[#1A1A2E]'}`}>↘</span>
         </>
       )}
 
@@ -304,10 +304,10 @@ function HostView({ roomId }: { roomId: string }) {
           <p className="font-mono text-2xl font-bold tracking-widest text-accent-soft">{roomId}</p>
         </div>
         <div className="ml-auto flex gap-2">
-          <button onClick={copy} className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:text-white">
+          <button onClick={copy} className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:text-fg">
             Copy Link
           </button>
-          <button onClick={() => setShowQR((v) => !v)} className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:text-white">
+          <button onClick={() => setShowQR((v) => !v)} className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:text-fg">
             {showQR ? 'Hide QR' : 'QR Code'}
           </button>
         </div>
@@ -320,7 +320,7 @@ function HostView({ roomId }: { roomId: string }) {
             <QRCodeSVG value={url} size={180} bgColor="#0F0F1A" fgColor="#FAFAFA" />
           </a>
           <p className="text-xs text-muted">Scan with phone to join as controller</p>
-          <a href={url} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-accent-soft underline underline-offset-2 hover:text-white transition-colors break-all text-center">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-accent-soft underline underline-offset-2 hover:text-fg transition-colors break-all text-center">
             {url}
           </a>
         </div>
@@ -332,7 +332,7 @@ function HostView({ roomId }: { roomId: string }) {
         <div className="flex gap-3">
           <button
             onClick={() => setMode('browser')}
-            className={`flex-1 rounded-xl border px-4 py-3 text-sm font-bold transition-colors ${mode === 'browser' ? 'border-[#7C3AED] bg-[#7C3AED]/20 text-[#A78BFA]' : 'border-border bg-[#08080E] text-muted hover:text-white'}`}
+            className={`flex-1 rounded-xl border px-4 py-3 text-sm font-bold transition-colors ${mode === 'browser' ? 'border-[#7C3AED] bg-[#7C3AED]/20 text-[#A78BFA]' : 'border-border bg-[#08080E] text-muted hover:text-fg'}`}
           >
             <span className="block text-base">🌐</span>
             Browser Mode
@@ -340,7 +340,7 @@ function HostView({ roomId }: { roomId: string }) {
           </button>
           <button
             onClick={() => setMode('agent')}
-            className={`flex-1 rounded-xl border px-4 py-3 text-sm font-bold transition-colors ${mode === 'agent' ? 'border-[#7C3AED] bg-[#7C3AED]/20 text-[#A78BFA]' : 'border-border bg-[#08080E] text-muted hover:text-white'}`}
+            className={`flex-1 rounded-xl border px-4 py-3 text-sm font-bold transition-colors ${mode === 'agent' ? 'border-[#7C3AED] bg-[#7C3AED]/20 text-[#A78BFA]' : 'border-border bg-[#08080E] text-muted hover:text-fg'}`}
           >
             <span className="block text-base">🖥️</span>
             Local Agent
@@ -357,7 +357,7 @@ function HostView({ roomId }: { roomId: string }) {
             </div>
             {agentStatus !== 'connected' && (
               <div className="rounded-lg border border-border bg-[#08080E] p-3 font-mono text-xs text-muted space-y-1">
-                <p className="text-white">Start the local agent:</p>
+                <p className="text-fg">Start the local agent:</p>
                 <p className="text-[#A78BFA]">cd local-agent</p>
                 <p className="text-[#A78BFA]">npm install</p>
                 <p className="text-[#A78BFA]">npm start</p>
@@ -400,7 +400,7 @@ function HostView({ roomId }: { roomId: string }) {
           <p className="text-sm text-muted">Waiting for input...</p>
         ) : (
           log.map((entry, i) => (
-            <p key={i} className="font-mono text-sm text-white">
+            <p key={i} className="font-mono text-sm text-fg">
               <span className={`mr-2 rounded border px-1.5 py-0.5 text-xs ${PLAYER_COLORS[(entry.player - 1) % MAX_PLAYERS].badge}`}>P{entry.player}</span>
               {entry.keys}
             </p>
@@ -452,7 +452,7 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-[#08080E] p-6">
       <div className="w-full max-w-xs space-y-4">
         <div className="text-center">
-          <p className="font-display text-2xl font-bold text-white">Choose Layout</p>
+          <p className="font-display text-2xl font-bold text-fg">Choose Layout</p>
           <p className="mt-1 text-sm text-[#52525B]">Pick a preset or import your own .inf</p>
         </div>
 
@@ -462,7 +462,7 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
             <select
               value={preset}
               onChange={(e) => setPreset(e.target.value as Preset)}
-              className="w-full rounded-xl border border-[#1A1A2E] bg-[#0F0F1A] px-4 py-3 font-mono text-sm text-white outline-none focus:border-[#7C3AED]"
+              className="w-full rounded-xl border border-[#1A1A2E] bg-[#0F0F1A] px-4 py-3 font-mono text-sm text-fg outline-none focus:border-[#7C3AED]"
             >
               <optgroup label="── Classic ──">
                 <option value="nes">NES — Player 1</option>
@@ -493,13 +493,13 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
           <div className="flex items-center justify-between rounded-xl border border-[#1A1A2E] bg-[#0F0F1A] px-4 py-3">
             <div>
               <p className="text-xs text-[#52525B]">Custom layout</p>
-              <p className="font-mono text-sm text-white">{config?.name ?? customName}</p>
+              <p className="font-mono text-sm text-fg">{config?.name ?? customName}</p>
             </div>
-            <button onClick={() => { setCustomName(null); setConfig(null) }} className="text-xs text-[#52525B] hover:text-white">✕</button>
+            <button onClick={() => { setCustomName(null); setConfig(null) }} className="text-xs text-[#52525B] hover:text-fg">✕</button>
           </div>
         )}
 
-        <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-[#1A1A2E] bg-[#0F0F1A] px-4 py-3 text-sm text-[#52525B] transition-colors hover:text-white">
+        <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-[#1A1A2E] bg-[#0F0F1A] px-4 py-3 text-sm text-[#52525B] transition-colors hover:text-fg">
           Import custom .inf
           <input type="file" accept=".inf" onChange={handleImport} className="hidden" />
         </label>
@@ -511,7 +511,7 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
         <button
           disabled={!config}
           onClick={() => config && onReady(config)}
-          className="w-full rounded-xl bg-[#7C3AED] px-4 py-3 font-bold text-white transition-colors hover:bg-[#7C3AED]/80 disabled:opacity-40"
+          className="w-full rounded-xl bg-[#7C3AED] px-4 py-3 font-bold text-fg transition-colors hover:bg-[#7C3AED]/80 disabled:opacity-40"
         >
           Join as Controller
         </button>
@@ -659,7 +659,7 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
       {/* Fullscreen toggle */}
       <button
         onClick={toggleFullscreen}
-        className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[#1A1A2E] bg-[#0F0F1A]/90 text-base text-white"
+        className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[#1A1A2E] bg-[#0F0F1A]/90 text-base text-fg"
       >
         {isFullscreen ? '⤡' : '⛶'}
       </button>
@@ -673,15 +673,15 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
           />
           <div className="relative w-full space-y-3 rounded-t-2xl border-t border-[#1A1A2E] bg-[#08080E] p-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-bold text-white">Đổi game từ điện thoại</p>
-              <button onClick={() => setShowRomPanel(false)} className="text-[#52525B] hover:text-white">✕</button>
+              <p className="text-sm font-bold text-fg">Đổi game từ điện thoại</p>
+              <button onClick={() => setShowRomPanel(false)} className="text-[#52525B] hover:text-fg">✕</button>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {CONTROLLER_SYSTEMS.map((s) => (
                 <button
                   key={s.value}
                   onClick={() => setRomPanelSystem(s.value)}
-                  className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${romPanelSystem === s.value ? 'border-[#7C3AED] bg-[#7C3AED]/20 text-[#A78BFA]' : 'border-[#1A1A2E] text-[#52525B] hover:text-white'}`}
+                  className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${romPanelSystem === s.value ? 'border-[#7C3AED] bg-[#7C3AED]/20 text-[#A78BFA]' : 'border-[#1A1A2E] text-[#52525B] hover:text-fg'}`}
                 >
                   {s.label}
                 </button>
@@ -694,7 +694,7 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
                 onChange={(e) => setRomPanelUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendRomUrl()}
                 placeholder="https://example.com/game.nes"
-                className="min-w-0 flex-1 rounded-lg border border-[#1A1A2E] bg-[#0F0F1A] px-3 py-2.5 font-mono text-xs text-white outline-none placeholder:text-[#52525B] focus:border-[#7C3AED]"
+                className="min-w-0 flex-1 rounded-lg border border-[#1A1A2E] bg-[#0F0F1A] px-3 py-2.5 font-mono text-xs text-fg outline-none placeholder:text-[#52525B] focus:border-[#7C3AED]"
               />
               <button
                 onClick={sendRomUrl}
@@ -740,7 +740,7 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
           onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); onDown(id) }}
           onPointerUp={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); onUp(id) }}
           onPointerCancel={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); onUp(id) }}
-          className="relative flex flex-col items-center justify-center rounded-xl border border-[#1A1A2E] bg-[#0F0F1A] font-display text-sm font-bold text-white select-none touch-none active:bg-[#7C3AED]/30 active:border-[#7C3AED]"
+          className="relative flex flex-col items-center justify-center rounded-xl border border-[#1A1A2E] bg-[#0F0F1A] font-display text-sm font-bold text-fg select-none touch-none active:bg-[#7C3AED]/30 active:border-[#7C3AED]"
         >
           {btn.label}
           {btn.hold && <span className="absolute bottom-0.5 right-1 text-[8px] text-[#52525B]">↻</span>}

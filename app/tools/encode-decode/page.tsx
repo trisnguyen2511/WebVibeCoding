@@ -31,14 +31,14 @@ function Base64Tab() {
       <div className="flex gap-2">
         {(['encode', 'decode'] as const).map((m) => (
           <button key={m} onClick={() => setMode(m)}
-            className={`rounded-lg border px-4 py-1.5 text-sm font-medium transition-colors capitalize ${mode === m ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-white'}`}>
+            className={`rounded-lg border px-4 py-1.5 text-sm font-medium transition-colors capitalize ${mode === m ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-fg'}`}>
             {m}
           </button>
         ))}
       </div>
       <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={4}
         placeholder={mode === 'encode' ? 'Enter text to encode...' : 'Enter Base64 to decode...'}
-        className="w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-white outline-none placeholder-muted focus:border-accent" />
+        className="w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-fg outline-none placeholder-muted focus:border-accent" />
       <button onClick={run}
         className="rounded-xl bg-accent px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent/80">
         {mode === 'encode' ? 'Encode →' : '← Decode'}
@@ -46,9 +46,9 @@ function Base64Tab() {
       {error && <p className="font-mono text-xs text-red-400">{error}</p>}
       {output && (
         <div className="relative rounded-xl border border-border bg-surface p-4">
-          <pre className="font-mono text-sm text-white break-all whitespace-pre-wrap">{output}</pre>
+          <pre className="font-mono text-sm text-fg break-all whitespace-pre-wrap">{output}</pre>
           <button onClick={() => copy(output)}
-            className="absolute right-3 top-3 rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-muted hover:text-white">
+            className="absolute right-3 top-3 rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-muted hover:text-fg">
             {copied ? '✓ Copied' : 'Copy'}
           </button>
         </div>
@@ -79,14 +79,14 @@ function UrlTab() {
       <div className="flex gap-2">
         {(['encode', 'decode'] as const).map((m) => (
           <button key={m} onClick={() => setMode(m)}
-            className={`rounded-lg border px-4 py-1.5 text-sm font-medium transition-colors capitalize ${mode === m ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-white'}`}>
+            className={`rounded-lg border px-4 py-1.5 text-sm font-medium transition-colors capitalize ${mode === m ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-fg'}`}>
             {m}
           </button>
         ))}
       </div>
       <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={4}
         placeholder={mode === 'encode' ? 'Enter text to URL-encode...' : 'Enter encoded string to decode...'}
-        className="w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-white outline-none placeholder-muted focus:border-accent" />
+        className="w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-fg outline-none placeholder-muted focus:border-accent" />
       <button onClick={run}
         className="rounded-xl bg-accent px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent/80">
         {mode === 'encode' ? 'Encode →' : '← Decode'}
@@ -94,9 +94,9 @@ function UrlTab() {
       {error && <p className="font-mono text-xs text-red-400">{error}</p>}
       {output && (
         <div className="relative rounded-xl border border-border bg-surface p-4">
-          <pre className="font-mono text-sm text-white break-all whitespace-pre-wrap">{output}</pre>
+          <pre className="font-mono text-sm text-fg break-all whitespace-pre-wrap">{output}</pre>
           <button onClick={() => copy(output)}
-            className="absolute right-3 top-3 rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-muted hover:text-white">
+            className="absolute right-3 top-3 rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-muted hover:text-fg">
             {copied ? '✓ Copied' : 'Copy'}
           </button>
         </div>
@@ -134,7 +134,7 @@ function JwtTab() {
     <div className="space-y-4">
       <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={3}
         placeholder="Paste JWT token here..."
-        className="w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-xs text-white outline-none placeholder-muted focus:border-accent" />
+        className="w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-xs text-fg outline-none placeholder-muted focus:border-accent" />
       <button onClick={decode}
         className="rounded-xl bg-accent px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent/80">
         Decode JWT
@@ -150,7 +150,7 @@ function JwtTab() {
           {[['Header', result.header], ['Payload', result.payload]].map(([label, val]) => (
             <div key={label} className="rounded-xl border border-border bg-surface p-4">
               <p className="mb-2 text-xs font-medium uppercase tracking-widest text-muted">{label}</p>
-              <pre className="font-mono text-sm text-white overflow-x-auto">{val}</pre>
+              <pre className="font-mono text-sm text-fg overflow-x-auto">{val}</pre>
             </div>
           ))}
         </div>
@@ -192,10 +192,10 @@ function AesTab() {
     <div className="space-y-4">
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4}
         placeholder="Enter text to encrypt or decrypt..."
-        className="w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-white outline-none placeholder-muted focus:border-accent" />
+        className="w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-fg outline-none placeholder-muted focus:border-accent" />
       <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
         placeholder="Password"
-        className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-white outline-none placeholder-muted focus:border-accent" />
+        className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-fg outline-none placeholder-muted focus:border-accent" />
       <div className="flex gap-3">
         <button onClick={() => run('encrypt')} disabled={loading || !text.trim() || !password.trim()}
           className="flex-1 rounded-xl bg-accent py-3 font-display font-semibold text-white transition-colors hover:bg-accent/80 disabled:opacity-40">
@@ -211,7 +211,7 @@ function AesTab() {
       )}
       {result && (
         <div className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface p-4">
-          <p className="break-all font-mono text-sm text-white">{result}</p>
+          <p className="break-all font-mono text-sm text-fg">{result}</p>
           <button onClick={() => copy(result)} className="shrink-0 text-xs text-muted hover:text-accent-soft">
             {copied ? '✓' : 'Copy'}
           </button>
@@ -236,7 +236,7 @@ export default function EncodeDecodePage() {
         <div className="flex gap-1 rounded-xl border border-border bg-surface p-1">
           {tabs.map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${tab === t.id ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-white'}`}>
+              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${tab === t.id ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
               {t.label}
             </button>
           ))}

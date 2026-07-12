@@ -96,7 +96,7 @@ export default function MarkdownEditorPage() {
       ref={textareaRef}
       value={content}
       onChange={(e) => setContent(e.target.value)}
-      className="h-full w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-white outline-none placeholder-muted focus:border-accent"
+      className="h-full w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-fg outline-none placeholder-muted focus:border-accent"
       style={{ minHeight: '60vh' }}
     />
   )
@@ -120,7 +120,7 @@ export default function MarkdownEditorPage() {
                 item.wrap as [string, string] | undefined,
                 item.prefix
               )}
-              className="rounded-lg border border-border bg-surface px-2.5 py-1 font-mono text-xs text-muted hover:border-accent/40 hover:text-white transition-colors">
+              className="rounded-lg border border-border bg-surface px-2.5 py-1 font-mono text-xs text-muted hover:border-accent/40 hover:text-fg transition-colors">
               {item.label}
             </button>
           ))}
@@ -128,12 +128,12 @@ export default function MarkdownEditorPage() {
             <span className="self-center text-xs text-muted">{wordCount} words · auto-saved</span>
             {(['split', 'write', 'preview'] as const).map((v) => (
               <button key={v} onClick={() => setView(v)}
-                className={`rounded-lg border px-2.5 py-1 text-xs font-medium capitalize transition-colors ${view === v ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-white'}`}>
+                className={`rounded-lg border px-2.5 py-1 text-xs font-medium capitalize transition-colors ${view === v ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-fg'}`}>
                 {v}
               </button>
             ))}
             <button onClick={exportMd}
-              className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs text-muted hover:text-white transition-colors">
+              className="rounded-lg border border-border bg-surface px-2.5 py-1 text-xs text-muted hover:text-fg transition-colors">
               Export .md
             </button>
           </div>
@@ -152,7 +152,7 @@ export default function MarkdownEditorPage() {
                     ref={textareaRef}
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
-                    className="h-full w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-white outline-none placeholder-muted focus:border-accent"
+                    className="h-full w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-fg outline-none placeholder-muted focus:border-accent"
                   />
                 }
                 right={

@@ -386,7 +386,7 @@ export default function LuckyWheelPage() {
                       disabled={spinning}
                       title={lvl.desc}
                       className={`flex flex-col items-center gap-1 rounded-xl border py-2 text-xs transition-all disabled:opacity-40 ${
-                        isActive ? lvl.activeClass : 'border-border bg-background text-muted hover:text-white'
+                        isActive ? lvl.activeClass : 'border-border bg-background text-muted hover:text-fg'
                       }`}
                     >
                       <span className="text-base leading-none">{lvl.icon}</span>
@@ -430,7 +430,7 @@ export default function LuckyWheelPage() {
                 <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${removeAfterSpin ? 'translate-x-4' : 'translate-x-0.5'}`} />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-medium text-white">Xoá mục trúng sau mỗi lượt</p>
+                <p className="text-xs font-medium text-fg">Xoá mục trúng sau mỗi lượt</p>
                 <p className="truncate font-mono text-[10px] text-muted">
                   {removeAfterSpin
                     ? `Còn ${items.length} mục · mỗi lượt quay sẽ xoá winner`
@@ -443,7 +443,7 @@ export default function LuckyWheelPage() {
             <button
               onClick={spin}
               disabled={spinning || items.length < 2}
-              className="w-full rounded-2xl py-3.5 font-display text-base font-bold text-white transition-all duration-150 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-2xl py-3.5 font-display text-base font-bold text-fg transition-all duration-150 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
               style={{
                 background: 'linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%)',
                 boxShadow: spinning ? 'none' : '0 0 28px rgba(124,58,237,0.42)',
@@ -456,7 +456,7 @@ export default function LuckyWheelPage() {
             {result && !spinning && (
               <div className="w-full animate-fade-up rounded-2xl border border-accent/40 bg-accent/10 p-5 text-center">
                 <p className="mb-1 font-mono text-xs uppercase tracking-widest text-muted">Kết quả</p>
-                <p className="font-display text-2xl font-bold text-white">{result}</p>
+                <p className="font-display text-2xl font-bold text-fg">{result}</p>
                 {removeAfterSpin && (
                   <p className="mt-1 font-mono text-xs text-muted">
                     Đã xoá khỏi bánh xe · còn {items.length} mục
@@ -465,7 +465,7 @@ export default function LuckyWheelPage() {
                 <button
                   onClick={spin}
                   disabled={items.length < 2}
-                  className="mt-3 text-xs text-accent-soft underline underline-offset-2 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  className="mt-3 text-xs text-accent-soft underline underline-offset-2 transition-colors hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {items.length < 2 ? 'Hết mục để quay' : 'Quay lại'}
                 </button>
@@ -487,7 +487,7 @@ export default function LuckyWheelPage() {
                     className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
                       activePreset === i
                         ? 'border-accent/40 bg-accent/15 text-accent-soft'
-                        : 'border-border bg-background text-muted hover:border-accent/30 hover:text-white'
+                        : 'border-border bg-background text-muted hover:border-accent/30 hover:text-fg'
                     }`}
                   >
                     {p.label}
@@ -513,7 +513,7 @@ export default function LuckyWheelPage() {
                 <button
                   onClick={() => { setEditMode((v) => !v); setPasteMode(false); setBulkText('') }}
                   className={`rounded-lg border px-2.5 py-1 text-xs transition-colors ${
-                    editMode ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border text-muted hover:text-white'
+                    editMode ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border text-muted hover:text-fg'
                   }`}
                 >
                   {editMode ? '✓ Xong' : '✏️ Sửa'}
@@ -536,10 +536,10 @@ export default function LuckyWheelPage() {
                         value={item}
                         onChange={(e) => updateItem(i, e.target.value)}
                         maxLength={30}
-                        className="flex-1 rounded-md border border-border bg-background px-2 py-0.5 text-sm text-white outline-none focus:border-accent"
+                        className="flex-1 rounded-md border border-border bg-background px-2 py-0.5 text-sm text-fg outline-none focus:border-accent"
                       />
                     ) : (
-                      <span className="flex-1 text-sm text-white">{item}</span>
+                      <span className="flex-1 text-sm text-fg">{item}</span>
                     )}
                     {editMode && (
                       <button
@@ -562,7 +562,7 @@ export default function LuckyWheelPage() {
                     <button
                       onClick={() => setPasteMode(false)}
                       className={`flex-1 rounded-md py-1 text-xs font-medium transition-colors ${
-                        !pasteMode ? 'bg-surface text-white' : 'text-muted hover:text-white'
+                        !pasteMode ? 'bg-surface text-fg' : 'text-muted hover:text-fg'
                       }`}
                     >
                       Thêm từng mục
@@ -570,7 +570,7 @@ export default function LuckyWheelPage() {
                     <button
                       onClick={() => setPasteMode(true)}
                       className={`flex-1 rounded-md py-1 text-xs font-medium transition-colors ${
-                        pasteMode ? 'bg-surface text-white' : 'text-muted hover:text-white'
+                        pasteMode ? 'bg-surface text-fg' : 'text-muted hover:text-fg'
                       }`}
                     >
                       📋 Dán danh sách
@@ -586,7 +586,7 @@ export default function LuckyWheelPage() {
                         onKeyDown={(e) => e.key === 'Enter' && addItem()}
                         placeholder="Nhập lựa chọn rồi Enter..."
                         maxLength={30}
-                        className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-white placeholder-muted outline-none focus:border-accent"
+                        className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-fg placeholder-muted outline-none focus:border-accent"
                       />
                       <button
                         onClick={addItem}
@@ -606,7 +606,7 @@ export default function LuckyWheelPage() {
                         onChange={(e) => setBulkText(e.target.value)}
                         placeholder={'Dán danh sách vào đây...\nMỗi dòng = 1 lựa chọn\nHoặc phân tách bằng dấu phẩy'}
                         rows={5}
-                        className="w-full resize-none rounded-lg border border-border bg-background p-2.5 font-mono text-sm text-white placeholder-muted outline-none focus:border-accent"
+                        className="w-full resize-none rounded-lg border border-border bg-background p-2.5 font-mono text-sm text-fg placeholder-muted outline-none focus:border-accent"
                       />
                       {parsedBulk.length > 0 && (
                         <div className="flex items-center gap-2">
@@ -643,7 +643,7 @@ export default function LuckyWheelPage() {
               <div className="rounded-xl border border-border bg-surface p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <p className="font-mono text-xs uppercase tracking-widest text-muted">Lịch sử quay</p>
-                  <button onClick={() => setHistory([])} className="text-xs text-muted transition-colors hover:text-white">
+                  <button onClick={() => setHistory([])} className="text-xs text-muted transition-colors hover:text-fg">
                     Xoá
                   </button>
                 </div>
@@ -680,7 +680,7 @@ export default function LuckyWheelPage() {
               <p className="mb-2 font-mono text-xs uppercase tracking-widest text-muted">Mẹo sử dụng</p>
               <ul className="space-y-1.5 text-xs text-muted">
                 <li className="flex gap-2"><span className="text-accent-soft">→</span> Không giới hạn số lựa chọn — dán cả danh sách lớp, team, tên thoải mái</li>
-                <li className="flex gap-2"><span className="text-accent-soft">→</span> Chế độ <span className="text-white font-medium">Dán danh sách</span>: mỗi dòng 1 mục hoặc phân tách bằng dấu phẩy</li>
+                <li className="flex gap-2"><span className="text-accent-soft">→</span> Chế độ <span className="text-fg font-medium">Dán danh sách</span>: mỗi dòng 1 mục hoặc phân tách bằng dấu phẩy</li>
                 <li className="flex gap-2"><span className="text-accent-soft">→</span> Mức <span className="text-accent-soft font-medium">Cực căng 🌀</span> quay ~30 vòng, giảm tốc siêu chậm — đảm bảo hồi hộp tột độ</li>
                 <li className="flex gap-2"><span className="text-accent-soft">→</span> Bật loa để nghe tick-tick và nhạc fanfare khi kết quả hiện ra</li>
               </ul>

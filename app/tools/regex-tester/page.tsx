@@ -80,12 +80,12 @@ export default function RegexTesterPage() {
             <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-muted text-sm select-none">/</span>
             <input value={pattern} onChange={(e) => setPattern(e.target.value)}
               placeholder="pattern"
-              className={`w-full rounded-xl border bg-surface py-2.5 pl-7 pr-4 font-mono text-sm text-white outline-none transition-colors ${error ? 'border-red-500' : 'border-border focus:border-accent'}`} />
+              className={`w-full rounded-xl border bg-surface py-2.5 pl-7 pr-4 font-mono text-sm text-fg outline-none transition-colors ${error ? 'border-red-500' : 'border-border focus:border-accent'}`} />
           </div>
           <div className="flex gap-1">
             {FLAGS.map((f) => (
               <button key={f} onClick={() => toggleFlag(f)}
-                className={`h-10 w-10 rounded-xl border font-mono text-sm font-bold transition-colors ${flags.has(f) ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-white'}`}>
+                className={`h-10 w-10 rounded-xl border font-mono text-sm font-bold transition-colors ${flags.has(f) ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-surface text-muted hover:text-fg'}`}>
                 {f}
               </button>
             ))}
@@ -96,13 +96,13 @@ export default function RegexTesterPage() {
         {/* Test string */}
         <textarea value={testStr} onChange={(e) => setTestStr(e.target.value)} rows={5}
           placeholder="Enter test string..."
-          className="w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-white outline-none placeholder-muted focus:border-accent" />
+          className="w-full resize-none rounded-xl border border-border bg-surface p-4 font-mono text-sm text-fg outline-none placeholder-muted focus:border-accent" />
 
         {/* Highlighted output */}
         {testStr && (
           <div className="rounded-xl border border-border bg-surface p-4">
             <p className="mb-2 text-xs uppercase tracking-widest text-muted">Preview</p>
-            <p className="font-mono text-sm leading-relaxed text-white whitespace-pre-wrap"
+            <p className="font-mono text-sm leading-relaxed text-fg whitespace-pre-wrap"
               dangerouslySetInnerHTML={{ __html: highlighted }} />
           </div>
         )}
@@ -130,7 +130,7 @@ export default function RegexTesterPage() {
 
         {/* Cheatsheet */}
         <button onClick={() => setShowCheat((v) => !v)}
-          className="text-xs text-muted hover:text-white transition-colors">
+          className="text-xs text-muted hover:text-fg transition-colors">
           {showCheat ? '▲ Hide' : '▼ Show'} regex cheatsheet
         </button>
         {showCheat && (

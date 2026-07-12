@@ -91,7 +91,7 @@ function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
         onChange={(e) => setPassword(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') login() }}
         placeholder="Admin password"
-        className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-base text-white outline-none placeholder-muted focus:border-accent sm:text-sm"
+        className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-base text-fg outline-none placeholder-muted focus:border-accent sm:text-sm"
       />
       {error && <p className="text-center text-xs text-red-400">{error}</p>}
       <button
@@ -239,8 +239,8 @@ function AdminPanel() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
-        <p className="font-display font-semibold text-white">Quản lý phòng chat</p>
-        <button onClick={logout} className="text-xs text-muted hover:text-white">Đăng xuất</button>
+        <p className="font-display font-semibold text-fg">Quản lý phòng chat</p>
+        <button onClick={logout} className="text-xs text-muted hover:text-fg">Đăng xuất</button>
       </div>
 
       <div className="space-y-3 rounded-xl border border-border bg-surface p-4">
@@ -251,13 +251,13 @@ function AdminPanel() {
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
             inputMode="numeric"
             placeholder="PIN (4-10 số)"
-            className="w-32 rounded-lg border border-border bg-background px-3 py-2 text-base text-white outline-none placeholder-muted focus:border-accent sm:text-sm"
+            className="w-32 rounded-lg border border-border bg-background px-3 py-2 text-base text-fg outline-none placeholder-muted focus:border-accent sm:text-sm"
           />
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Tên phòng"
-            className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-base text-white outline-none placeholder-muted focus:border-accent sm:text-sm"
+            className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-base text-fg outline-none placeholder-muted focus:border-accent sm:text-sm"
           />
           <button
             onClick={create}
@@ -273,7 +273,7 @@ function AdminPanel() {
               key={t}
               onClick={() => setType(t)}
               className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                type === t ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-background text-muted hover:text-white'
+                type === t ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-background text-muted hover:text-fg'
               }`}
             >
               {t === 'group' ? 'Nhóm (bắt buộc tên)' : 'Độc thoại (không cần tên)'}
@@ -304,7 +304,7 @@ function AdminPanel() {
                 <button
                   onClick={() => iconInputRefs.current.get(r.id)?.click()}
                   title="Đổi icon phòng"
-                  className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-border bg-background text-muted hover:border-accent/50 hover:text-white"
+                  className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-border bg-background text-muted hover:border-accent/50 hover:text-fg"
                 >
                   {uploadingIconFor === r.id ? (
                     <span className="text-xs">...</span>
@@ -322,7 +322,7 @@ function AdminPanel() {
                 )}
               </div>
               <div>
-                <p className="font-medium text-white">
+                <p className="font-medium text-fg">
                   {r.name}
                   {r.type === 'solo' && (
                     <span className="ml-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-normal text-rose-400">độc thoại</span>
@@ -335,7 +335,7 @@ function AdminPanel() {
                     type="date"
                     defaultValue={r.anniversary_date ?? ''}
                     onBlur={(e) => setAnniversary(r.id, e.target.value)}
-                    className="rounded-lg border border-border bg-background px-2 py-1 text-base text-white outline-none focus:border-accent sm:text-xs"
+                    className="rounded-lg border border-border bg-background px-2 py-1 text-base text-fg outline-none focus:border-accent sm:text-xs"
                   />
                 </div>
               </div>
@@ -351,7 +351,7 @@ function AdminPanel() {
                 onBlur={(e) => saveMoodOptions(r.id, e.target.value)}
                 rows={3}
                 placeholder={'😄 Vui\n🥰 Yêu đời\n😡 Bực'}
-                className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-1.5 font-mono text-base text-white outline-none placeholder-muted focus:border-accent sm:text-xs"
+                className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-1.5 font-mono text-base text-fg outline-none placeholder-muted focus:border-accent sm:text-xs"
               />
             </div>
             <div>
@@ -360,7 +360,7 @@ function AdminPanel() {
                 defaultValue={reactionEmojisToText(r.reaction_emojis)}
                 onBlur={(e) => saveReactionEmojis(r.id, e.target.value)}
                 placeholder="❤️ 👍 😂 😮 😢 😡 🎉"
-                className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-1.5 font-mono text-base text-white outline-none placeholder-muted focus:border-accent sm:text-xs"
+                className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-1.5 font-mono text-base text-fg outline-none placeholder-muted focus:border-accent sm:text-xs"
               />
             </div>
             <div className="sm:col-span-2">
@@ -382,7 +382,7 @@ function AdminPanel() {
                         defaultValue={opt?.label ?? f.label}
                         onBlur={(e) => saveFontLabel(r, f.id, e.target.value)}
                         disabled={!enabled}
-                        className="w-24 rounded-lg border border-border bg-background px-2 py-1 text-xs text-white outline-none focus:border-accent disabled:opacity-40"
+                        className="w-24 rounded-lg border border-border bg-background px-2 py-1 text-xs text-fg outline-none focus:border-accent disabled:opacity-40"
                       />
                     </label>
                   )

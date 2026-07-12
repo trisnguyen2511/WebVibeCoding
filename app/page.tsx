@@ -2,6 +2,7 @@ import { Zap } from 'lucide-react'
 import { tools } from '@/lib/tools-registry'
 import { SearchableToolGrid } from '@/components/searchable-tool-grid'
 import { LastToolRedirect } from '@/components/last-tool-redirect'
+import { SettingsMenu } from '@/components/settings-menu'
 
 const STATS = [
   { value: String(tools.length), label: 'Tools', sub: 'and growing' },
@@ -25,29 +26,32 @@ export default function HomePage() {
       </div>
 
       {/* ── Header ───────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 border-b border-white/[0.06] bg-background/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-20 border-b border-overlay/[0.06] bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3.5">
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent shadow-[0_0_14px_rgba(124,58,237,0.55)]">
               <Zap size={13} className="text-white" fill="white" />
             </div>
-            <span className="font-display text-lg font-bold tracking-tight text-white">WebVibe</span>
+            <span className="font-display text-lg font-bold tracking-tight text-fg">WebVibe</span>
             <span className="hidden rounded-full border border-accent/20 bg-accent/[0.08] px-2 py-0.5 font-mono text-[10px] text-accent-soft sm:inline">
               tools
             </span>
           </div>
-          <span className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
-            Press{' '}
-            <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[11px] text-white/60">
-              /
-            </kbd>{' '}
-            to search
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
+              Press{' '}
+              <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[11px] text-fg/60">
+                /
+              </kbd>{' '}
+              to search
+            </span>
+            <SettingsMenu />
+          </div>
         </div>
       </header>
 
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="relative border-b border-white/[0.05] pb-14 pt-16 sm:pb-16 sm:pt-20">
+      <section className="relative border-b border-overlay/[0.05] pb-14 pt-16 sm:pb-16 sm:pt-20">
         <div className="mx-auto max-w-5xl px-6">
 
           {/* Badge */}
@@ -57,9 +61,9 @@ export default function HomePage() {
           </div>
 
           {/* Headline */}
-          <h1 className="mb-5 max-w-2xl font-display text-[2.6rem] font-bold leading-[1.06] tracking-tight text-white sm:text-5xl lg:text-[3.75rem]">
+          <h1 className="mb-5 max-w-2xl font-display text-[2.6rem] font-bold leading-[1.06] tracking-tight text-fg sm:text-5xl lg:text-[3.75rem]">
             Every tool you{' '}
-            <span className="bg-gradient-to-r from-accent-soft via-white to-white bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-accent-soft via-fg to-fg bg-clip-text text-transparent">
               actually need
             </span>
           </h1>
@@ -74,7 +78,7 @@ export default function HomePage() {
             {CHIPS.map((chip) => (
               <span
                 key={chip}
-                className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3.5 py-1.5 text-xs text-white/60 backdrop-blur-sm"
+                className="flex items-center gap-2 rounded-full border border-overlay/[0.08] bg-overlay/[0.04] px-3.5 py-1.5 text-xs text-fg/60 backdrop-blur-sm"
               >
                 <span className="h-[5px] w-[5px] rounded-full bg-accent-soft/70" />
                 {chip}
@@ -85,19 +89,19 @@ export default function HomePage() {
       </section>
 
       {/* ── Stats bento ──────────────────────────────────────── */}
-      <section className="border-b border-white/[0.05]">
+      <section className="border-b border-overlay/[0.05]">
         <div className="mx-auto max-w-5xl px-6 py-8">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {STATS.map((s) => (
               <div
                 key={s.label}
-                className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.03] p-5 backdrop-blur-sm transition-all duration-300 hover:border-accent/25 hover:bg-white/[0.05] hover:shadow-[0_0_24px_rgba(124,58,237,0.08)]"
+                className="group relative overflow-hidden rounded-2xl border border-overlay/[0.07] bg-overlay/[0.03] p-5 backdrop-blur-sm transition-all duration-300 hover:border-accent/25 hover:bg-overlay/[0.05] hover:shadow-[0_0_24px_rgba(124,58,237,0.08)]"
               >
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/[0.05] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                <p className="font-display text-3xl font-bold tracking-tight text-white sm:text-[2.25rem]">
+                <p className="font-display text-3xl font-bold tracking-tight text-fg sm:text-[2.25rem]">
                   {s.value}
                 </p>
-                <p className="mt-1 text-sm font-semibold text-white/80">{s.label}</p>
+                <p className="mt-1 text-sm font-semibold text-fg/80">{s.label}</p>
                 <p className="mt-0.5 text-xs leading-snug text-muted">{s.sub}</p>
               </div>
             ))}
@@ -109,7 +113,7 @@ export default function HomePage() {
       <main className="mx-auto max-w-5xl px-6 pb-24 pt-10">
         <div className="mb-7 flex items-end justify-between">
           <div>
-            <h2 className="font-display text-xl font-semibold text-white">Browse tools</h2>
+            <h2 className="font-display text-xl font-semibold text-fg">Browse tools</h2>
             <p className="mt-0.5 text-sm text-muted">
               {tools.length} tools · search or filter by category
             </p>
@@ -123,7 +127,7 @@ export default function HomePage() {
       </main>
 
       {/* ── Footer ───────────────────────────────────────────── */}
-      <footer className="border-t border-white/[0.05]">
+      <footer className="border-t border-overlay/[0.05]">
         <div className="mx-auto max-w-5xl px-6 py-5">
           <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
             <p className="font-mono text-[11px] text-muted">
@@ -135,7 +139,7 @@ export default function HomePage() {
                 href="https://trisnguyen2511.github.io/CVHTML/Index/index.html"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-accent-soft transition-colors hover:text-white"
+                className="text-accent-soft transition-colors hover:text-fg"
               >
                 Tris
               </a>

@@ -4,6 +4,7 @@ import { Inter, Space_Grotesk, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import { CommandPalette } from '@/components/command-palette'
 import { RegisterServiceWorker } from '@/components/register-service-worker'
+import { ThemeProvider } from '@/components/theme-provider'
 import { Agentation } from 'agentation'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
@@ -41,12 +42,14 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
-        <RegisterServiceWorker />
-        <CommandPalette />
-        {children}
-        {process.env.NEXT_PUBLIC_ENABLE_AGENTATION === 'true' && <Agentation />}
+        <ThemeProvider>
+          <RegisterServiceWorker />
+          <CommandPalette />
+          {children}
+          {process.env.NEXT_PUBLIC_ENABLE_AGENTATION === 'true' && <Agentation />}
+        </ThemeProvider>
       </body>
     </html>
   )
