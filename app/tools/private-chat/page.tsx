@@ -7,13 +7,17 @@ import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { CHAT_MAX_FILE_SIZE_BYTES, CHAT_MAX_FILE_SIZE_MB, CHAT_OVERSIZE_DISMISS_DAYS } from '@/lib/chat-limits'
 import { loadCachedMessages, saveCachedMessages } from '@/lib/chat-cache'
 import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, FONT_CATALOG, type MoodOption, type FontId, type FontOption } from '@/lib/chat-defaults'
-import { Dancing_Script, Baloo_2, Noto_Serif } from 'next/font/google'
+import { Dancing_Script, Baloo_2, Noto_Serif, Pacifico, Anton, Mali, Lobster } from 'next/font/google'
 
 // Scoped to this page only (not the global layout) so other tools' bundles
-// stay untouched. All three support the Vietnamese subset.
+// stay untouched. All support the Vietnamese subset.
 const dancingScript = Dancing_Script({ subsets: ['vietnamese', 'latin'], weight: '700', variable: '--font-dancing-script' })
 const baloo2 = Baloo_2({ subsets: ['vietnamese', 'latin'], weight: '600', variable: '--font-baloo-2' })
 const notoSerif = Noto_Serif({ subsets: ['vietnamese', 'latin'], weight: ['400', '700'], variable: '--font-noto-serif' })
+const pacifico = Pacifico({ subsets: ['vietnamese', 'latin'], weight: '400', variable: '--font-pacifico' })
+const anton = Anton({ subsets: ['vietnamese', 'latin'], weight: '400', variable: '--font-anton' })
+const mali = Mali({ subsets: ['vietnamese', 'latin'], weight: '600', variable: '--font-mali' })
+const lobster = Lobster({ subsets: ['vietnamese', 'latin'], weight: '400', variable: '--font-lobster' })
 
 const OVERSIZE_DISMISS_KEY = 'wv-chat-oversize-dismissed-at'
 
@@ -97,6 +101,14 @@ function fontStyleFor(font?: string | null): React.CSSProperties {
       return { fontFamily: 'var(--font-baloo-2), sans-serif' }
     case 'serif':
       return { fontFamily: 'var(--font-noto-serif), serif' }
+    case 'script':
+      return { fontFamily: 'var(--font-pacifico), cursive' }
+    case 'impact':
+      return { fontFamily: 'var(--font-anton), sans-serif' }
+    case 'cute':
+      return { fontFamily: 'var(--font-mali), sans-serif' }
+    case 'funky':
+      return { fontFamily: 'var(--font-lobster), cursive' }
     default:
       return {}
   }
@@ -1802,7 +1814,9 @@ export default function PrivateChatPage() {
 
   return (
     <ToolShell name="Private Chat" icon="💬" description="Đoạn chat riêng tư bằng mã PIN" fullBleed>
-      <div className={`contents ${dancingScript.variable} ${baloo2.variable} ${notoSerif.variable}`}>
+      <div
+        className={`contents ${dancingScript.variable} ${baloo2.variable} ${notoSerif.variable} ${pacifico.variable} ${anton.variable} ${mali.variable} ${lobster.variable}`}
+      >
         {session === undefined ? null : session ? (
           <ChatScreen session={session} onLeave={() => setSession(null)} />
         ) : (
