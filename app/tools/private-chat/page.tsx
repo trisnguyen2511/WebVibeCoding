@@ -515,6 +515,29 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [newMessageCount, setNewMessageCount] = useState(0)
   const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null)
 
+  // Closes any open popover (tools menu + its style/capsule/gesture panels,
+  // mood picker, per-message reaction/actions) when tapping/clicking outside
+  // it — elements belonging to a popover are tagged with
+  // data-popover-group so clicks inside them don't close their own group.
+  useEffect(() => {
+    const handler = (e: PointerEvent) => {
+      const target = e.target as Element
+      if (!target.closest('[data-popover-group="tools"]')) {
+        setShowToolsMenu(false)
+        setShowStylePicker(false)
+        setShowCapsulePicker(false)
+        setShowGesturePicker(false)
+      }
+      if (!target.closest('[data-popover-group="mood"]')) setShowMoodPicker(false)
+      if (!target.closest('[data-popover-group="actions"]')) {
+        setReactionPickerFor(null)
+        setActiveActionsFor(null)
+      }
+    }
+    document.addEventListener('pointerdown', handler)
+    return () => document.removeEventListener('pointerdown', handler)
+  }, [])
+
   const deviceId = useRef(getDeviceId())
   const nearBottomRef = useRef(true)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -1195,6 +1218,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             </span>
           )}
           <button
+            data-popover-group="mood"
             onClick={() => setShowMoodPicker((v) => !v)}
             title="Trạng thái cảm xúc"
             className={`flex h-9 w-9 items-center justify-center rounded-xl text-lg transition-all hover:scale-110 ${
@@ -1215,7 +1239,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Mood picker ─────────────────────────────────────────── */}
       {showMoodPicker && (
-        <div className="mb-2 flex flex-wrap gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
+        <div data-popover-group="mood" className="mb-2 flex flex-wrap gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
           {moodOptions.map((m) => (
             <button
               key={m.id}
@@ -1364,6 +1388,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       onReply={() => setReplyingTo({ id: m.id, nickname: m.nickname, preview: m.content ?? '[Hình ảnh]' })}
                     >
                     <div
+                      data-popover-group="actions"
                       onClick={() => setActiveActionsFor((id) => (id === m.id ? null : m.id))}
                       className={`flex flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'} ${m.pending || m.failed ? 'opacity-50' : ''} transition-opacity`}
                     >
@@ -1597,7 +1622,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Time capsule picker ─────────────────────────────────── */}
       {showCapsulePicker && (
-        <div className="mt-2 flex items-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
+        <div data-popover-group="tools" className="mt-2 flex items-center gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
           <Clock size={14} className="shrink-0 text-accent-soft" />
           <span className="text-xs text-muted">Mở lúc</span>
           <input
@@ -1617,7 +1642,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Gesture picker ──────────────────────────────────────── */}
       {showGesturePicker && (
-        <div className="mt-2 grid grid-cols-4 gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
+        <div data-popover-group="tools" className="mt-2 grid grid-cols-4 gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
           {GESTURE_OPTIONS.map((g) => (
             <button
               key={g.id}
@@ -1633,7 +1658,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Style picker ────────────────────────────────────────── */}
       {showStylePicker && (
-        <div className="mt-2 space-y-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 backdrop-blur-xl animate-panel-in">
+        <div data-popover-group="tools" className="mt-2 space-y-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 backdrop-blur-xl animate-panel-in">
           <div className="flex items-center gap-3">
             <span className="w-16 shrink-0 text-xs text-muted">Màu chữ</span>
             <div className="flex flex-wrap gap-2">
@@ -1705,7 +1730,18 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         <input ref={attachmentInputRef} type="file" onChange={onAttachmentSelected} className="hidden" />
 
         <button
-          onClick={() => setShowToolsMenu((v) => !v)}
+          data-popover-group="tools"
+          onClick={() => {
+            const anyOpen = showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker
+            if (anyOpen) {
+              setShowToolsMenu(false)
+              setShowStylePicker(false)
+              setShowCapsulePicker(false)
+              setShowGesturePicker(false)
+            } else {
+              setShowToolsMenu(true)
+            }
+          }}
           title="Thêm"
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all ${
             showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker
@@ -1717,7 +1753,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         </button>
 
         {showToolsMenu && (
-          <div className="absolute bottom-full left-0 mb-2 flex animate-panel-in gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.06] p-2 shadow-2xl backdrop-blur-xl">
+          <div data-popover-group="tools" className="absolute bottom-full left-0 mb-2 flex animate-panel-in gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.06] p-2 shadow-2xl backdrop-blur-xl">
             <button
               onClick={() => { pickMedia(); setShowToolsMenu(false) }}
               title="Gửi ảnh/video"
