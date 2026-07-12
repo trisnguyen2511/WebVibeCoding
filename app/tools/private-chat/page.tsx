@@ -458,6 +458,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [pinnedMessage, setPinnedMessage] = useState<PinnedMessage | null>(null)
   const [seenMap, setSeenMap] = useState<Map<string, string>>(new Map())
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null)
+  const [activeActionsFor, setActiveActionsFor] = useState<string | null>(null)
   const [showCapsulePicker, setShowCapsulePicker] = useState(false)
   const [capsuleAt, setCapsuleAt] = useState('')
   const [ownMood, setOwnMood] = useState<string | null>(null)
@@ -1294,7 +1295,10 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       disabled={m.locked}
                       onReply={() => setReplyingTo({ id: m.id, nickname: m.nickname, preview: m.content ?? '[Hình ảnh]' })}
                     >
-                    <div className={`flex flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'} ${m.pending || m.failed ? 'opacity-50' : ''} transition-opacity`}>
+                    <div
+                      onClick={() => setActiveActionsFor((id) => (id === m.id ? null : m.id))}
+                      className={`flex flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'} ${m.pending || m.failed ? 'opacity-50' : ''} transition-opacity`}
+                    >
                       {m.locked ? (
                         <span className={`${bubbleMaxWidth} flex items-center gap-2 rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-muted`}>
                           <Lock size={13} className="shrink-0" />
@@ -1370,28 +1374,41 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       </div>
                     )}
 
-                    <div className={`mt-1 hidden items-center gap-1 group-hover:flex ${isJournal ? 'pl-4' : ''}`}>
+                    <div
+                      className={`mt-1.5 flex items-center gap-0.5 rounded-full border border-white/[0.08] bg-white/[0.05] p-1 backdrop-blur-sm transition-all duration-150 ease-out ${isJournal ? 'ml-4' : ''} ${
+                        activeActionsFor === m.id
+                          ? 'translate-y-0 opacity-100'
+                          : 'pointer-events-none -translate-y-1 opacity-0 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100'
+                      }`}
+                    >
                       <button
+                        title="Thả cảm xúc"
                         onClick={() => setReactionPickerFor(reactionPickerFor === m.id ? null : m.id)}
-                        className="flex h-6 w-6 items-center justify-center rounded-lg text-muted transition-all hover:bg-white/[0.07] hover:text-white"
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-white/[0.08] hover:text-white"
                       >
-                        <SmilePlus size={11} />
+                        <SmilePlus size={13} />
                       </button>
                       {!m.locked && (
                         <button
-                          onClick={() => setReplyingTo({ id: m.id, nickname: m.nickname, preview: m.content ?? '[Hình ảnh]' })}
-                          className="flex h-6 items-center gap-1 rounded-lg px-1.5 text-[10px] text-muted transition-all hover:bg-white/[0.07] hover:text-white"
+                          title="Trả lời"
+                          onClick={() => {
+                            setReplyingTo({ id: m.id, nickname: m.nickname, preview: m.content ?? '[Hình ảnh]' })
+                            setActiveActionsFor(null)
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-white/[0.08] hover:text-white"
                         >
-                          <Reply size={10} />
-                          Trả lời
+                          <Reply size={13} />
                         </button>
                       )}
                       <button
-                        onClick={() => pinMessage(m.id)}
-                        className="flex h-6 items-center gap-1 rounded-lg px-1.5 text-[10px] text-muted transition-all hover:bg-white/[0.07] hover:text-white"
+                        title="Ghim"
+                        onClick={() => {
+                          pinMessage(m.id)
+                          setActiveActionsFor(null)
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-white/[0.08] hover:text-white"
                       >
-                        <Pin size={10} />
-                        Ghim
+                        <Pin size={13} />
                       </button>
                     </div>
 
