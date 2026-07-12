@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { ToolShell } from '@/components/tool-shell'
 import { compressImageToDataUrl } from '@/lib/compress-image'
 
+type MoodOption = { id: string; emoji: string; label: string; color: string }
+
 type Room = {
   id: string
   pin: string
@@ -10,8 +12,42 @@ type Room = {
   type: 'group' | 'solo'
   anniversary_date: string | null
   icon_url: string | null
+  mood_options: MoodOption[] | null
+  reaction_emojis: string[] | null
   created_at: string
   deviceCount: number
+}
+
+// Custom mood options are entered as one "emoji label" pair per line — the
+// color is auto-assigned from a fixed palette so the admin doesn't have to
+// pick hex codes for something this small.
+const MOOD_COLOR_PALETTE = ['#FBBF24', '#F472B6', '#34D399', '#60A5FA', '#818CF8', '#F87171', '#A78BFA', '#FCA5A5']
+
+function parseMoodOptionsInput(text: string): MoodOption[] {
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+  const seen = new Set<string>()
+  return lines.map((line, i) => {
+    const spaceIdx = line.indexOf(' ')
+    const emoji = spaceIdx === -1 ? line : line.slice(0, spaceIdx)
+    const label = spaceIdx === -1 ? line : line.slice(spaceIdx + 1).trim()
+    let id = (label || emoji)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || `mood-${i}`
+    while (seen.has(id)) id = `${id}-${i}`
+    seen.add(id)
+    return { id, emoji, label: label || emoji, color: MOOD_COLOR_PALETTE[i % MOOD_COLOR_PALETTE.length] }
+  })
+}
+
+function moodOptionsToText(options: MoodOption[] | null): string {
+  return (options ?? []).map((m) => `${m.emoji} ${m.label}`).join('\n')
+}
+
+function parseReactionInput(text: string): string[] {
+  return text.split(/\s+/).map((s) => s.trim()).filter(Boolean)
 }
 
 function LoginScreen({ onLoggedIn }: { onLoggedIn: () => void }) {
@@ -138,6 +174,26 @@ function AdminPanel() {
     load()
   }
 
+  const saveMoodOptions = async (id: string, text: string) => {
+    const parsed = parseMoodOptionsInput(text)
+    await fetch(`/api/chat/admin/rooms?id=${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ moodOptions: parsed.length > 0 ? parsed : null }),
+    })
+    load()
+  }
+
+  const saveReactionEmojis = async (id: string, text: string) => {
+    const parsed = parseReactionInput(text)
+    await fetch(`/api/chat/admin/rooms?id=${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reactionEmojis: parsed.length > 0 ? parsed : null }),
+    })
+    load()
+  }
+
   const logout = async () => {
     await fetch('/api/chat/admin/logout', { method: 'POST' })
     window.location.reload()
@@ -193,7 +249,8 @@ function AdminPanel() {
       <div className="space-y-2">
         {rooms.length === 0 && <p className="text-center text-sm text-muted">Chưa có phòng nào</p>}
         {rooms.map((r) => (
-          <div key={r.id} className="flex items-start justify-between rounded-xl border border-border bg-surface p-4">
+          <div key={r.id} className="space-y-3 rounded-xl border border-border bg-surface p-4">
+          <div className="flex items-start justify-between">
             <div className="flex items-start gap-3">
               <div className="shrink-0">
                 <input
@@ -247,6 +304,29 @@ function AdminPanel() {
               </div>
             </div>
             <button onClick={() => remove(r.id)} className="text-xs text-red-400 hover:text-red-300">Xóa</button>
+          </div>
+
+          <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
+            <div>
+              <span className="text-xs text-muted">😄 Trạng thái cảm xúc (mỗi dòng: emoji + tên, để trống = mặc định)</span>
+              <textarea
+                defaultValue={moodOptionsToText(r.mood_options)}
+                onBlur={(e) => saveMoodOptions(r.id, e.target.value)}
+                rows={3}
+                placeholder={'😄 Vui\n🥰 Yêu đời\n😡 Bực'}
+                className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-1.5 font-mono text-base text-white outline-none placeholder-muted focus:border-accent sm:text-xs"
+              />
+            </div>
+            <div>
+              <span className="text-xs text-muted">👍 Emoji react nhanh (cách nhau bằng khoảng trắng, để trống = mặc định)</span>
+              <input
+                defaultValue={(r.reaction_emojis ?? []).join(' ')}
+                onBlur={(e) => saveReactionEmojis(r.id, e.target.value)}
+                placeholder="❤️ 👍 😂 😮 😢 😡 🎉"
+                className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-1.5 font-mono text-base text-white outline-none placeholder-muted focus:border-accent sm:text-xs"
+              />
+            </div>
+          </div>
           </div>
         ))}
       </div>

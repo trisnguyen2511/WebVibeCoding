@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { data: rooms, error } = await supabase
     .from('chat_rooms')
-    .select('id, pin, name, type, anniversary_date, icon_url, created_at')
+    .select('id, pin, name, type, anniversary_date, icon_url, mood_options, reaction_emojis, created_at')
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -66,17 +66,36 @@ export async function PATCH(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'invalid request body' }, { status: 400 })
   }
-  const { anniversaryDate, iconDataUrl, removeIcon } = body as {
+  const { anniversaryDate, iconDataUrl, removeIcon, moodOptions, reactionEmojis } = body as {
     anniversaryDate?: string | null
     iconDataUrl?: string
     removeIcon?: boolean
+    moodOptions?: { id: string; emoji: string; label: string; color: string }[] | null
+    reactionEmojis?: string[] | null
   }
 
   const supabase = getSupabaseAdmin()
-  const update: { anniversary_date?: string | null; icon_url?: string | null; icon_public_id?: string | null } = {}
+  const update: {
+    anniversary_date?: string | null
+    icon_url?: string | null
+    icon_public_id?: string | null
+    mood_options?: { id: string; emoji: string; label: string; color: string }[] | null
+    reaction_emojis?: string[] | null
+  } = {}
 
   if (anniversaryDate !== undefined) {
     update.anniversary_date = anniversaryDate || null
+  }
+
+  if (moodOptions !== undefined) {
+    update.mood_options =
+      moodOptions && moodOptions.length > 0
+        ? moodOptions.filter((m) => m.id && m.emoji && m.label && m.color)
+        : null
+  }
+
+  if (reactionEmojis !== undefined) {
+    update.reaction_emojis = reactionEmojis && reactionEmojis.length > 0 ? reactionEmojis.filter(Boolean) : null
   }
 
   if (iconDataUrl || removeIcon) {

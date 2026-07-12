@@ -25,6 +25,8 @@ type Session = {
   roomType: 'group' | 'solo'
   anniversaryDate?: string | null
   roomIconUrl?: string | null
+  moodOptions?: MoodOption[] | null
+  reactionEmojis?: string[] | null
 }
 
 type Reaction = { device_id: string; emoji: string }
@@ -70,15 +72,19 @@ const FONT_OPTIONS: { id: FontId; label: string; style: React.CSSProperties }[] 
   { id: 'cursive', label: 'Viết tay', style: { fontFamily: 'cursive' } },
 ]
 
-const REACTION_EMOJIS = ['❤️', '👍', '😂', '😮', '😢', '🎉']
+type MoodOption = { id: string; emoji: string; label: string; color: string }
 
-const MOOD_OPTIONS: { id: string; emoji: string; label: string; color: string }[] = [
+// Fallback sets used when a room hasn't customized its own (admin panel can
+// override both per room).
+const DEFAULT_REACTION_EMOJIS = ['❤️', '👍', '😂', '😮', '😢', '😡', '🎉']
+
+const DEFAULT_MOOD_OPTIONS: MoodOption[] = [
   { id: 'happy', emoji: '😄', label: 'Vui', color: '#FBBF24' },
   { id: 'love', emoji: '🥰', label: 'Yêu đời', color: '#F472B6' },
   { id: 'calm', emoji: '😌', label: 'Bình yên', color: '#34D399' },
   { id: 'tired', emoji: '😴', label: 'Mệt', color: '#60A5FA' },
   { id: 'sad', emoji: '😢', label: 'Buồn', color: '#818CF8' },
-  { id: 'angry', emoji: '😤', label: 'Bực', color: '#F87171' },
+  { id: 'angry', emoji: '😡', label: 'Bực', color: '#F87171' },
 ]
 
 const GESTURE_OPTIONS: { id: string; emoji: string; label: string }[] = [
@@ -255,6 +261,8 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         roomType: data.roomType === 'solo' ? 'solo' : 'group',
         anniversaryDate: data.anniversaryDate ?? null,
         roomIconUrl: data.roomIconUrl ?? null,
+        moodOptions: data.moodOptions ?? null,
+        reactionEmojis: data.reactionEmojis ?? null,
       }
       localStorage.setItem(SESSION_KEY, JSON.stringify(session))
       onJoined(session)
@@ -392,6 +400,9 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
 }
 
 function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => void }) {
+  const moodOptions = session.moodOptions && session.moodOptions.length > 0 ? session.moodOptions : DEFAULT_MOOD_OPTIONS
+  const reactionEmojis = session.reactionEmojis && session.reactionEmojis.length > 0 ? session.reactionEmojis : DEFAULT_REACTION_EMOJIS
+
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [hasMore, setHasMore] = useState(false)
@@ -970,7 +981,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     onLeave()
   }
 
-  const otherMoodColor = MOOD_OPTIONS.find((m) => m.id === otherMood)?.color
+  const otherMoodColor = moodOptions.find((m) => m.id === otherMood)?.color
   const showSeenIndicator = session.roomType !== 'solo'
   const lastMineId = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -1033,10 +1044,10 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         <div className="flex shrink-0 items-center gap-1">
           {otherMood && (
             <span
-              title={`Đối phương đang: ${MOOD_OPTIONS.find((m) => m.id === otherMood)?.label ?? ''}`}
+              title={`Đối phương đang: ${moodOptions.find((m) => m.id === otherMood)?.label ?? ''}`}
               className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-lg"
             >
-              {MOOD_OPTIONS.find((m) => m.id === otherMood)?.emoji}
+              {moodOptions.find((m) => m.id === otherMood)?.emoji}
             </span>
           )}
           <button
@@ -1046,7 +1057,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               showMoodPicker ? 'border border-accent/30 bg-accent/[0.12]' : 'hover:bg-white/[0.06]'
             }`}
           >
-            {MOOD_OPTIONS.find((m) => m.id === ownMood)?.emoji ?? '🙂'}
+            {moodOptions.find((m) => m.id === ownMood)?.emoji ?? '🙂'}
           </button>
           <button
             onClick={leave}
@@ -1061,7 +1072,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       {/* ── Mood picker ─────────────────────────────────────────── */}
       {showMoodPicker && (
         <div className="mb-2 flex flex-wrap gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 backdrop-blur-xl animate-panel-in">
-          {MOOD_OPTIONS.map((m) => (
+          {moodOptions.map((m) => (
             <button
               key={m.id}
               onClick={() => changeMood(ownMood === m.id ? null : m.id)}
@@ -1287,7 +1298,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
                     {reactionPickerFor === m.id && (
                       <div className={`mt-1.5 flex animate-panel-in gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.06] px-3 py-2 shadow-xl backdrop-blur-xl ${isJournal ? 'ml-4' : ''}`}>
-                        {REACTION_EMOJIS.map((emoji) => (
+                        {reactionEmojis.map((emoji) => (
                           <button
                             key={emoji}
                             onClick={() => toggleReaction(m.id, emoji)}
