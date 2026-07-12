@@ -487,8 +487,14 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return
-        setOwnMood(data.ownMood ?? null)
-        setOtherMood(data.otherMood ?? null)
+        if (session.roomType === 'solo') {
+          // Solo rooms are one person across possibly several devices — there
+          // is no "yours vs theirs", just one shared mood.
+          setOwnMood(data.ownMood ?? data.otherMood ?? null)
+        } else {
+          setOwnMood(data.ownMood ?? null)
+          setOtherMood(data.otherMood ?? null)
+        }
       })
     return () => { cancelled = true }
   }, [session.roomId, markSeen])
@@ -643,7 +649,8 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     channel.on('broadcast', { event: 'mood' }, (payload) => {
       const { deviceId: fromDeviceId, mood } = payload.payload as { deviceId: string; mood: string | null }
       if (fromDeviceId === deviceId.current) return
-      setOtherMood(mood)
+      if (session.roomType === 'solo') setOwnMood(mood)
+      else setOtherMood(mood)
     })
     channel.subscribe()
     channelRef.current = channel
