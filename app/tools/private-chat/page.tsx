@@ -446,6 +446,14 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const moodOptions = session.moodOptions && session.moodOptions.length > 0 ? session.moodOptions : DEFAULT_MOOD_OPTIONS
   const reactionEmojis = session.reactionEmojis && session.reactionEmojis.length > 0 ? session.reactionEmojis : DEFAULT_REACTION_EMOJIS
 
+  // A locally-cached session (from an older app version, or corrupted) can
+  // have a stale/wrong roomType — the mood endpoint always returns the
+  // server's actual room type, which corrects this in-memory and in the
+  // cached session going forward.
+  const [roomType, setRoomType] = useState(session.roomType)
+  const roomTypeRef = useRef(roomType)
+  useEffect(() => { roomTypeRef.current = roomType }, [roomType])
+
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [hasMore, setHasMore] = useState(false)
@@ -545,7 +553,17 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return
-        if (session.roomType === 'solo') {
+        const serverRoomType: 'group' | 'solo' = data.roomType === 'solo' ? 'solo' : 'group'
+        if (serverRoomType !== roomType) {
+          setRoomType(serverRoomType)
+          try {
+            const raw = localStorage.getItem(SESSION_KEY)
+            if (raw) localStorage.setItem(SESSION_KEY, JSON.stringify({ ...JSON.parse(raw), roomType: serverRoomType }))
+          } catch {
+            // best-effort cache fixup — not worth failing the mood load over
+          }
+        }
+        if (serverRoomType === 'solo') {
           // Solo rooms are one person across possibly several devices — there
           // is no "yours vs theirs", just one shared mood.
           setOwnMood(data.ownMood ?? data.otherMood ?? null)
@@ -740,7 +758,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     channel.on('broadcast', { event: 'mood' }, (payload) => {
       const { deviceId: fromDeviceId, mood } = payload.payload as { deviceId: string; mood: string | null }
       if (fromDeviceId === deviceId.current) return
-      if (session.roomType === 'solo') setOwnMood(mood)
+      if (roomTypeRef.current === 'solo') setOwnMood(mood)
       else setOtherMood(mood)
     })
     channel.subscribe()
@@ -1077,7 +1095,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   }
 
   const otherMoodColor = moodOptions.find((m) => m.id === otherMood)?.color
-  const showSeenIndicator = session.roomType !== 'solo'
+  const showSeenIndicator = roomType !== 'solo'
   const lastMineId = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].device_id === deviceId.current) return messages[i].id
@@ -1120,7 +1138,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           {session.roomIconUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={session.roomIconUrl} alt="" className="h-full w-full object-cover" />
-          ) : session.roomType === 'solo' ? (
+          ) : roomType === 'solo' ? (
             <BookOpen size={17} className="text-accent-soft" />
           ) : (
             <MessageCircle size={17} className="text-accent-soft" />
@@ -1133,7 +1151,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               💞 Yêu nhau được {daysSince(session.anniversaryDate)} ngày
             </p>
           ) : (
-            <p className="mt-0.5 text-xs text-muted">{session.roomType === 'solo' ? 'Độc thoại' : 'Nhóm'}</p>
+            <p className="mt-0.5 text-xs text-muted">{roomType === 'solo' ? 'Độc thoại' : 'Nhóm'}</p>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -1246,7 +1264,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             )}
             {messages.map((m, i) => {
               const prev = messages[i - 1]
-              const showDayDivider = session.roomType === 'solo' && (!prev || formatDayLabel(prev.created_at) !== formatDayLabel(m.created_at))
+              const showDayDivider = roomType === 'solo' && (!prev || formatDayLabel(prev.created_at) !== formatDayLabel(m.created_at))
 
               if (m.device_id === 'system') {
                 return (
@@ -1267,7 +1285,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                 )
               }
 
-              const isJournal = session.roomType === 'solo'
+              const isJournal = roomType === 'solo'
               const mine = !isJournal && m.device_id === deviceId.current
               const reactions = m.chat_message_reactions ?? []
               const reactionGroups = new Map<string, number>()
