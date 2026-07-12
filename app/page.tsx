@@ -1,6 +1,7 @@
 import { Zap } from 'lucide-react'
 import { tools } from '@/lib/tools-registry'
 import { SearchableToolGrid } from '@/components/searchable-tool-grid'
+import { LastToolRedirect } from '@/components/last-tool-redirect'
 
 const STATS = [
   { value: String(tools.length), label: 'Tools', sub: 'and growing' },
@@ -14,6 +15,7 @@ const CHIPS = ['No account needed', 'Runs locally', 'Zero tracking']
 export default function HomePage() {
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background">
+      <LastToolRedirect />
 
       {/* ── Ambient blobs ────────────────────────────────────── */}
       <div aria-hidden className="pointer-events-none fixed inset-0 select-none overflow-hidden">
