@@ -1891,6 +1891,7 @@ function ChatScreen({
                     )}
 
                     <div
+                      data-popover-group="actions"
                       className={`overflow-hidden transition-all duration-200 ease-out ${
                         activeActionsFor === m.id ? 'mt-1.5 max-h-10' : 'mt-0 max-h-0 group-hover:mt-1.5 group-hover:max-h-10'
                       }`}
@@ -1933,7 +1934,10 @@ function ChatScreen({
                     </div>
 
                     {reactionPickerFor === m.id && (
-                      <div className={`mt-1.5 flex animate-panel-in gap-1.5 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.06] px-3 py-2 shadow-xl backdrop-blur-xl ${isJournal ? 'ml-4' : ''}`}>
+                      <div
+                        data-popover-group="actions"
+                        className={`mt-1.5 flex animate-panel-in gap-1.5 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.06] px-3 py-2 shadow-xl backdrop-blur-xl ${isJournal ? 'ml-4' : ''}`}
+                      >
                         {reactionEmojis.map((emoji) => (
                           <button
                             key={emoji}
