@@ -21,9 +21,26 @@ interface ToolShellProps {
    * app-like frame instead of a normal scrolling page.
    */
   fullBleed?: boolean
+  /**
+   * Optional inline background override for the outer page frame (e.g. a
+   * theme-derived gradient). Painted on top of the default `bg-background`
+   * class, which still shows through any transparent gradient stops.
+   */
+  backgroundStyle?: React.CSSProperties
+  /** Extra class names appended to the outer frame's animation/utility classes. */
+  backgroundClassName?: string
 }
 
-export function ToolShell({ name, icon, description, children, wide = false, fullBleed = false }: ToolShellProps) {
+export function ToolShell({
+  name,
+  icon,
+  description,
+  children,
+  wide = false,
+  fullBleed = false,
+  backgroundStyle,
+  backgroundClassName,
+}: ToolShellProps) {
   const maxW = wide ? 'max-w-6xl' : 'max-w-4xl'
   const pathname = usePathname()
 
@@ -33,8 +50,8 @@ export function ToolShell({ name, icon, description, children, wide = false, ful
 
   return (
     <div
-      className={fullBleed ? 'flex h-dvh flex-col overflow-hidden bg-background' : 'min-h-screen bg-background'}
-      style={fullBleed ? { overscrollBehavior: 'none' } : undefined}
+      className={`${fullBleed ? 'flex h-dvh flex-col overflow-hidden bg-background' : 'min-h-screen bg-background'} ${backgroundClassName ?? ''}`}
+      style={{ ...(fullBleed ? { overscrollBehavior: 'none' } : undefined), ...backgroundStyle }}
     >
       <header className="sticky top-0 z-20 shrink-0 border-b border-border bg-background/85 backdrop-blur-md">
         <div className={`mx-auto flex ${maxW} items-center gap-3 px-4 py-2.5`}>
