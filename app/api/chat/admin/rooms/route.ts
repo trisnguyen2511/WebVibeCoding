@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { data: rooms, error } = await supabase
     .from('chat_rooms')
-    .select('id, pin, name, type, anniversary_date, icon_url, mood_options, reaction_emojis, font_options, wallpaper_preset, wallpaper_url, created_at')
+    .select('id, pin, name, type, anniversary_date, icon_url, mood_options, reaction_emojis, font_options, wallpaper_preset, wallpaper_url, bubble_mine_color, bubble_other_color, created_at')
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -78,6 +78,8 @@ export async function PATCH(req: NextRequest) {
     wallpaperPreset,
     wallpaperDataUrl,
     removeWallpaperImage,
+    bubbleMineColor,
+    bubbleOtherColor,
   } = body as {
     name?: string
     anniversaryDate?: string | null
@@ -89,7 +91,11 @@ export async function PATCH(req: NextRequest) {
     wallpaperPreset?: string | null
     wallpaperDataUrl?: string
     removeWallpaperImage?: boolean
+    bubbleMineColor?: string | null
+    bubbleOtherColor?: string | null
   }
+
+  const HEX_RE = /^#[0-9a-fA-F]{6}$/
 
   const supabase = getSupabaseAdmin()
   const update: {
@@ -103,7 +109,16 @@ export async function PATCH(req: NextRequest) {
     wallpaper_preset?: string | null
     wallpaper_url?: string | null
     wallpaper_public_id?: string | null
+    bubble_mine_color?: string | null
+    bubble_other_color?: string | null
   } = {}
+
+  if (bubbleMineColor !== undefined) {
+    update.bubble_mine_color = bubbleMineColor && HEX_RE.test(bubbleMineColor) ? bubbleMineColor : null
+  }
+  if (bubbleOtherColor !== undefined) {
+    update.bubble_other_color = bubbleOtherColor && HEX_RE.test(bubbleOtherColor) ? bubbleOtherColor : null
+  }
 
   if (name !== undefined) {
     if (!name.trim()) return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 })

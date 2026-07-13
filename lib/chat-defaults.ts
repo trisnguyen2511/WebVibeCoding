@@ -49,3 +49,26 @@ export const WALLPAPER_PRESETS: { id: WallpaperPresetId; label: string; css: str
   { id: 'midnight', label: 'Đêm sâu', css: 'radial-gradient(circle at 50% 0%, rgba(129,140,248,0.20), transparent 60%)' },
   { id: 'mosaic', label: 'Gạch hoa', css: "url('/wallpapers/mosaic-tiles.jpg')" },
 ]
+
+// One-click "apply this whole look" presets — bundles a wallpaper with
+// matching bubble colors and font, instead of an admin having to configure
+// each piece separately to match a reference theme image.
+export type ThemePreset = {
+  id: string
+  label: string
+  wallpaperPreset: WallpaperPresetId
+  bubbleMineColor: string
+  bubbleOtherColor: string
+  fontId: FontId
+}
+
+export const THEME_PRESETS: ThemePreset[] = [
+  {
+    id: 'mosaic',
+    label: 'Gạch hoa (Talavera)',
+    wallpaperPreset: 'mosaic',
+    bubbleMineColor: '#1E4FD6', // cobalt blue tile
+    bubbleOtherColor: '#E23B2E', // vermillion tile
+    fontId: 'rounded',
+  },
+]
