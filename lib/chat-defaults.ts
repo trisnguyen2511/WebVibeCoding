@@ -59,6 +59,8 @@ export type ThemePreset = {
   wallpaperPreset: WallpaperPresetId
   primaryColor: string
   secondaryColor: string
+  tertiaryColor: string
+  quaternaryColor: string
   fontId: FontId
 }
 
@@ -69,6 +71,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     wallpaperPreset: 'mosaic',
     primaryColor: '#1E4FD6', // cobalt blue tile
     secondaryColor: '#E23B2E', // vermillion tile
+    tertiaryColor: '#F2A80F', // marigold tile
+    quaternaryColor: '#2F9E4F', // leaf-green tile
     fontId: 'rounded',
   },
 ]

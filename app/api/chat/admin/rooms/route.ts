@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { data: rooms, error } = await supabase
     .from('chat_rooms')
-    .select('id, pin, name, type, anniversary_date, icon_url, mood_options, reaction_emojis, font_options, wallpaper_preset, wallpaper_url, primary_color, secondary_color, theme_font, created_at')
+    .select('id, pin, name, type, anniversary_date, icon_url, mood_options, reaction_emojis, font_options, wallpaper_preset, wallpaper_url, primary_color, secondary_color, tertiary_color, quaternary_color, theme_font, created_at')
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -80,6 +80,8 @@ export async function PATCH(req: NextRequest) {
     removeWallpaperImage,
     primaryColor,
     secondaryColor,
+    tertiaryColor,
+    quaternaryColor,
     themeFont,
   } = body as {
     name?: string
@@ -94,6 +96,8 @@ export async function PATCH(req: NextRequest) {
     removeWallpaperImage?: boolean
     primaryColor?: string | null
     secondaryColor?: string | null
+    tertiaryColor?: string | null
+    quaternaryColor?: string | null
     themeFont?: string | null
   }
 
@@ -113,6 +117,8 @@ export async function PATCH(req: NextRequest) {
     wallpaper_public_id?: string | null
     primary_color?: string | null
     secondary_color?: string | null
+    tertiary_color?: string | null
+    quaternary_color?: string | null
     theme_font?: string | null
   } = {}
 
@@ -121,6 +127,12 @@ export async function PATCH(req: NextRequest) {
   }
   if (secondaryColor !== undefined) {
     update.secondary_color = secondaryColor && HEX_RE.test(secondaryColor) ? secondaryColor : null
+  }
+  if (tertiaryColor !== undefined) {
+    update.tertiary_color = tertiaryColor && HEX_RE.test(tertiaryColor) ? tertiaryColor : null
+  }
+  if (quaternaryColor !== undefined) {
+    update.quaternary_color = quaternaryColor && HEX_RE.test(quaternaryColor) ? quaternaryColor : null
   }
   if (themeFont !== undefined) {
     const catalogIds = new Set(FONT_CATALOG.map((f) => f.id as string))

@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     const { data: room, error } = await supabase
       .from('chat_rooms')
       .select(
-        'name, type, anniversary_date, icon_url, mood_options, reaction_emojis, font_options, wallpaper_preset, wallpaper_url, primary_color, secondary_color, theme_font'
+        'name, type, anniversary_date, icon_url, mood_options, reaction_emojis, font_options, wallpaper_preset, wallpaper_url, primary_color, secondary_color, tertiary_color, quaternary_color, theme_font'
       )
       .eq('id', roomId)
       .maybeSingle()
@@ -37,6 +37,8 @@ export async function GET(req: NextRequest) {
       wallpaperUrl: room.wallpaper_url,
       primaryColor: room.primary_color,
       secondaryColor: room.secondary_color,
+      tertiaryColor: room.tertiary_color,
+      quaternaryColor: room.quaternary_color,
       themeFont: room.theme_font,
     })
   }
