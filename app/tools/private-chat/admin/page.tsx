@@ -255,24 +255,24 @@ function AdminPanel() {
 
       <div className="space-y-3 rounded-xl border border-border bg-surface p-4">
         <p className="text-xs uppercase tracking-widest text-muted">Tạo phòng mới</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
             inputMode="numeric"
             placeholder="PIN (4-10 số)"
-            className="w-32 rounded-lg border border-border bg-background px-3 py-2 text-base text-fg outline-none placeholder-muted focus:border-accent sm:text-sm"
+            className="w-28 min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-base text-fg outline-none placeholder-muted focus:border-accent sm:text-sm"
           />
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Tên phòng"
-            className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-base text-fg outline-none placeholder-muted focus:border-accent sm:text-sm"
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-base text-fg outline-none placeholder-muted focus:border-accent sm:text-sm"
           />
           <button
             onClick={create}
             disabled={loading || !pin.trim() || !name.trim()}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
+            className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
           >
             Tạo
           </button>
