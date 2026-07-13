@@ -265,7 +265,7 @@ function SwipeToReply({ onReply, disabled, children }: { onReply: () => void; di
   )
 }
 
-function LinkPreviewCard({ message }: { message: ChatMessage }) {
+function LinkPreviewCard({ message, opaque }: { message: ChatMessage; opaque?: boolean }) {
   const preview = message.link_preview
   if (!preview) return null
   return (
@@ -273,7 +273,9 @@ function LinkPreviewCard({ message }: { message: ChatMessage }) {
       href={preview.url}
       target="_blank"
       rel="noreferrer"
-      className="mb-1.5 flex max-w-[75%] items-center gap-3 overflow-hidden rounded-xl border border-overlay/[0.08] bg-overlay/[0.04] transition-colors hover:bg-overlay/[0.07]"
+      className={`mb-1.5 flex max-w-[75%] items-center gap-3 overflow-hidden rounded-xl border border-overlay/[0.08] backdrop-blur-md transition-colors ${
+        opaque ? 'bg-background/70 hover:bg-background/80' : 'bg-overlay/[0.04] hover:bg-overlay/[0.07]'
+      }`}
     >
       {preview.image && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -509,6 +511,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const wallpaperCss = session.wallpaperUrl
     ? undefined
     : WALLPAPER_PRESETS.find((w) => w.id === session.wallpaperPreset)?.css
+  const hasWallpaper = Boolean(session.wallpaperUrl || wallpaperCss)
 
   // A locally-cached session (from an older app version, or corrupted) can
   // have a stale/wrong roomType — the mood endpoint always returns the
@@ -1660,8 +1663,13 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                           Tin nhắn hẹn giờ, mở lúc {m.reveal_at ? formatTime(m.reveal_at) : '...'}
                         </span>
                       ) : isJournal ? (
-                        <div className="w-full overflow-x-auto border-l-2 border-accent/40 py-1 pl-4" style={{ touchAction: 'pan-y' }}>
-                          <LinkPreviewCard message={m} />
+                        <div
+                          className={`w-full overflow-x-auto border-l-2 border-accent/40 ${
+                            hasWallpaper ? 'rounded-r-xl bg-background/70 py-2 pl-4 pr-3 backdrop-blur-md' : 'py-1 pl-4'
+                          }`}
+                          style={{ touchAction: 'pan-y' }}
+                        >
+                          <LinkPreviewCard message={m} opaque={hasWallpaper} />
                           <FileAttachment message={m} />
                           {m.content && (
                             <p
@@ -1680,7 +1688,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                         </div>
                       ) : (
                         <>
-                          <LinkPreviewCard message={m} />
+                          <LinkPreviewCard message={m} opaque={hasWallpaper} />
                           <FileAttachment message={m} />
                           {m.content && (
                             <div
