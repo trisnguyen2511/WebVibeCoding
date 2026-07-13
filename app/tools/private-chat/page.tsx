@@ -647,6 +647,7 @@ function ChatScreen({
   const [otherMood, setOtherMood] = useState<string | null>(null)
   const [showMoodPicker, setShowMoodPicker] = useState(false)
   const [showGesturePicker, setShowGesturePicker] = useState(false)
+  const [inputFocused, setInputFocused] = useState(false)
   const [gestureOverlay, setGestureOverlay] = useState<{ emoji: string; nickname: string; label: string } | null>(null)
   const [showToolsMenu, setShowToolsMenu] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
@@ -2189,14 +2190,6 @@ function ChatScreen({
         {showToolsMenu && (
           <div data-popover-group="tools" className="absolute bottom-full left-0 mb-2 flex animate-panel-in gap-1.5 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.06] p-2 shadow-2xl backdrop-blur-xl">
             <button
-              onClick={() => { pickMedia(); setShowToolsMenu(false) }}
-              title="Gửi ảnh/video"
-              className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
-              style={themeColor ? { color: themeColor } : undefined}
-            >
-              <ImageIcon size={17} />
-            </button>
-            <button
               onClick={() => { setShowStylePicker((v) => !v); setShowToolsMenu(false) }}
               title="Tùy chỉnh kiểu chữ"
               className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 ${
@@ -2217,16 +2210,6 @@ function ChatScreen({
               <Clock size={15} />
             </button>
             <button
-              onClick={() => { setShowGesturePicker((v) => !v); setShowToolsMenu(false) }}
-              title="Gửi cử chỉ"
-              className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 ${
-                showGesturePicker ? (themeColor ? '' : 'bg-accent/[0.15] text-accent-soft') : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
-              }`}
-              style={showGesturePicker && themeColor ? { backgroundColor: `${themeColor}26`, color: themeColor } : undefined}
-            >
-              <span className="text-base">🤗</span>
-            </button>
-            <button
               onClick={() => { pickAttachment(); setShowToolsMenu(false) }}
               title={`Gửi file/video (tối đa ${CHAT_MAX_FILE_SIZE_MB}MB)`}
               className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
@@ -2236,6 +2219,40 @@ function ChatScreen({
             </button>
           </div>
         )}
+
+        <div
+          className={`flex shrink-0 items-center gap-1.5 overflow-hidden transition-all duration-200 ${
+            inputFocused ? 'w-0 opacity-0' : 'w-[92px] opacity-100'
+          }`}
+        >
+          <button
+            onClick={pickMedia}
+            title="Gửi ảnh/video"
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] transition-all hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
+            style={themeColor ? { color: themeColor } : undefined}
+          >
+            <ImageIcon size={17} />
+          </button>
+          <button
+            data-popover-group="tools"
+            onClick={() => setShowGesturePicker((v) => !v)}
+            title="Gửi cử chỉ"
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all ${
+              showGesturePicker
+                ? themeColor ? '' : 'border-accent/40 bg-accent/[0.15]'
+                : `border-overlay/[0.08] bg-overlay/[0.03] hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`
+            }`}
+            style={
+              themeColor
+                ? showGesturePicker
+                  ? { borderColor: `${themeColor}66`, backgroundColor: `${themeColor}26` }
+                  : { color: themeColor }
+                : undefined
+            }
+          >
+            <span className="text-base">🤗</span>
+          </button>
+        </div>
 
         <textarea
           ref={messageInputRef}
@@ -2253,7 +2270,11 @@ function ChatScreen({
             e.preventDefault()
             send()
           }}
-          onFocus={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 300)}
+          onFocus={() => {
+            setInputFocused(true)
+            setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 300)
+          }}
+          onBlur={() => setInputFocused(false)}
           placeholder="Nhắn gì đó..."
           rows={1}
           style={{
