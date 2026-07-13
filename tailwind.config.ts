@@ -49,6 +49,10 @@ const config: Config = {
           '0%, 60%, 100%': { transform: 'translateY(0)', opacity: '0.4' },
           '30%': { transform: 'translateY(-3px)', opacity: '1' },
         },
+        'aurora-drift': {
+          '0%, 100%': { backgroundPosition: '12% 8%, 88% 92%, 50% 50%' },
+          '50%': { backgroundPosition: '20% 14%, 80% 84%, 46% 54%' },
+        },
       },
       animation: {
         'msg-in': 'msg-in 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -56,6 +60,7 @@ const config: Config = {
         'panel-in': 'panel-in 0.16s ease-out',
         'gesture-burst': 'gesture-burst 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)',
         'typing-dot': 'typing-dot 1.2s ease-in-out infinite',
+        'aurora-drift': 'aurora-drift 14s ease-in-out infinite',
       },
     },
   },

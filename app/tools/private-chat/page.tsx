@@ -122,6 +122,31 @@ function fontStyleFor(font?: string | null): React.CSSProperties {
   }
 }
 
+function hexAlpha(hex: string, alphaHex: string): string {
+  return /^#[0-9a-fA-F]{6}$/.test(hex) ? `${hex}${alphaHex}` : hex
+}
+
+// The outer frame behind the chat card gets a soft two-color aurora derived
+// from the room's own bubble colors, so the page itself feels themed instead
+// of stopping dead at the flat app background. Low-opacity, large, blurred
+// blobs (not a hard gradient fill) keep contrast/legibility of the header UI
+// sitting on top, per the "Aurora UI" pattern (12-18% opacity blobs on a
+// near-black base, slow ambient drift, never a saturated fill).
+function auroraBackgroundStyle(mine?: string | null, other?: string | null): React.CSSProperties | undefined {
+  if (!mine && !other) return undefined
+  const a = mine || other!
+  const b = other || mine!
+  return {
+    backgroundImage: [
+      `radial-gradient(ellipse 90% 70% at 12% 8%, ${hexAlpha(a, '33')} 0%, transparent 60%)`,
+      `radial-gradient(ellipse 80% 65% at 88% 92%, ${hexAlpha(b, '33')} 0%, transparent 60%)`,
+      `radial-gradient(ellipse 130% 95% at 50% 50%, ${hexAlpha(a, '14')} 0%, transparent 75%)`,
+    ].join(', '),
+    backgroundColor: 'rgb(var(--color-bg))',
+    backgroundSize: '160% 160%, 160% 160%, 160% 160%',
+  }
+}
+
 function loadSavedStyle(): MessageStyle {
   try {
     const raw = localStorage.getItem(STYLE_KEY)
@@ -512,7 +537,15 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
   )
 }
 
-function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => void }) {
+function ChatScreen({
+  session,
+  onLeave,
+  onThemeChange,
+}: {
+  session: Session
+  onLeave: () => void
+  onThemeChange: (mine?: string | null, other?: string | null) => void
+}) {
   // Room customization (mood/reaction/font options, wallpaper, bubble
   // colors, theme font, name, icon, anniversary) is only ever set on the
   // session object at join time — a device that joined before an admin
@@ -520,6 +553,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   // user manually left and rejoined. Refreshed from the server on mount.
   const [roomInfo, setRoomInfo] = useState(session)
   useEffect(() => {
+    onThemeChange(session.bubbleMineColor, session.bubbleOtherColor)
     let cancelled = false
     fetch(`/api/chat/room-info?roomId=${session.roomId}`)
       .then((r) => r.json())
@@ -533,10 +567,12 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           } catch {
             // best-effort cache fixup
           }
+          onThemeChange(next.bubbleMineColor, next.bubbleOtherColor)
           return next
         })
       })
     return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.roomId])
 
   const moodOptions = roomInfo.moodOptions && roomInfo.moodOptions.length > 0 ? roomInfo.moodOptions : DEFAULT_MOOD_OPTIONS
@@ -2200,6 +2236,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
 export default function PrivateChatPage() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
+  const [theme, setTheme] = useState<{ mine?: string | null; other?: string | null }>({})
 
   useEffect(() => {
     const raw = localStorage.getItem(SESSION_KEY)
@@ -2209,12 +2246,23 @@ export default function PrivateChatPage() {
   }, [])
 
   return (
-    <ToolShell name="Private Chat" icon="💬" description="Đoạn chat riêng tư bằng mã PIN" fullBleed>
+    <ToolShell
+      name="Private Chat"
+      icon="💬"
+      description="Đoạn chat riêng tư bằng mã PIN"
+      fullBleed
+      backgroundStyle={auroraBackgroundStyle(theme.mine, theme.other)}
+      backgroundClassName={theme.mine || theme.other ? 'animate-aurora-drift' : undefined}
+    >
       <div
         className={`contents ${dancingScript.variable} ${baloo2.variable} ${notoSerif.variable} ${pacifico.variable} ${anton.variable} ${mali.variable} ${lobster.variable}`}
       >
         {session === undefined ? null : session ? (
-          <ChatScreen session={session} onLeave={() => setSession(null)} />
+          <ChatScreen
+            session={session}
+            onLeave={() => { setSession(null); setTheme({}) }}
+            onThemeChange={(mine, other) => setTheme({ mine, other })}
+          />
         ) : (
           <div className="flex h-full items-center justify-center overflow-y-auto p-4">
             <JoinScreen onJoined={setSession} />
