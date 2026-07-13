@@ -1684,7 +1684,12 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                               {m.content}
                             </p>
                           )}
-                          <span className="mt-1 block text-[10px] text-muted/70">{formatTime(m.created_at)}</span>
+                          <span
+                            className={`mt-1 block text-[10px] ${hasWallpaper ? 'text-fg/80' : 'text-muted/70'}`}
+                            style={hasWallpaper ? { textShadow: '0 1px 3px rgb(var(--color-bg) / 0.8)' } : undefined}
+                          >
+                            {formatTime(m.created_at)}
+                          </span>
                         </div>
                       ) : (
                         <>
