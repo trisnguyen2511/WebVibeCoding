@@ -1532,14 +1532,16 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           />
           <div
             className="absolute inset-0"
-            style={{ background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.45) 100%)' }}
+            style={{ background: 'radial-gradient(ellipse at center, transparent 45%, rgb(var(--color-bg) / 0.55) 100%)' }}
           />
         </div>
       )}
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="relative h-full space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-overlay/[0.06] bg-overlay/[0.02] p-4 backdrop-blur-sm"
+        className={`relative h-full space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-overlay/[0.06] bg-overlay/[0.02] p-4 ${
+          session.wallpaperUrl || wallpaperCss ? '' : 'backdrop-blur-sm'
+        }`}
         style={otherMoodColor ? { boxShadow: `inset 0 0 80px ${otherMoodColor}18` } : undefined}
       >
         {initialLoading ? (
