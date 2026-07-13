@@ -513,18 +513,44 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
 }
 
 function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => void }) {
-  const moodOptions = session.moodOptions && session.moodOptions.length > 0 ? session.moodOptions : DEFAULT_MOOD_OPTIONS
-  const reactionEmojis = session.reactionEmojis && session.reactionEmojis.length > 0 ? session.reactionEmojis : DEFAULT_REACTION_EMOJIS
-  const fontOptions = session.fontOptions && session.fontOptions.length > 0 ? session.fontOptions : FONT_CATALOG
-  const wallpaperCss = session.wallpaperUrl
+  // Room customization (mood/reaction/font options, wallpaper, bubble
+  // colors, theme font, name, icon, anniversary) is only ever set on the
+  // session object at join time — a device that joined before an admin
+  // changed any of it would otherwise show stale data forever until the
+  // user manually left and rejoined. Refreshed from the server on mount.
+  const [roomInfo, setRoomInfo] = useState(session)
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/chat/room-info?roomId=${session.roomId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled || data.error) return
+        setRoomInfo((prev) => {
+          const next = { ...prev, ...data }
+          try {
+            const raw = localStorage.getItem(SESSION_KEY)
+            if (raw) localStorage.setItem(SESSION_KEY, JSON.stringify({ ...JSON.parse(raw), ...data }))
+          } catch {
+            // best-effort cache fixup
+          }
+          return next
+        })
+      })
+    return () => { cancelled = true }
+  }, [session.roomId])
+
+  const moodOptions = roomInfo.moodOptions && roomInfo.moodOptions.length > 0 ? roomInfo.moodOptions : DEFAULT_MOOD_OPTIONS
+  const reactionEmojis = roomInfo.reactionEmojis && roomInfo.reactionEmojis.length > 0 ? roomInfo.reactionEmojis : DEFAULT_REACTION_EMOJIS
+  const fontOptions = roomInfo.fontOptions && roomInfo.fontOptions.length > 0 ? roomInfo.fontOptions : FONT_CATALOG
+  const wallpaperCss = roomInfo.wallpaperUrl
     ? undefined
-    : WALLPAPER_PRESETS.find((w) => w.id === session.wallpaperPreset)?.css
-  const hasWallpaper = Boolean(session.wallpaperUrl || wallpaperCss)
-  const themeColor = session.bubbleMineColor
+    : WALLPAPER_PRESETS.find((w) => w.id === roomInfo.wallpaperPreset)?.css
+  const hasWallpaper = Boolean(roomInfo.wallpaperUrl || wallpaperCss)
+  const themeColor = roomInfo.bubbleMineColor
   // Applied to the screen's own chrome text (room name, labels, empty
   // states) — never message content, which always sets its own explicit
   // font (see fontStyleFor's default case) and so never inherits this.
-  const chromeFontStyle = session.themeFont ? fontStyleFor(session.themeFont) : undefined
+  const chromeFontStyle = roomInfo.themeFont ? fontStyleFor(roomInfo.themeFont) : undefined
 
   // A locally-cached session (from an older app version, or corrupted) can
   // have a stale/wrong roomType — the mood endpoint always returns the
@@ -1441,9 +1467,9 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           }`}
           style={themeColor ? { borderColor: `${themeColor}4D`, backgroundColor: `${themeColor}1A` } : undefined}
         >
-          {session.roomIconUrl ? (
+          {roomInfo.roomIconUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={session.roomIconUrl} alt="" className="h-full w-full object-cover" />
+            <img src={roomInfo.roomIconUrl} alt="" className="h-full w-full object-cover" />
           ) : roomType === 'solo' ? (
             <BookOpen size={17} className={themeColor ? '' : 'text-accent-soft'} style={themeColor ? { color: themeColor } : undefined} />
           ) : (
@@ -1451,10 +1477,10 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-display font-semibold text-fg" style={chromeFontStyle}>{session.roomName}</p>
-          {session.anniversaryDate ? (
+          <p className="truncate font-display font-semibold text-fg" style={chromeFontStyle}>{roomInfo.roomName}</p>
+          {roomInfo.anniversaryDate ? (
             <p className="mt-0.5 truncate text-xs font-medium text-accent-soft">
-              💞 Yêu nhau được {daysSince(session.anniversaryDate)} ngày
+              💞 Yêu nhau được {daysSince(roomInfo.anniversaryDate)} ngày
             </p>
           ) : (
             <p className="mt-0.5 text-xs text-muted">{roomType === 'solo' ? 'Độc thoại' : 'Nhóm'}</p>
@@ -1545,17 +1571,17 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
       <div className="relative min-h-0 flex-1">
       {/* Wallpaper stays put behind the scrolling content — doesn't scroll
           away with it. */}
-      {(session.wallpaperUrl || wallpaperCss) && (
+      {(roomInfo.wallpaperUrl || wallpaperCss) && (
         <div
           className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl bg-cover bg-center"
-          style={{ backgroundImage: session.wallpaperUrl ? `url(${session.wallpaperUrl})` : wallpaperCss }}
+          style={{ backgroundImage: roomInfo.wallpaperUrl ? `url(${roomInfo.wallpaperUrl})` : wallpaperCss }}
         />
       )}
       <div
         ref={scrollRef}
         onScroll={onScroll}
         className={`relative h-full space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-overlay/[0.06] bg-overlay/[0.02] p-4 ${
-          session.wallpaperUrl || wallpaperCss ? '' : 'backdrop-blur-sm'
+          roomInfo.wallpaperUrl || wallpaperCss ? '' : 'backdrop-blur-sm'
         }`}
         style={otherMoodColor ? { boxShadow: `inset 0 0 80px ${otherMoodColor}18` } : undefined}
       >
@@ -1623,7 +1649,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               // person — alternate the theme color by which device actually
               // sent it instead of always using "mine".
               const isOwnDevice = m.device_id === deviceId.current
-              const journalColor = isOwnDevice ? session.bubbleMineColor : session.bubbleOtherColor
+              const journalColor = isOwnDevice ? roomInfo.bubbleMineColor : roomInfo.bubbleOtherColor
               const reactions = m.chat_message_reactions ?? []
               const reactionGroups = new Map<string, number>()
               reactions.forEach((r) => reactionGroups.set(r.emoji, (reactionGroups.get(r.emoji) ?? 0) + 1))
@@ -1657,10 +1683,10 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       <div
                         onClick={() => scrollToMessage(m.reply_to_id!)}
                         className={`mb-1.5 ${bubbleMaxWidth} flex cursor-pointer items-start gap-1.5 rounded-xl border-l-2 ${
-                          (isJournal ? journalColor : mine ? session.bubbleMineColor : session.bubbleOtherColor) ? '' : 'border-accent/40'
+                          (isJournal ? journalColor : mine ? roomInfo.bubbleMineColor : roomInfo.bubbleOtherColor) ? '' : 'border-accent/40'
                         } bg-overlay/[0.04] px-2.5 py-1.5 text-xs text-muted backdrop-blur-sm transition-colors hover:bg-overlay/[0.07] ${mine ? 'text-right' : ''}`}
                         style={{
-                          borderColor: (isJournal ? journalColor : mine ? session.bubbleMineColor : session.bubbleOtherColor) ?? undefined,
+                          borderColor: (isJournal ? journalColor : mine ? roomInfo.bubbleMineColor : roomInfo.bubbleOtherColor) ?? undefined,
                         }}
                       >
                         <Reply size={10} className="mt-0.5 shrink-0 text-accent-soft/70" />
@@ -1726,14 +1752,14 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                             <div
                               className={`max-w-[75%] overflow-x-auto rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${tailClass} ${
                                 mine
-                                  ? `text-white shadow-[0_2px_16px_rgba(124,58,237,0.35)] ${session.bubbleMineColor ? '' : 'bg-gradient-to-br from-accent to-[#5b21b6]'}`
-                                  : `text-fg backdrop-blur-sm ${session.bubbleOtherColor ? 'border' : 'border border-overlay/[0.08] bg-overlay/[0.06]'}`
+                                  ? `text-white shadow-[0_2px_16px_rgba(124,58,237,0.35)] ${roomInfo.bubbleMineColor ? '' : 'bg-gradient-to-br from-accent to-[#5b21b6]'}`
+                                  : `text-fg backdrop-blur-sm ${roomInfo.bubbleOtherColor ? 'border' : 'border border-overlay/[0.08] bg-overlay/[0.06]'}`
                               }`}
                               style={{
                                 ...fontStyleFor(m.font_family),
-                                ...(mine && session.bubbleMineColor ? { backgroundColor: session.bubbleMineColor } : undefined),
-                                ...(!mine && session.bubbleOtherColor
-                                  ? { backgroundColor: `${session.bubbleOtherColor}1A`, borderColor: `${session.bubbleOtherColor}55` }
+                                ...(mine && roomInfo.bubbleMineColor ? { backgroundColor: roomInfo.bubbleMineColor } : undefined),
+                                ...(!mine && roomInfo.bubbleOtherColor
+                                  ? { backgroundColor: `${roomInfo.bubbleOtherColor}1A`, borderColor: `${roomInfo.bubbleOtherColor}55` }
                                   : undefined),
                                 color: m.text_color ?? undefined,
                                 fontWeight: m.bold ? 700 : undefined,
