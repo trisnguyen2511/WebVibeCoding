@@ -1520,18 +1520,27 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Message list ────────────────────────────────────────── */}
       <div className="relative min-h-0 flex-1">
+      {/* Wallpaper stays put behind the scrolling content (doesn't scroll
+          away with it), with a soft vignette — dark at the edges, clear in
+          the middle — so the photo still reads fully while message text
+          over it doesn't lose contrast. */}
+      {(session.wallpaperUrl || wallpaperCss) && (
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: session.wallpaperUrl ? `url(${session.wallpaperUrl})` : wallpaperCss }}
+          />
+          <div
+            className="absolute inset-0"
+            style={{ background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.45) 100%)' }}
+          />
+        </div>
+      )}
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="h-full space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-overlay/[0.06] bg-overlay/[0.02] bg-cover bg-center p-4 backdrop-blur-sm"
-        style={{
-          ...(otherMoodColor ? { boxShadow: `inset 0 0 80px ${otherMoodColor}18` } : undefined),
-          ...(session.wallpaperUrl
-            ? { backgroundImage: `url(${session.wallpaperUrl})` }
-            : wallpaperCss
-              ? { backgroundImage: wallpaperCss }
-              : undefined),
-        }}
+        className="relative h-full space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-overlay/[0.06] bg-overlay/[0.02] p-4 backdrop-blur-sm"
+        style={otherMoodColor ? { boxShadow: `inset 0 0 80px ${otherMoodColor}18` } : undefined}
       >
         {initialLoading ? (
           <div className="space-y-4 p-2">
