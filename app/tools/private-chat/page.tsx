@@ -1524,21 +1524,13 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Message list ────────────────────────────────────────── */}
       <div className="relative min-h-0 flex-1">
-      {/* Wallpaper stays put behind the scrolling content (doesn't scroll
-          away with it), with a soft vignette — dark at the edges, clear in
-          the middle — so the photo still reads fully while message text
-          over it doesn't lose contrast. */}
+      {/* Wallpaper stays put behind the scrolling content — doesn't scroll
+          away with it. */}
       {(session.wallpaperUrl || wallpaperCss) && (
-        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: session.wallpaperUrl ? `url(${session.wallpaperUrl})` : wallpaperCss }}
-          />
-          <div
-            className="absolute inset-0"
-            style={{ background: 'radial-gradient(ellipse at center, transparent 45%, rgb(var(--color-bg) / 0.55) 100%)' }}
-          />
-        </div>
+        <div
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl bg-cover bg-center"
+          style={{ backgroundImage: session.wallpaperUrl ? `url(${session.wallpaperUrl})` : wallpaperCss }}
+        />
       )}
       <div
         ref={scrollRef}
