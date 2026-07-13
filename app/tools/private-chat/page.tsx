@@ -42,6 +42,8 @@ type Session = {
   fontOptions?: FontOption[] | null
   wallpaperPreset?: string | null
   wallpaperUrl?: string | null
+  bubbleMineColor?: string | null
+  bubbleOtherColor?: string | null
 }
 
 type Reaction = { device_id: string; emoji: string }
@@ -368,6 +370,8 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         fontOptions: data.fontOptions ?? null,
         wallpaperPreset: data.wallpaperPreset ?? null,
         wallpaperUrl: data.wallpaperUrl ?? null,
+        bubbleMineColor: data.bubbleMineColor ?? null,
+        bubbleOtherColor: data.bubbleOtherColor ?? null,
       }
       localStorage.setItem(SESSION_KEY, JSON.stringify(session))
       onJoined(session)
@@ -1694,11 +1698,15 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                             <div
                               className={`max-w-[75%] overflow-x-auto rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${tailClass} ${
                                 mine
-                                  ? 'bg-gradient-to-br from-accent to-[#5b21b6] text-white shadow-[0_2px_16px_rgba(124,58,237,0.35)]'
-                                  : 'border border-overlay/[0.08] bg-overlay/[0.06] text-fg backdrop-blur-sm'
+                                  ? `text-white shadow-[0_2px_16px_rgba(124,58,237,0.35)] ${session.bubbleMineColor ? '' : 'bg-gradient-to-br from-accent to-[#5b21b6]'}`
+                                  : `text-fg backdrop-blur-sm ${session.bubbleOtherColor ? 'border' : 'border border-overlay/[0.08] bg-overlay/[0.06]'}`
                               }`}
                               style={{
                                 ...fontStyleFor(m.font_family),
+                                ...(mine && session.bubbleMineColor ? { backgroundColor: session.bubbleMineColor } : undefined),
+                                ...(!mine && session.bubbleOtherColor
+                                  ? { backgroundColor: `${session.bubbleOtherColor}1A`, borderColor: `${session.bubbleOtherColor}55` }
+                                  : undefined),
                                 color: m.text_color ?? undefined,
                                 fontWeight: m.bold ? 700 : undefined,
                                 fontStyle: m.italic ? 'italic' : undefined,

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ToolShell } from '@/components/tool-shell'
 import { compressImageToDataUrl } from '@/lib/compress-image'
-import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, FONT_CATALOG, WALLPAPER_PRESETS, type MoodOption, type FontOption } from '@/lib/chat-defaults'
+import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, FONT_CATALOG, WALLPAPER_PRESETS, THEME_PRESETS, type MoodOption, type FontOption } from '@/lib/chat-defaults'
 
 type Room = {
   id: string
@@ -16,6 +16,8 @@ type Room = {
   font_options: FontOption[] | null
   wallpaper_preset: string | null
   wallpaper_url: string | null
+  bubble_mine_color: string | null
+  bubble_other_color: string | null
   created_at: string
   deviceCount: number
 }
@@ -279,6 +281,35 @@ function AdminPanel() {
     load()
   }
 
+  const setBubbleColor = async (id: string, key: 'bubbleMineColor' | 'bubbleOtherColor', color: string) => {
+    await fetch(`/api/chat/admin/rooms?id=${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: color }),
+    })
+    load()
+  }
+
+  const applyThemePreset = async (room: Room, theme: (typeof THEME_PRESETS)[number]) => {
+    // Puts the theme's recommended font first in the picker (a suggestion,
+    // not forced — whoever's typing still picks their own style per message).
+    const reordered = [
+      FONT_CATALOG.find((f) => f.id === theme.fontId)!,
+      ...FONT_CATALOG.filter((f) => f.id !== theme.fontId),
+    ]
+    await fetch(`/api/chat/admin/rooms?id=${room.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        wallpaperPreset: theme.wallpaperPreset,
+        bubbleMineColor: theme.bubbleMineColor,
+        bubbleOtherColor: theme.bubbleOtherColor,
+        fontOptions: reordered,
+      }),
+    })
+    load()
+  }
+
   const logout = async () => {
     await fetch('/api/chat/admin/logout', { method: 'POST' })
     window.location.reload()
@@ -488,6 +519,39 @@ function AdminPanel() {
                     Xoá ảnh
                   </button>
                 )}
+              </div>
+            </div>
+            <div className="sm:col-span-2">
+              <span className="text-xs text-muted">🎨 Màu bong bóng chat</span>
+              <div className="mt-1 flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs text-muted">
+                  Của bạn
+                  <input
+                    type="color"
+                    value={r.bubble_mine_color ?? '#7C3AED'}
+                    onChange={(e) => setBubbleColor(r.id, 'bubbleMineColor', e.target.value)}
+                    className="h-7 w-7 cursor-pointer rounded border border-border bg-transparent p-0"
+                  />
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-muted">
+                  Đối phương
+                  <input
+                    type="color"
+                    value={r.bubble_other_color ?? '#1A1A2E'}
+                    onChange={(e) => setBubbleColor(r.id, 'bubbleOtherColor', e.target.value)}
+                    className="h-7 w-7 cursor-pointer rounded border border-border bg-transparent p-0"
+                  />
+                </label>
+                <div className="h-6 w-px bg-border" />
+                {THEME_PRESETS.map((theme) => (
+                  <button
+                    key={theme.id}
+                    onClick={() => applyThemePreset(r, theme)}
+                    className="rounded-lg border border-accent/30 bg-accent/[0.08] px-2.5 py-1.5 text-xs text-accent-soft transition-colors hover:bg-accent/[0.15]"
+                  >
+                    ✨ Áp dụng theme: {theme.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
