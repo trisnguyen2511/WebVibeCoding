@@ -666,8 +666,9 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         }
         if (serverRoomType === 'solo') {
           // Solo rooms are one person across possibly several devices — there
-          // is no "yours vs theirs", just one shared mood.
-          setOwnMood(data.ownMood ?? data.otherMood ?? null)
+          // is no "yours vs theirs", just whichever device set a mood most
+          // recently (not necessarily this device's own row).
+          setOwnMood(data.sharedMood ?? null)
         } else {
           setOwnMood(data.ownMood ?? null)
           setOtherMood(data.otherMood ?? null)
