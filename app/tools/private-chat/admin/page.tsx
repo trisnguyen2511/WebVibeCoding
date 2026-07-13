@@ -535,7 +535,7 @@ function AdminPanel() {
               <span className="text-xs text-muted">🎨 Màu theme (4 vai trò)</span>
               <div className="mt-1 flex flex-wrap items-center gap-3">
                 <label className="flex items-center gap-1.5 text-xs text-muted">
-                  Của bạn
+                  Màu chính (của bạn)
                   <input
                     type="color"
                     value={r.primary_color ?? '#7C3AED'}
@@ -544,7 +544,7 @@ function AdminPanel() {
                   />
                 </label>
                 <label className="flex items-center gap-1.5 text-xs text-muted">
-                  Đối phương
+                  Màu phụ (đối phương)
                   <input
                     type="color"
                     value={r.secondary_color ?? '#1A1A2E'}
@@ -553,7 +553,7 @@ function AdminPanel() {
                   />
                 </label>
                 <label className="flex items-center gap-1.5 text-xs text-muted">
-                  Điểm nhấn
+                  Màu điểm nhấn
                   <input
                     type="color"
                     value={r.tertiary_color ?? '#FBBF24'}
@@ -562,7 +562,7 @@ function AdminPanel() {
                   />
                 </label>
                 <label className="flex items-center gap-1.5 text-xs text-muted">
-                  Phụ trợ
+                  Màu bổ trợ
                   <input
                     type="color"
                     value={r.quaternary_color ?? '#34D399'}
