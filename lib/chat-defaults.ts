@@ -35,9 +35,10 @@ export const FONT_CATALOG: FontOption[] = [
   { id: 'funky', label: 'Phá cách' },
 ]
 
-// Wallpaper presets are CSS gradients (rendered behind the message list) —
-// fixed in code, a room picks one by id or uploads a custom image instead.
-export type WallpaperPresetId = 'none' | 'nebula' | 'sunset' | 'ocean' | 'blush' | 'forest' | 'midnight'
+// Wallpaper presets are CSS background-image values (gradients or a bundled
+// static image) rendered behind the message list — fixed in code, a room
+// picks one by id or uploads a fully custom image instead.
+export type WallpaperPresetId = 'none' | 'nebula' | 'sunset' | 'ocean' | 'blush' | 'forest' | 'midnight' | 'mosaic'
 export const WALLPAPER_PRESETS: { id: WallpaperPresetId; label: string; css: string }[] = [
   { id: 'none', label: 'Mặc định', css: '' },
   { id: 'nebula', label: 'Tinh vân', css: 'radial-gradient(circle at 20% 20%, rgba(124,58,237,0.25), transparent 55%), radial-gradient(circle at 80% 70%, rgba(167,139,250,0.18), transparent 50%)' },
@@ -46,4 +47,5 @@ export const WALLPAPER_PRESETS: { id: WallpaperPresetId; label: string; css: str
   { id: 'blush', label: 'Ửng hồng', css: 'radial-gradient(circle at 30% 30%, rgba(244,114,182,0.22), transparent 55%), radial-gradient(circle at 75% 80%, rgba(167,139,250,0.16), transparent 55%)' },
   { id: 'forest', label: 'Rừng xanh', css: 'linear-gradient(160deg, rgba(52,211,153,0.16), rgba(96,165,250,0.10) 60%, transparent)' },
   { id: 'midnight', label: 'Đêm sâu', css: 'radial-gradient(circle at 50% 0%, rgba(129,140,248,0.20), transparent 60%)' },
+  { id: 'mosaic', label: 'Gạch hoa', css: "url('/wallpapers/mosaic-tiles.jpg')" },
 ]

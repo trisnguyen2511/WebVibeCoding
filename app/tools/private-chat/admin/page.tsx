@@ -455,7 +455,11 @@ function AdminPanel() {
                         ? 'border-accent scale-110'
                         : 'border-transparent hover:border-border'
                     }`}
-                    style={{ background: w.css || 'linear-gradient(135deg, #1A1A2E, #0F0F1A)' }}
+                    style={{
+                      background: w.css || 'linear-gradient(135deg, #1A1A2E, #0F0F1A)',
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }}
                   />
                 ))}
                 <div className="h-6 w-px bg-border" />
