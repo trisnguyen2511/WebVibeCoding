@@ -42,8 +42,8 @@ type Session = {
   fontOptions?: FontOption[] | null
   wallpaperPreset?: string | null
   wallpaperUrl?: string | null
-  bubbleMineColor?: string | null
-  bubbleOtherColor?: string | null
+  primaryColor?: string | null
+  secondaryColor?: string | null
   themeFont?: FontId | null
 }
 
@@ -398,8 +398,8 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         fontOptions: data.fontOptions ?? null,
         wallpaperPreset: data.wallpaperPreset ?? null,
         wallpaperUrl: data.wallpaperUrl ?? null,
-        bubbleMineColor: data.bubbleMineColor ?? null,
-        bubbleOtherColor: data.bubbleOtherColor ?? null,
+        primaryColor: data.primaryColor ?? null,
+        secondaryColor: data.secondaryColor ?? null,
         themeFont: data.themeFont ?? null,
       }
       localStorage.setItem(SESSION_KEY, JSON.stringify(session))
@@ -553,7 +553,7 @@ function ChatScreen({
   // user manually left and rejoined. Refreshed from the server on mount.
   const [roomInfo, setRoomInfo] = useState(session)
   useEffect(() => {
-    onThemeChange(session.bubbleMineColor, session.bubbleOtherColor)
+    onThemeChange(session.primaryColor, session.secondaryColor)
     let cancelled = false
     fetch(`/api/chat/room-info?roomId=${session.roomId}`)
       .then((r) => r.json())
@@ -567,7 +567,7 @@ function ChatScreen({
           } catch {
             // best-effort cache fixup
           }
-          onThemeChange(next.bubbleMineColor, next.bubbleOtherColor)
+          onThemeChange(next.primaryColor, next.secondaryColor)
           return next
         })
       })
@@ -582,7 +582,7 @@ function ChatScreen({
     ? undefined
     : WALLPAPER_PRESETS.find((w) => w.id === roomInfo.wallpaperPreset)?.css
   const hasWallpaper = Boolean(roomInfo.wallpaperUrl || wallpaperCss)
-  const themeColor = roomInfo.bubbleMineColor
+  const themeColor = roomInfo.primaryColor
   // Applied to the screen's own chrome text (room name, labels, empty
   // states) — never message content, which always sets its own explicit
   // font (see fontStyleFor's default case) and so never inherits this.
@@ -1696,7 +1696,7 @@ function ChatScreen({
               // person — alternate the theme color by which device actually
               // sent it instead of always using "mine".
               const isOwnDevice = m.device_id === deviceId.current
-              const journalColor = isOwnDevice ? roomInfo.bubbleMineColor : roomInfo.bubbleOtherColor
+              const journalColor = isOwnDevice ? roomInfo.primaryColor : roomInfo.secondaryColor
               const reactions = m.chat_message_reactions ?? []
               const reactionGroups = new Map<string, number>()
               reactions.forEach((r) => reactionGroups.set(r.emoji, (reactionGroups.get(r.emoji) ?? 0) + 1))
@@ -1730,10 +1730,10 @@ function ChatScreen({
                       <div
                         onClick={() => scrollToMessage(m.reply_to_id!)}
                         className={`mb-1.5 ${bubbleMaxWidth} flex cursor-pointer items-start gap-1.5 rounded-xl border-l-2 ${
-                          (isJournal ? journalColor : mine ? roomInfo.bubbleMineColor : roomInfo.bubbleOtherColor) ? '' : 'border-accent/40'
+                          (isJournal ? journalColor : mine ? roomInfo.primaryColor : roomInfo.secondaryColor) ? '' : 'border-accent/40'
                         } bg-overlay/[0.04] px-2.5 py-1.5 text-xs text-muted backdrop-blur-sm transition-colors hover:bg-overlay/[0.07] ${mine ? 'text-right' : ''}`}
                         style={{
-                          borderColor: (isJournal ? journalColor : mine ? roomInfo.bubbleMineColor : roomInfo.bubbleOtherColor) ?? undefined,
+                          borderColor: (isJournal ? journalColor : mine ? roomInfo.primaryColor : roomInfo.secondaryColor) ?? undefined,
                         }}
                       >
                         <Reply size={10} className="mt-0.5 shrink-0 text-accent-soft/70" />
@@ -1799,14 +1799,14 @@ function ChatScreen({
                             <div
                               className={`max-w-[75%] overflow-x-auto rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${tailClass} ${
                                 mine
-                                  ? `text-white shadow-[0_2px_16px_rgba(124,58,237,0.35)] ${roomInfo.bubbleMineColor ? '' : 'bg-gradient-to-br from-accent to-[#5b21b6]'}`
-                                  : `text-fg backdrop-blur-sm ${roomInfo.bubbleOtherColor ? 'border' : 'border border-overlay/[0.08] bg-overlay/[0.06]'}`
+                                  ? `text-white shadow-[0_2px_16px_rgba(124,58,237,0.35)] ${roomInfo.primaryColor ? '' : 'bg-gradient-to-br from-accent to-[#5b21b6]'}`
+                                  : `text-fg backdrop-blur-sm ${roomInfo.secondaryColor ? 'border' : 'border border-overlay/[0.08] bg-overlay/[0.06]'}`
                               }`}
                               style={{
                                 ...fontStyleFor(m.font_family),
-                                ...(mine && roomInfo.bubbleMineColor ? { backgroundColor: roomInfo.bubbleMineColor } : undefined),
-                                ...(!mine && roomInfo.bubbleOtherColor
-                                  ? { backgroundColor: `${roomInfo.bubbleOtherColor}1A`, borderColor: `${roomInfo.bubbleOtherColor}55` }
+                                ...(mine && roomInfo.primaryColor ? { backgroundColor: roomInfo.primaryColor } : undefined),
+                                ...(!mine && roomInfo.secondaryColor
+                                  ? { backgroundColor: `${roomInfo.secondaryColor}1A`, borderColor: `${roomInfo.secondaryColor}55` }
                                   : undefined),
                                 color: m.text_color ?? undefined,
                                 fontWeight: m.bold ? 700 : undefined,

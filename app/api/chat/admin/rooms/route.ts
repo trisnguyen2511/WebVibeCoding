@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { data: rooms, error } = await supabase
     .from('chat_rooms')
-    .select('id, pin, name, type, anniversary_date, icon_url, mood_options, reaction_emojis, font_options, wallpaper_preset, wallpaper_url, bubble_mine_color, bubble_other_color, theme_font, created_at')
+    .select('id, pin, name, type, anniversary_date, icon_url, mood_options, reaction_emojis, font_options, wallpaper_preset, wallpaper_url, primary_color, secondary_color, theme_font, created_at')
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -78,8 +78,8 @@ export async function PATCH(req: NextRequest) {
     wallpaperPreset,
     wallpaperDataUrl,
     removeWallpaperImage,
-    bubbleMineColor,
-    bubbleOtherColor,
+    primaryColor,
+    secondaryColor,
     themeFont,
   } = body as {
     name?: string
@@ -92,8 +92,8 @@ export async function PATCH(req: NextRequest) {
     wallpaperPreset?: string | null
     wallpaperDataUrl?: string
     removeWallpaperImage?: boolean
-    bubbleMineColor?: string | null
-    bubbleOtherColor?: string | null
+    primaryColor?: string | null
+    secondaryColor?: string | null
     themeFont?: string | null
   }
 
@@ -111,16 +111,16 @@ export async function PATCH(req: NextRequest) {
     wallpaper_preset?: string | null
     wallpaper_url?: string | null
     wallpaper_public_id?: string | null
-    bubble_mine_color?: string | null
-    bubble_other_color?: string | null
+    primary_color?: string | null
+    secondary_color?: string | null
     theme_font?: string | null
   } = {}
 
-  if (bubbleMineColor !== undefined) {
-    update.bubble_mine_color = bubbleMineColor && HEX_RE.test(bubbleMineColor) ? bubbleMineColor : null
+  if (primaryColor !== undefined) {
+    update.primary_color = primaryColor && HEX_RE.test(primaryColor) ? primaryColor : null
   }
-  if (bubbleOtherColor !== undefined) {
-    update.bubble_other_color = bubbleOtherColor && HEX_RE.test(bubbleOtherColor) ? bubbleOtherColor : null
+  if (secondaryColor !== undefined) {
+    update.secondary_color = secondaryColor && HEX_RE.test(secondaryColor) ? secondaryColor : null
   }
   if (themeFont !== undefined) {
     const catalogIds = new Set(FONT_CATALOG.map((f) => f.id as string))
