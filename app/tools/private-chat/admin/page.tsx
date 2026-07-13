@@ -297,8 +297,8 @@ function AdminPanel() {
         {rooms.length === 0 && <p className="text-center text-sm text-muted">Chưa có phòng nào</p>}
         {rooms.map((r) => (
           <div key={r.id} className="space-y-3 rounded-xl border border-border bg-surface p-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
               <div className="shrink-0">
                 <input
                   ref={(el) => { if (el) iconInputRefs.current.set(r.id, el) }}
@@ -331,13 +331,13 @@ function AdminPanel() {
                   </button>
                 )}
               </div>
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-center gap-2">
                   <input
                     defaultValue={r.name}
                     onBlur={(e) => renameRoom(r.id, e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-                    className="rounded-lg border border-transparent bg-transparent px-1.5 py-0.5 font-medium text-fg outline-none transition-colors hover:border-border focus:border-accent focus:bg-background"
+                    className="w-full min-w-0 rounded-lg border border-transparent bg-transparent px-1.5 py-0.5 font-medium text-fg outline-none transition-colors hover:border-border focus:border-accent focus:bg-background"
                   />
                   {r.type === 'solo' && (
                     <span className="shrink-0 rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-normal text-rose-400">độc thoại</span>
@@ -355,7 +355,7 @@ function AdminPanel() {
                 </div>
               </div>
             </div>
-            <button onClick={() => remove(r.id)} className="text-xs text-red-400 hover:text-red-300">Xóa</button>
+            <button onClick={() => remove(r.id)} className="shrink-0 text-xs text-red-400 hover:text-red-300">Xóa</button>
           </div>
 
           <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
