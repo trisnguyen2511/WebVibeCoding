@@ -13,17 +13,25 @@ export async function GET(req: NextRequest) {
 
   const supabase = getSupabaseAdmin()
   const [{ data, error }, { data: room }] = await Promise.all([
-    supabase.from('chat_devices').select('device_id, mood').eq('room_id', roomId),
+    supabase.from('chat_devices').select('device_id, mood, mood_updated_at').eq('room_id', roomId),
     supabase.from('chat_rooms').select('type').eq('id', roomId).maybeSingle(),
   ])
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const ownMood = data?.find((d) => d.device_id === deviceId)?.mood ?? null
   const otherMood = data?.find((d) => d.device_id !== deviceId && d.mood)?.mood ?? null
+
+  // Solo rooms are one person across possibly several devices — there's no
+  // "yours vs theirs", so pick whichever device's mood was set most recently
+  // instead of arbitrarily preferring this device's own (possibly stale) row.
+  const mostRecent = (data ?? [])
+    .filter((d) => d.mood)
+    .sort((a, b) => new Date(b.mood_updated_at ?? 0).getTime() - new Date(a.mood_updated_at ?? 0).getTime())[0]
+
   // Returned so the client isn't relying solely on its own (possibly stale,
   // cached-from-an-older-session) idea of the room type to decide whether
   // mood is a single shared state (solo) or yours-vs-theirs (group).
-  return NextResponse.json({ ownMood, otherMood, roomType: room?.type ?? 'group' })
+  return NextResponse.json({ ownMood, otherMood, sharedMood: mostRecent?.mood ?? null, roomType: room?.type ?? 'group' })
 }
 
 export async function POST(req: NextRequest) {
@@ -39,7 +47,7 @@ export async function POST(req: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { error } = await supabase
     .from('chat_devices')
-    .update({ mood: mood ?? null })
+    .update({ mood: mood ?? null, mood_updated_at: new Date().toISOString() })
     .eq('room_id', roomId)
     .eq('device_id', deviceId)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
