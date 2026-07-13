@@ -18,6 +18,7 @@ type Room = {
   wallpaper_url: string | null
   bubble_mine_color: string | null
   bubble_other_color: string | null
+  theme_font: string | null
   created_at: string
   deviceCount: number
 }
@@ -305,6 +306,7 @@ function AdminPanel() {
         bubbleMineColor: theme.bubbleMineColor,
         bubbleOtherColor: theme.bubbleOtherColor,
         fontOptions: reordered,
+        themeFont: theme.fontId,
       }),
     })
     load()

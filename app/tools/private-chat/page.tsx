@@ -44,6 +44,7 @@ type Session = {
   wallpaperUrl?: string | null
   bubbleMineColor?: string | null
   bubbleOtherColor?: string | null
+  themeFont?: FontId | null
 }
 
 type Reaction = { device_id: string; emoji: string }
@@ -115,7 +116,9 @@ function fontStyleFor(font?: string | null): React.CSSProperties {
     case 'funky':
       return { fontFamily: 'var(--font-lobster), cursive' }
     default:
-      return {}
+      // Explicit (not just "unset") so message text never inherits a
+      // room's chrome theme font — only the sender's own per-message choice.
+      return { fontFamily: 'var(--font-inter), sans-serif' }
   }
 }
 
@@ -372,6 +375,7 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         wallpaperUrl: data.wallpaperUrl ?? null,
         bubbleMineColor: data.bubbleMineColor ?? null,
         bubbleOtherColor: data.bubbleOtherColor ?? null,
+        themeFont: data.themeFont ?? null,
       }
       localStorage.setItem(SESSION_KEY, JSON.stringify(session))
       onJoined(session)
@@ -516,6 +520,11 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     ? undefined
     : WALLPAPER_PRESETS.find((w) => w.id === session.wallpaperPreset)?.css
   const hasWallpaper = Boolean(session.wallpaperUrl || wallpaperCss)
+  const themeColor = session.bubbleMineColor
+  // Applied to the screen's own chrome text (room name, labels, empty
+  // states) — never message content, which always sets its own explicit
+  // font (see fontStyleFor's default case) and so never inherits this.
+  const chromeFontStyle = session.themeFont ? fontStyleFor(session.themeFont) : undefined
 
   // A locally-cached session (from an older app version, or corrupted) can
   // have a stale/wrong roomType — the mood endpoint always returns the
@@ -1273,7 +1282,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   })()
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4">
+    <div className="mx-auto flex h-full w-full max-w-2xl flex-col p-4" style={chromeFontStyle}>
 
       {/* ── Gesture overlay ─────────────────────────────────────── */}
       {gestureOverlay && (
@@ -1426,18 +1435,23 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Header ──────────────────────────────────────────────── */}
       <div className="mb-3 flex items-center gap-3 border-b border-overlay/[0.06] pb-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-accent/30 bg-accent/[0.10] shadow-[0_0_14px_rgba(124,58,237,0.2)]">
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border shadow-[0_0_14px_rgba(124,58,237,0.2)] ${
+            themeColor ? '' : 'border-accent/30 bg-accent/[0.10]'
+          }`}
+          style={themeColor ? { borderColor: `${themeColor}4D`, backgroundColor: `${themeColor}1A` } : undefined}
+        >
           {session.roomIconUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={session.roomIconUrl} alt="" className="h-full w-full object-cover" />
           ) : roomType === 'solo' ? (
-            <BookOpen size={17} className="text-accent-soft" />
+            <BookOpen size={17} className={themeColor ? '' : 'text-accent-soft'} style={themeColor ? { color: themeColor } : undefined} />
           ) : (
-            <MessageCircle size={17} className="text-accent-soft" />
+            <MessageCircle size={17} className={themeColor ? '' : 'text-accent-soft'} style={themeColor ? { color: themeColor } : undefined} />
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-display font-semibold text-fg">{session.roomName}</p>
+          <p className="truncate font-display font-semibold text-fg" style={chromeFontStyle}>{session.roomName}</p>
           {session.anniversaryDate ? (
             <p className="mt-0.5 truncate text-xs font-medium text-accent-soft">
               💞 Yêu nhau được {daysSince(session.anniversaryDate)} ngày
@@ -1473,9 +1487,10 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             data-popover-group="mood"
             onClick={() => setShowMoodPicker((v) => !v)}
             title="Trạng thái cảm xúc"
-            className={`flex h-9 w-9 items-center justify-center rounded-xl text-lg transition-all hover:scale-110 ${
-              showMoodPicker ? 'border border-accent/30 bg-accent/[0.12]' : 'hover:bg-overlay/[0.06]'
+            className={`flex h-9 w-9 items-center justify-center rounded-xl border text-lg transition-all hover:scale-110 ${
+              showMoodPicker ? (themeColor ? '' : 'border-accent/30 bg-accent/[0.12]') : 'border-transparent hover:bg-overlay/[0.06]'
             }`}
+            style={showMoodPicker && themeColor ? { borderColor: `${themeColor}4D`, backgroundColor: `${themeColor}1F` } : undefined}
           >
             {moodOptions.find((m) => m.id === ownMood)?.emoji ?? '🙂'}
           </button>
@@ -2038,9 +2053,14 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           title="Thêm"
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all ${
             showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker
-              ? 'border-accent/40 bg-accent/[0.15] text-accent-soft rotate-45'
+              ? `rotate-45 ${themeColor ? '' : 'border-accent/40 bg-accent/[0.15] text-accent-soft'}`
               : 'border-overlay/[0.08] bg-overlay/[0.03] text-muted hover:border-overlay/[0.14] hover:text-fg'
           }`}
+          style={
+            (showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker) && themeColor
+              ? { borderColor: `${themeColor}66`, backgroundColor: `${themeColor}26`, color: themeColor }
+              : undefined
+          }
         >
           <Plus size={18} />
         </button>
@@ -2058,8 +2078,9 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               onClick={() => { setShowStylePicker((v) => !v); setShowToolsMenu(false) }}
               title="Tùy chỉnh kiểu chữ"
               className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 ${
-                showStylePicker ? 'bg-accent/[0.15] text-accent-soft' : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
+                showStylePicker ? (themeColor ? '' : 'bg-accent/[0.15] text-accent-soft') : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
               }`}
+              style={showStylePicker && themeColor ? { backgroundColor: `${themeColor}26`, color: themeColor } : undefined}
             >
               <Type size={15} />
             </button>
@@ -2067,8 +2088,9 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               onClick={() => { setShowCapsulePicker((v) => !v); setShowToolsMenu(false) }}
               title="Tin nhắn hẹn giờ"
               className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 ${
-                showCapsulePicker || capsuleAt ? 'bg-accent/[0.15] text-accent-soft' : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
+                showCapsulePicker || capsuleAt ? (themeColor ? '' : 'bg-accent/[0.15] text-accent-soft') : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
               }`}
+              style={(showCapsulePicker || capsuleAt) && themeColor ? { backgroundColor: `${themeColor}26`, color: themeColor } : undefined}
             >
               <Clock size={15} />
             </button>
@@ -2076,8 +2098,9 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               onClick={() => { setShowGesturePicker((v) => !v); setShowToolsMenu(false) }}
               title="Gửi cử chỉ"
               className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 ${
-                showGesturePicker ? 'bg-accent/[0.15] text-accent-soft' : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
+                showGesturePicker ? (themeColor ? '' : 'bg-accent/[0.15] text-accent-soft') : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
               }`}
+              style={showGesturePicker && themeColor ? { backgroundColor: `${themeColor}26`, color: themeColor } : undefined}
             >
               <span className="text-base">🤗</span>
             </button>
@@ -2122,7 +2145,10 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         <button
           onClick={send}
           disabled={!input.trim()}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent text-white shadow-[0_4px_16px_rgba(124,58,237,0.4)] transition-all hover:bg-accent/90 hover:shadow-[0_6px_24px_rgba(124,58,237,0.55)] active:scale-95 disabled:opacity-40 disabled:shadow-none"
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-[0_4px_16px_rgba(124,58,237,0.4)] transition-all hover:shadow-[0_6px_24px_rgba(124,58,237,0.55)] active:scale-95 disabled:opacity-40 disabled:shadow-none ${
+            themeColor ? '' : 'bg-accent hover:bg-accent/90'
+          }`}
+          style={themeColor ? { backgroundColor: themeColor } : undefined}
         >
           <Send size={16} />
         </button>
