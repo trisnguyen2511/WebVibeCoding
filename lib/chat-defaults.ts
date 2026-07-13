@@ -57,8 +57,8 @@ export type ThemePreset = {
   id: string
   label: string
   wallpaperPreset: WallpaperPresetId
-  bubbleMineColor: string
-  bubbleOtherColor: string
+  primaryColor: string
+  secondaryColor: string
   fontId: FontId
 }
 
@@ -67,8 +67,8 @@ export const THEME_PRESETS: ThemePreset[] = [
     id: 'mosaic',
     label: 'Gạch hoa (Talavera)',
     wallpaperPreset: 'mosaic',
-    bubbleMineColor: '#1E4FD6', // cobalt blue tile
-    bubbleOtherColor: '#E23B2E', // vermillion tile
+    primaryColor: '#1E4FD6', // cobalt blue tile
+    secondaryColor: '#E23B2E', // vermillion tile
     fontId: 'rounded',
   },
 ]

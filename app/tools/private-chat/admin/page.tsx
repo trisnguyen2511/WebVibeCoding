@@ -16,8 +16,8 @@ type Room = {
   font_options: FontOption[] | null
   wallpaper_preset: string | null
   wallpaper_url: string | null
-  bubble_mine_color: string | null
-  bubble_other_color: string | null
+  primary_color: string | null
+  secondary_color: string | null
   theme_font: string | null
   created_at: string
   deviceCount: number
@@ -282,7 +282,7 @@ function AdminPanel() {
     load()
   }
 
-  const setBubbleColor = async (id: string, key: 'bubbleMineColor' | 'bubbleOtherColor', color: string) => {
+  const setBubbleColor = async (id: string, key: 'primaryColor' | 'secondaryColor', color: string) => {
     await fetch(`/api/chat/admin/rooms?id=${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -303,8 +303,8 @@ function AdminPanel() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         wallpaperPreset: theme.wallpaperPreset,
-        bubbleMineColor: theme.bubbleMineColor,
-        bubbleOtherColor: theme.bubbleOtherColor,
+        primaryColor: theme.primaryColor,
+        secondaryColor: theme.secondaryColor,
         fontOptions: reordered,
         themeFont: theme.fontId,
       }),
@@ -530,8 +530,8 @@ function AdminPanel() {
                   Của bạn
                   <input
                     type="color"
-                    value={r.bubble_mine_color ?? '#7C3AED'}
-                    onChange={(e) => setBubbleColor(r.id, 'bubbleMineColor', e.target.value)}
+                    value={r.primary_color ?? '#7C3AED'}
+                    onChange={(e) => setBubbleColor(r.id, 'primaryColor', e.target.value)}
                     className="h-7 w-7 cursor-pointer rounded border border-border bg-transparent p-0"
                   />
                 </label>
@@ -539,8 +539,8 @@ function AdminPanel() {
                   Đối phương
                   <input
                     type="color"
-                    value={r.bubble_other_color ?? '#1A1A2E'}
-                    onChange={(e) => setBubbleColor(r.id, 'bubbleOtherColor', e.target.value)}
+                    value={r.secondary_color ?? '#1A1A2E'}
+                    onChange={(e) => setBubbleColor(r.id, 'secondaryColor', e.target.value)}
                     className="h-7 w-7 cursor-pointer rounded border border-border bg-transparent p-0"
                   />
                 </label>
