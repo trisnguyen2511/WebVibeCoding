@@ -1604,6 +1604,11 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
               const isJournal = roomType === 'solo'
               const mine = !isJournal && m.device_id === deviceId.current
+              // Solo rooms can still span multiple devices for the same
+              // person — alternate the theme color by which device actually
+              // sent it instead of always using "mine".
+              const isOwnDevice = m.device_id === deviceId.current
+              const journalColor = isOwnDevice ? session.bubbleMineColor : session.bubbleOtherColor
               const reactions = m.chat_message_reactions ?? []
               const reactionGroups = new Map<string, number>()
               reactions.forEach((r) => reactionGroups.set(r.emoji, (reactionGroups.get(r.emoji) ?? 0) + 1))
@@ -1637,10 +1642,10 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       <div
                         onClick={() => scrollToMessage(m.reply_to_id!)}
                         className={`mb-1.5 ${bubbleMaxWidth} flex cursor-pointer items-start gap-1.5 rounded-xl border-l-2 ${
-                          (isJournal || mine) ? (session.bubbleMineColor ? '' : 'border-accent/40') : (session.bubbleOtherColor ? '' : 'border-accent/40')
+                          (isJournal ? journalColor : mine ? session.bubbleMineColor : session.bubbleOtherColor) ? '' : 'border-accent/40'
                         } bg-overlay/[0.04] px-2.5 py-1.5 text-xs text-muted backdrop-blur-sm transition-colors hover:bg-overlay/[0.07] ${mine ? 'text-right' : ''}`}
                         style={{
-                          borderColor: (isJournal || mine) ? session.bubbleMineColor ?? undefined : session.bubbleOtherColor ?? undefined,
+                          borderColor: (isJournal ? journalColor : mine ? session.bubbleMineColor : session.bubbleOtherColor) ?? undefined,
                         }}
                       >
                         <Reply size={10} className="mt-0.5 shrink-0 text-accent-soft/70" />
@@ -1666,12 +1671,12 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                         </span>
                       ) : isJournal ? (
                         <div
-                          className={`w-full overflow-x-auto border-l-2 ${session.bubbleMineColor ? '' : 'border-accent/40'} ${
+                          className={`w-full overflow-x-auto border-l-2 ${journalColor ? '' : 'border-accent/40'} ${
                             hasWallpaper ? 'rounded-r-xl bg-background/40 py-2 pl-4 pr-3 backdrop-blur-md' : 'py-1 pl-4'
                           }`}
                           style={{
                             touchAction: 'pan-y',
-                            ...(session.bubbleMineColor ? { borderColor: session.bubbleMineColor } : undefined),
+                            ...(journalColor ? { borderColor: journalColor } : undefined),
                           }}
                         >
                           <LinkPreviewCard message={m} opaque={hasWallpaper} />
