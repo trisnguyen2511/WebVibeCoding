@@ -1,12 +1,12 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { LogOut, Pin, Reply, SmilePlus, Clock, Image as ImageIcon, Type, Send, MessageCircle, BookOpen, X, Plus, Lock, Paperclip, FileIcon } from 'lucide-react'
+import { LogOut, Pin, Reply, SmilePlus, Clock, Image as ImageIcon, Type, Send, MessageCircle, BookOpen, X, Plus, Lock, Paperclip, FileIcon, Search, Images, ExternalLink, ArrowLeft } from 'lucide-react'
 import { ToolShell } from '@/components/tool-shell'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { CHAT_MAX_FILE_SIZE_BYTES, CHAT_MAX_FILE_SIZE_MB, CHAT_OVERSIZE_DISMISS_DAYS } from '@/lib/chat-limits'
 import { loadCachedMessages, saveCachedMessages } from '@/lib/chat-cache'
-import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, FONT_CATALOG, type MoodOption, type FontId, type FontOption } from '@/lib/chat-defaults'
+import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, FONT_CATALOG, WALLPAPER_PRESETS, type MoodOption, type FontId, type FontOption } from '@/lib/chat-defaults'
 import { Dancing_Script, Baloo_2, Noto_Serif, Pacifico, Anton, Mali, Lobster } from 'next/font/google'
 
 // Scoped to this page only (not the global layout) so other tools' bundles
@@ -40,6 +40,8 @@ type Session = {
   moodOptions?: MoodOption[] | null
   reactionEmojis?: string[] | null
   fontOptions?: FontOption[] | null
+  wallpaperPreset?: string | null
+  wallpaperUrl?: string | null
 }
 
 type Reaction = { device_id: string; emoji: string }
@@ -67,6 +69,7 @@ type ChatMessage = {
   file_bytes?: number | null
   file_name?: string | null
   file_resource_type?: string | null
+  link_preview?: { url: string; title: string; description: string | null; image: string | null; siteName: string | null } | null
 }
 
 type PinnedMessage = { id: string; device_id: string; nickname: string; content: string | null; image_url?: string | null }
@@ -262,6 +265,33 @@ function SwipeToReply({ onReply, disabled, children }: { onReply: () => void; di
   )
 }
 
+function LinkPreviewCard({ message, opaque }: { message: ChatMessage; opaque?: boolean }) {
+  const preview = message.link_preview
+  if (!preview) return null
+  return (
+    <a
+      href={preview.url}
+      target="_blank"
+      rel="noreferrer"
+      className={`mb-1.5 flex max-w-[75%] items-center gap-3 overflow-hidden rounded-xl border border-overlay/[0.08] backdrop-blur-md transition-colors ${
+        opaque ? 'bg-background/45 hover:bg-background/55' : 'bg-overlay/[0.04] hover:bg-overlay/[0.07]'
+      }`}
+    >
+      {preview.image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={preview.image} alt="" className="h-16 w-16 shrink-0 object-cover" />
+      )}
+      <div className={`min-w-0 flex-1 py-2 pr-3 ${preview.image ? '' : 'pl-3'}`}>
+        <p className="truncate text-sm font-medium text-fg">{preview.title}</p>
+        {preview.description && <p className="line-clamp-2 text-xs text-muted">{preview.description}</p>}
+        <span className="mt-0.5 flex items-center gap-1 text-[10px] text-accent-soft">
+          <ExternalLink size={9} /> {preview.siteName}
+        </span>
+      </div>
+    </a>
+  )
+}
+
 function FileAttachment({ message }: { message: ChatMessage }) {
   // image_url is the legacy column from before image/video/file uploads were
   // unified onto one direct-to-Cloudinary path — old messages still use it.
@@ -336,6 +366,8 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         moodOptions: data.moodOptions ?? null,
         reactionEmojis: data.reactionEmojis ?? null,
         fontOptions: data.fontOptions ?? null,
+        wallpaperPreset: data.wallpaperPreset ?? null,
+        wallpaperUrl: data.wallpaperUrl ?? null,
       }
       localStorage.setItem(SESSION_KEY, JSON.stringify(session))
       onJoined(session)
@@ -476,6 +508,10 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const moodOptions = session.moodOptions && session.moodOptions.length > 0 ? session.moodOptions : DEFAULT_MOOD_OPTIONS
   const reactionEmojis = session.reactionEmojis && session.reactionEmojis.length > 0 ? session.reactionEmojis : DEFAULT_REACTION_EMOJIS
   const fontOptions = session.fontOptions && session.fontOptions.length > 0 ? session.fontOptions : FONT_CATALOG
+  const wallpaperCss = session.wallpaperUrl
+    ? undefined
+    : WALLPAPER_PRESETS.find((w) => w.id === session.wallpaperPreset)?.css
+  const hasWallpaper = Boolean(session.wallpaperUrl || wallpaperCss)
 
   // A locally-cached session (from an older app version, or corrupted) can
   // have a stale/wrong roomType — the mood endpoint always returns the
@@ -506,6 +542,17 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
   const [showGesturePicker, setShowGesturePicker] = useState(false)
   const [gestureOverlay, setGestureOverlay] = useState<{ emoji: string; nickname: string; label: string } | null>(null)
   const [showToolsMenu, setShowToolsMenu] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<{ id: string; nickname: string; content: string | null; created_at: string }[] | null>(null)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [showGallery, setShowGallery] = useState(false)
+  const [galleryItems, setGalleryItems] = useState<
+    { id: string; nickname: string; image_url: string | null; file_url: string | null; file_name: string | null; file_resource_type: string | null; created_at: string }[]
+  >([])
+  const [galleryLoading, setGalleryLoading] = useState(false)
+  const [galleryHasMore, setGalleryHasMore] = useState(false)
+  const [lightboxUrl, setLightboxUrl] = useState<{ url: string; resourceType: string | null } | null>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [fileUploadStatus, setFileUploadStatus] = useState<'idle' | 'uploading' | 'error'>('idle')
   const [fileError, setFileError] = useState('')
@@ -658,6 +705,57 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
     scrollToMessage(targetId)
     window.history.replaceState(null, '', window.location.pathname)
   }, [messages, scrollToMessage])
+
+  // Debounced search-as-you-type — waits for a pause in typing before
+  // hitting the server, so every keystroke doesn't fire a request.
+  useEffect(() => {
+    if (!showSearch) return
+    const q = searchQuery.trim()
+    if (!q) { setSearchResults(null); return }
+    setSearchLoading(true)
+    const timer = setTimeout(() => {
+      fetch(`/api/chat/search?roomId=${session.roomId}&deviceId=${deviceId.current}&q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((data) => setSearchResults(data.results ?? []))
+        .finally(() => setSearchLoading(false))
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery, showSearch, session.roomId])
+
+  const jumpToSearchResult = useCallback(async (id: string, createdAt: string) => {
+    setShowSearch(false)
+    setSearchQuery('')
+    setSearchResults(null)
+    if (!scrollRef.current?.querySelector(`[data-message-id="${id}"]`)) {
+      const res = await fetch(
+        `/api/chat/messages?roomId=${session.roomId}&deviceId=${deviceId.current}&around=${encodeURIComponent(createdAt)}`
+      )
+      const data = await res.json()
+      if (data.messages) {
+        setMessages((prev) => {
+          const known = new Set(prev.map((m: ChatMessage) => m.id))
+          const fresh = (data.messages as ChatMessage[]).filter((m) => !known.has(m.id))
+          return [...fresh, ...prev].sort((a, b) => a.created_at.localeCompare(b.created_at))
+        })
+      }
+    }
+    requestAnimationFrame(() => scrollToMessage(id))
+  }, [session.roomId, scrollToMessage])
+
+  const loadGallery = useCallback(async (before?: string) => {
+    setGalleryLoading(true)
+    try {
+      const url = `/api/chat/media?roomId=${session.roomId}&deviceId=${deviceId.current}${before ? `&before=${encodeURIComponent(before)}` : ''}`
+      const res = await fetch(url)
+      const data = await res.json()
+      if (data.items) {
+        setGalleryItems((prev) => (before ? [...prev, ...data.items] : data.items))
+        setGalleryHasMore(Boolean(data.hasMore))
+      }
+    } finally {
+      setGalleryLoading(false)
+    }
+  }, [session.roomId])
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || messages.length === 0) return
@@ -1186,6 +1284,141 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
         </div>
       )}
 
+      {/* ── Search overlay ──────────────────────────────────────── */}
+      {showSearch && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-background animate-[panel-in_0.15s_ease-out]">
+          <div className="flex items-center gap-2 border-b border-overlay/[0.08] p-3">
+            <button
+              onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults(null) }}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted transition-colors hover:bg-overlay/[0.06] hover:text-fg"
+            >
+              <ArrowLeft size={17} />
+            </button>
+            <div className="relative flex-1">
+              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+              <input
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm tin nhắn..."
+                className="w-full rounded-xl border border-overlay/[0.08] bg-overlay/[0.04] py-2 pl-9 pr-3 text-base text-fg outline-none placeholder-muted focus:border-accent/60 sm:text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            {searchLoading && (
+              <p className="p-4 text-center text-xs text-muted">Đang tìm...</p>
+            )}
+            {!searchLoading && searchResults && searchResults.length === 0 && (
+              <p className="p-4 text-center text-xs text-muted">Không tìm thấy tin nhắn nào</p>
+            )}
+            {!searchLoading && searchResults?.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => jumpToSearchResult(r.id, r.created_at)}
+                className="flex w-full flex-col items-start gap-0.5 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-overlay/[0.06]"
+              >
+                <span className="flex w-full items-center justify-between gap-2 text-xs text-muted">
+                  <span className="font-medium text-accent-soft">{r.nickname}</span>
+                  <span className="shrink-0">{formatTime(r.created_at)}</span>
+                </span>
+                <span className="line-clamp-2 text-sm text-fg">{r.content}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Media gallery overlay ───────────────────────────────── */}
+      {showGallery && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-background animate-[panel-in_0.15s_ease-out]">
+          <div className="flex items-center gap-2 border-b border-overlay/[0.08] p-3">
+            <button
+              onClick={() => setShowGallery(false)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted transition-colors hover:bg-overlay/[0.06] hover:text-fg"
+            >
+              <ArrowLeft size={17} />
+            </button>
+            <h2 className="font-display text-sm font-semibold text-fg">Ảnh & file đã gửi</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            {galleryItems.length === 0 && !galleryLoading && (
+              <p className="p-8 text-center text-xs text-muted">Chưa có ảnh hay file nào</p>
+            )}
+            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+              {galleryItems.map((item) => {
+                const url = item.file_url ?? item.image_url
+                if (!url) return null
+                const resourceType = item.file_url ? item.file_resource_type : 'image'
+                if (resourceType === 'image' || resourceType === 'video') {
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setLightboxUrl({ url, resourceType })}
+                      className="group relative aspect-square overflow-hidden rounded-lg bg-overlay/[0.04]"
+                    >
+                      {resourceType === 'video' ? (
+                        <video src={url} className="h-full w-full object-cover" muted />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={url} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                      )}
+                      {resourceType === 'video' && (
+                        <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-0.5 text-[9px] text-white">▶</span>
+                      )}
+                    </button>
+                  )
+                }
+                return (
+                  <a
+                    key={item.id}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={item.file_name ?? undefined}
+                    className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg bg-overlay/[0.04] p-2 text-center transition-colors hover:bg-overlay/[0.08]"
+                  >
+                    <FileIcon size={20} className="text-accent-soft" />
+                    <span className="line-clamp-2 text-[9px] text-muted">{item.file_name ?? 'File'}</span>
+                  </a>
+                )
+              })}
+            </div>
+            {galleryHasMore && (
+              <button
+                onClick={() => loadGallery(galleryItems[galleryItems.length - 1]?.created_at)}
+                disabled={galleryLoading}
+                className="mx-auto mt-4 block rounded-xl border border-overlay/[0.08] px-4 py-2 text-xs text-muted transition-colors hover:text-fg disabled:opacity-40"
+              >
+                {galleryLoading ? 'Đang tải...' : 'Tải thêm'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Lightbox ─────────────────────────────────────────────── */}
+      {lightboxUrl && (
+        <div
+          onClick={() => setLightboxUrl(null)}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm animate-[panel-in_0.15s_ease-out]"
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+          >
+            <X size={18} />
+          </button>
+          {lightboxUrl.resourceType === 'video' ? (
+            <video src={lightboxUrl.url} controls autoPlay className="max-h-full max-w-full rounded-xl" onClick={(e) => e.stopPropagation()} />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={lightboxUrl.url} alt="" className="max-h-full max-w-full rounded-xl object-contain" onClick={(e) => e.stopPropagation()} />
+          )}
+        </div>
+      )}
+
       {/* ── Header ──────────────────────────────────────────────── */}
       <div className="mb-3 flex items-center gap-3 border-b border-overlay/[0.06] pb-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-accent/30 bg-accent/[0.10] shadow-[0_0_14px_rgba(124,58,237,0.2)]">
@@ -1209,6 +1442,20 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <button
+            onClick={() => { setShowGallery(true); loadGallery() }}
+            title="Ảnh & file đã gửi"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-muted transition-all hover:bg-overlay/[0.06] hover:text-fg"
+          >
+            <Images size={16} />
+          </button>
+          <button
+            onClick={() => setShowSearch(true)}
+            title="Tìm tin nhắn"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-muted transition-all hover:bg-overlay/[0.06] hover:text-fg"
+          >
+            <Search size={16} />
+          </button>
           {otherMood && (
             <span
               title={`Đối phương đang: ${moodOptions.find((m) => m.id === otherMood)?.label ?? ''}`}
@@ -1276,10 +1523,28 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
 
       {/* ── Message list ────────────────────────────────────────── */}
       <div className="relative min-h-0 flex-1">
+      {/* Wallpaper stays put behind the scrolling content (doesn't scroll
+          away with it), with a soft vignette — dark at the edges, clear in
+          the middle — so the photo still reads fully while message text
+          over it doesn't lose contrast. */}
+      {(session.wallpaperUrl || wallpaperCss) && (
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: session.wallpaperUrl ? `url(${session.wallpaperUrl})` : wallpaperCss }}
+          />
+          <div
+            className="absolute inset-0"
+            style={{ background: 'radial-gradient(ellipse at center, transparent 45%, rgb(var(--color-bg) / 0.55) 100%)' }}
+          />
+        </div>
+      )}
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="h-full space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-overlay/[0.06] bg-overlay/[0.02] p-4 backdrop-blur-sm"
+        className={`relative h-full space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-overlay/[0.06] bg-overlay/[0.02] p-4 ${
+          session.wallpaperUrl || wallpaperCss ? '' : 'backdrop-blur-sm'
+        }`}
         style={otherMoodColor ? { boxShadow: `inset 0 0 80px ${otherMoodColor}18` } : undefined}
       >
         {initialLoading ? (
@@ -1398,7 +1663,13 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                           Tin nhắn hẹn giờ, mở lúc {m.reveal_at ? formatTime(m.reveal_at) : '...'}
                         </span>
                       ) : isJournal ? (
-                        <div className="w-full overflow-x-auto border-l-2 border-accent/40 py-1 pl-4" style={{ touchAction: 'pan-y' }}>
+                        <div
+                          className={`w-full overflow-x-auto border-l-2 border-accent/40 ${
+                            hasWallpaper ? 'rounded-r-xl bg-background/40 py-2 pl-4 pr-3 backdrop-blur-md' : 'py-1 pl-4'
+                          }`}
+                          style={{ touchAction: 'pan-y' }}
+                        >
+                          <LinkPreviewCard message={m} opaque={hasWallpaper} />
                           <FileAttachment message={m} />
                           {m.content && (
                             <p
@@ -1413,10 +1684,18 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                               {m.content}
                             </p>
                           )}
-                          <span className="mt-1 block text-[10px] text-muted/70">{formatTime(m.created_at)}</span>
+                          {activeActionsFor === m.id && (
+                            <span
+                              className={`mt-1 block animate-panel-in text-[10px] ${hasWallpaper ? 'text-fg/80' : 'text-muted/70'}`}
+                              style={hasWallpaper ? { textShadow: '0 1px 3px rgb(var(--color-bg) / 0.8)' } : undefined}
+                            >
+                              {formatTime(m.created_at)}
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <>
+                          <LinkPreviewCard message={m} opaque={hasWallpaper} />
                           <FileAttachment message={m} />
                           {m.content && (
                             <div

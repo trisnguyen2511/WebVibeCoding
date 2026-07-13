@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAdminRequest } from '@/lib/chat-admin-auth'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { deleteChatImages, uploadChatImage } from '@/lib/cloudinary'
-import { FONT_CATALOG } from '@/lib/chat-defaults'
+import { FONT_CATALOG, WALLPAPER_PRESETS } from '@/lib/chat-defaults'
 
 export async function GET(req: NextRequest) {
   if (!isAdminRequest(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { data: rooms, error } = await supabase
     .from('chat_rooms')
-    .select('id, pin, name, type, anniversary_date, icon_url, mood_options, reaction_emojis, font_options, created_at')
+    .select('id, pin, name, type, anniversary_date, icon_url, mood_options, reaction_emojis, font_options, wallpaper_preset, wallpaper_url, created_at')
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -67,7 +67,18 @@ export async function PATCH(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'invalid request body' }, { status: 400 })
   }
-  const { name, anniversaryDate, iconDataUrl, removeIcon, moodOptions, reactionEmojis, fontOptions } = body as {
+  const {
+    name,
+    anniversaryDate,
+    iconDataUrl,
+    removeIcon,
+    moodOptions,
+    reactionEmojis,
+    fontOptions,
+    wallpaperPreset,
+    wallpaperDataUrl,
+    removeWallpaperImage,
+  } = body as {
     name?: string
     anniversaryDate?: string | null
     iconDataUrl?: string
@@ -75,6 +86,9 @@ export async function PATCH(req: NextRequest) {
     moodOptions?: { id: string; emoji: string; label: string; color: string }[] | null
     reactionEmojis?: string[] | null
     fontOptions?: { id: string; label: string }[] | null
+    wallpaperPreset?: string | null
+    wallpaperDataUrl?: string
+    removeWallpaperImage?: boolean
   }
 
   const supabase = getSupabaseAdmin()
@@ -86,6 +100,9 @@ export async function PATCH(req: NextRequest) {
     mood_options?: { id: string; emoji: string; label: string; color: string }[] | null
     reaction_emojis?: string[] | null
     font_options?: { id: string; label: string }[] | null
+    wallpaper_preset?: string | null
+    wallpaper_url?: string | null
+    wallpaper_public_id?: string | null
   } = {}
 
   if (name !== undefined) {
@@ -132,6 +149,33 @@ export async function PATCH(req: NextRequest) {
     } else {
       update.icon_url = null
       update.icon_public_id = null
+    }
+  }
+
+  if (wallpaperPreset !== undefined) {
+    const validPresetIds = new Set(WALLPAPER_PRESETS.map((w) => w.id))
+    update.wallpaper_preset = wallpaperPreset && validPresetIds.has(wallpaperPreset as (typeof WALLPAPER_PRESETS)[number]['id'])
+      ? wallpaperPreset
+      : null
+  }
+
+  if (wallpaperDataUrl || removeWallpaperImage) {
+    const { data: existing } = await supabase.from('chat_rooms').select('wallpaper_public_id').eq('id', id).maybeSingle()
+    if (existing?.wallpaper_public_id) {
+      await deleteChatImages([existing.wallpaper_public_id]).catch(() => {})
+    }
+    if (wallpaperDataUrl) {
+      try {
+        const uploaded = await uploadChatImage(wallpaperDataUrl)
+        update.wallpaper_url = uploaded.url
+        update.wallpaper_public_id = uploaded.publicId
+        update.wallpaper_preset = null // custom image takes over from any preset
+      } catch {
+        return NextResponse.json({ error: 'wallpaper upload failed' }, { status: 502 })
+      }
+    } else {
+      update.wallpaper_url = null
+      update.wallpaper_public_id = null
     }
   }
 

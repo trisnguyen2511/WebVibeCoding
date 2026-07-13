@@ -4,6 +4,7 @@ import { pushToRoom } from '@/lib/chat-notify'
 import { enforceStorageQuota } from '@/lib/chat-storage-quota'
 import { verifyAdminPassword } from '@/lib/chat-admin-auth'
 import { CHAT_MAX_FILE_SIZE_BYTES } from '@/lib/chat-limits'
+import { fetchLinkPreview, findFirstUrl } from '@/lib/link-preview'
 
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/
 const FONT_FAMILIES = new Set(['sans', 'display', 'mono', 'cursive'])
@@ -55,6 +56,11 @@ export async function POST(req: NextRequest) {
     if (parsed.getTime() > Date.now()) revealAtIso = parsed.toISOString()
   }
 
+  // Best-effort — a slow/failed fetch of the target page must never block
+  // or fail the message send.
+  const firstUrl = findFirstUrl(trimmedContent)
+  const linkPreview = firstUrl ? await fetchLinkPreview(firstUrl).catch(() => null) : null
+
   const supabase = getSupabaseAdmin()
 
   const { data: sender } = await supabase
@@ -83,6 +89,7 @@ export async function POST(req: NextRequest) {
     file_bytes?: number
     file_name?: string
     file_resource_type?: string
+    link_preview?: unknown
   } = {
     room_id: roomId,
     device_id: deviceId,
@@ -93,6 +100,7 @@ export async function POST(req: NextRequest) {
     bold: Boolean(style?.bold),
     italic: Boolean(style?.italic),
     reveal_at: revealAtIso,
+    link_preview: linkPreview,
   }
 
   if (replyTo?.id && typeof replyTo.nickname === 'string') {
@@ -113,7 +121,7 @@ export async function POST(req: NextRequest) {
     .from('chat_messages')
     .insert(insertPayload)
     .select(
-      'id, device_id, nickname, content, image_url, text_color, font_family, bold, italic, reply_to_id, reply_to_nickname, reply_to_content, reveal_at, file_url, file_bytes, file_name, file_resource_type, created_at'
+      'id, device_id, nickname, content, image_url, text_color, font_family, bold, italic, reply_to_id, reply_to_nickname, reply_to_content, reveal_at, file_url, file_bytes, file_name, file_resource_type, link_preview, created_at'
     )
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

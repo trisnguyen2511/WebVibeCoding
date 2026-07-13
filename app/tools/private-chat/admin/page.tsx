@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ToolShell } from '@/components/tool-shell'
 import { compressImageToDataUrl } from '@/lib/compress-image'
-import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, FONT_CATALOG, type MoodOption, type FontOption } from '@/lib/chat-defaults'
+import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, FONT_CATALOG, WALLPAPER_PRESETS, type MoodOption, type FontOption } from '@/lib/chat-defaults'
 
 type Room = {
   id: string
@@ -14,6 +14,8 @@ type Room = {
   mood_options: MoodOption[] | null
   reaction_emojis: string[] | null
   font_options: FontOption[] | null
+  wallpaper_preset: string | null
+  wallpaper_url: string | null
   created_at: string
   deviceCount: number
 }
@@ -241,6 +243,42 @@ function AdminPanel() {
     load()
   }
 
+  const [uploadingWallpaperFor, setUploadingWallpaperFor] = useState<string | null>(null)
+  const wallpaperInputRefs = useRef<Map<string, HTMLInputElement>>(new Map())
+
+  const setWallpaperPreset = async (id: string, presetId: string) => {
+    await fetch(`/api/chat/admin/rooms?id=${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallpaperPreset: presetId === 'none' ? null : presetId }),
+    })
+    load()
+  }
+
+  const uploadWallpaper = async (id: string, file: File) => {
+    setUploadingWallpaperFor(id)
+    try {
+      const wallpaperDataUrl = await compressImageToDataUrl(file, 1080, 0.85)
+      await fetch(`/api/chat/admin/rooms?id=${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallpaperDataUrl }),
+      })
+      load()
+    } finally {
+      setUploadingWallpaperFor(null)
+    }
+  }
+
+  const removeWallpaperImage = async (id: string) => {
+    await fetch(`/api/chat/admin/rooms?id=${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ removeWallpaperImage: true }),
+    })
+    load()
+  }
+
   const logout = async () => {
     await fetch('/api/chat/admin/logout', { method: 'POST' })
     window.location.reload()
@@ -402,6 +440,50 @@ function AdminPanel() {
                     </label>
                   )
                 })}
+              </div>
+            </div>
+            <div className="sm:col-span-2">
+              <span className="text-xs text-muted">🖼️ Hình nền đoạn chat</span>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                {WALLPAPER_PRESETS.map((w) => (
+                  <button
+                    key={w.id}
+                    onClick={() => setWallpaperPreset(r.id, w.id)}
+                    title={w.label}
+                    className={`h-8 w-8 rounded-lg border-2 transition-all hover:scale-110 ${
+                      (r.wallpaper_preset ?? 'none') === w.id && !r.wallpaper_url
+                        ? 'border-accent scale-110'
+                        : 'border-transparent hover:border-border'
+                    }`}
+                    style={{ background: w.css || 'linear-gradient(135deg, #1A1A2E, #0F0F1A)' }}
+                  />
+                ))}
+                <div className="h-6 w-px bg-border" />
+                <input
+                  ref={(el) => { if (el) wallpaperInputRefs.current.set(r.id, el) }}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (file) uploadWallpaper(r.id, file)
+                  }}
+                />
+                <button
+                  onClick={() => wallpaperInputRefs.current.get(r.id)?.click()}
+                  className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-muted transition-colors hover:text-fg"
+                >
+                  {uploadingWallpaperFor === r.id ? '...' : r.wallpaper_url ? 'Đổi ảnh' : 'Tải ảnh riêng'}
+                </button>
+                {r.wallpaper_url && (
+                  <button
+                    onClick={() => removeWallpaperImage(r.id)}
+                    className="text-xs text-muted hover:text-red-400"
+                  >
+                    Xoá ảnh
+                  </button>
+                )}
               </div>
             </div>
           </div>
