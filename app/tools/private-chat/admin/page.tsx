@@ -18,6 +18,8 @@ type Room = {
   wallpaper_url: string | null
   primary_color: string | null
   secondary_color: string | null
+  tertiary_color: string | null
+  quaternary_color: string | null
   theme_font: string | null
   created_at: string
   deviceCount: number
@@ -282,7 +284,11 @@ function AdminPanel() {
     load()
   }
 
-  const setBubbleColor = async (id: string, key: 'primaryColor' | 'secondaryColor', color: string) => {
+  const setBubbleColor = async (
+    id: string,
+    key: 'primaryColor' | 'secondaryColor' | 'tertiaryColor' | 'quaternaryColor',
+    color: string
+  ) => {
     await fetch(`/api/chat/admin/rooms?id=${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -305,6 +311,8 @@ function AdminPanel() {
         wallpaperPreset: theme.wallpaperPreset,
         primaryColor: theme.primaryColor,
         secondaryColor: theme.secondaryColor,
+        tertiaryColor: theme.tertiaryColor,
+        quaternaryColor: theme.quaternaryColor,
         fontOptions: reordered,
         themeFont: theme.fontId,
       }),
@@ -524,7 +532,7 @@ function AdminPanel() {
               </div>
             </div>
             <div className="sm:col-span-2">
-              <span className="text-xs text-muted">🎨 Màu bong bóng chat</span>
+              <span className="text-xs text-muted">🎨 Màu theme (4 vai trò)</span>
               <div className="mt-1 flex flex-wrap items-center gap-3">
                 <label className="flex items-center gap-1.5 text-xs text-muted">
                   Của bạn
@@ -541,6 +549,24 @@ function AdminPanel() {
                     type="color"
                     value={r.secondary_color ?? '#1A1A2E'}
                     onChange={(e) => setBubbleColor(r.id, 'secondaryColor', e.target.value)}
+                    className="h-7 w-7 cursor-pointer rounded border border-border bg-transparent p-0"
+                  />
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-muted">
+                  Điểm nhấn
+                  <input
+                    type="color"
+                    value={r.tertiary_color ?? '#FBBF24'}
+                    onChange={(e) => setBubbleColor(r.id, 'tertiaryColor', e.target.value)}
+                    className="h-7 w-7 cursor-pointer rounded border border-border bg-transparent p-0"
+                  />
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-muted">
+                  Phụ trợ
+                  <input
+                    type="color"
+                    value={r.quaternary_color ?? '#34D399'}
+                    onChange={(e) => setBubbleColor(r.id, 'quaternaryColor', e.target.value)}
                     className="h-7 w-7 cursor-pointer rounded border border-border bg-transparent p-0"
                   />
                 </label>

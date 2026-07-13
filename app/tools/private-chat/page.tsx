@@ -44,6 +44,8 @@ type Session = {
   wallpaperUrl?: string | null
   primaryColor?: string | null
   secondaryColor?: string | null
+  tertiaryColor?: string | null
+  quaternaryColor?: string | null
   themeFont?: FontId | null
 }
 
@@ -126,24 +128,34 @@ function hexAlpha(hex: string, alphaHex: string): string {
   return /^#[0-9a-fA-F]{6}$/.test(hex) ? `${hex}${alphaHex}` : hex
 }
 
-// The outer frame behind the chat card gets a soft two-color aurora derived
-// from the room's own bubble colors, so the page itself feels themed instead
+// The outer frame behind the chat card gets a soft multi-color aurora derived
+// from the room's own theme colors, so the page itself feels themed instead
 // of stopping dead at the flat app background. Low-opacity, large, blurred
 // blobs (not a hard gradient fill) keep contrast/legibility of the header UI
 // sitting on top, per the "Aurora UI" pattern (12-18% opacity blobs on a
-// near-black base, slow ambient drift, never a saturated fill).
-function auroraBackgroundStyle(mine?: string | null, other?: string | null): React.CSSProperties | undefined {
-  if (!mine && !other) return undefined
-  const a = mine || other!
-  const b = other || mine!
+// near-black base, slow ambient drift, never a saturated fill). The
+// quaternary color (when set) gets a small extra blob for a livelier,
+// richer blend instead of just two colors facing off.
+function auroraBackgroundStyle(
+  primary?: string | null,
+  secondary?: string | null,
+  quaternary?: string | null
+): React.CSSProperties | undefined {
+  if (!primary && !secondary) return undefined
+  const a = primary || secondary!
+  const b = secondary || primary!
+  const stops = [
+    `radial-gradient(ellipse 90% 70% at 12% 8%, ${hexAlpha(a, '33')} 0%, transparent 60%)`,
+    `radial-gradient(ellipse 80% 65% at 88% 92%, ${hexAlpha(b, '33')} 0%, transparent 60%)`,
+  ]
+  if (quaternary) {
+    stops.push(`radial-gradient(ellipse 70% 55% at 78% 18%, ${hexAlpha(quaternary, '22')} 0%, transparent 65%)`)
+  }
+  stops.push(`radial-gradient(ellipse 130% 95% at 50% 50%, ${hexAlpha(a, '14')} 0%, transparent 75%)`)
   return {
-    backgroundImage: [
-      `radial-gradient(ellipse 90% 70% at 12% 8%, ${hexAlpha(a, '33')} 0%, transparent 60%)`,
-      `radial-gradient(ellipse 80% 65% at 88% 92%, ${hexAlpha(b, '33')} 0%, transparent 60%)`,
-      `radial-gradient(ellipse 130% 95% at 50% 50%, ${hexAlpha(a, '14')} 0%, transparent 75%)`,
-    ].join(', '),
+    backgroundImage: stops.join(', '),
     backgroundColor: 'rgb(var(--color-bg))',
-    backgroundSize: '160% 160%, 160% 160%, 160% 160%',
+    backgroundSize: stops.map(() => '160% 160%').join(', '),
   }
 }
 
@@ -295,7 +307,15 @@ function SwipeToReply({ onReply, disabled, children }: { onReply: () => void; di
   )
 }
 
-function LinkPreviewCard({ message, opaque }: { message: ChatMessage; opaque?: boolean }) {
+function LinkPreviewCard({
+  message,
+  opaque,
+  accentColor,
+}: {
+  message: ChatMessage
+  opaque?: boolean
+  accentColor?: string | null
+}) {
   const preview = message.link_preview
   if (!preview) return null
   return (
@@ -314,7 +334,7 @@ function LinkPreviewCard({ message, opaque }: { message: ChatMessage; opaque?: b
       <div className={`min-w-0 flex-1 py-2 pr-3 ${preview.image ? '' : 'pl-3'}`}>
         <p className="truncate text-sm font-medium text-fg">{preview.title}</p>
         {preview.description && <p className="line-clamp-2 text-xs text-muted">{preview.description}</p>}
-        <span className="mt-0.5 flex items-center gap-1 text-[10px] text-accent-soft">
+        <span className={`mt-0.5 flex items-center gap-1 text-[10px] ${accentColor ? '' : 'text-accent-soft'}`} style={accentColor ? { color: accentColor } : undefined}>
           <ExternalLink size={9} /> {preview.siteName}
         </span>
       </div>
@@ -400,6 +420,8 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
         wallpaperUrl: data.wallpaperUrl ?? null,
         primaryColor: data.primaryColor ?? null,
         secondaryColor: data.secondaryColor ?? null,
+        tertiaryColor: data.tertiaryColor ?? null,
+        quaternaryColor: data.quaternaryColor ?? null,
         themeFont: data.themeFont ?? null,
       }
       localStorage.setItem(SESSION_KEY, JSON.stringify(session))
@@ -544,7 +566,12 @@ function ChatScreen({
 }: {
   session: Session
   onLeave: () => void
-  onThemeChange: (mine?: string | null, other?: string | null) => void
+  onThemeChange: (
+    primary?: string | null,
+    secondary?: string | null,
+    tertiary?: string | null,
+    quaternary?: string | null
+  ) => void
 }) {
   // Room customization (mood/reaction/font options, wallpaper, bubble
   // colors, theme font, name, icon, anniversary) is only ever set on the
@@ -553,7 +580,7 @@ function ChatScreen({
   // user manually left and rejoined. Refreshed from the server on mount.
   const [roomInfo, setRoomInfo] = useState(session)
   useEffect(() => {
-    onThemeChange(session.primaryColor, session.secondaryColor)
+    onThemeChange(session.primaryColor, session.secondaryColor, session.tertiaryColor, session.quaternaryColor)
     let cancelled = false
     fetch(`/api/chat/room-info?roomId=${session.roomId}`)
       .then((r) => r.json())
@@ -567,7 +594,7 @@ function ChatScreen({
           } catch {
             // best-effort cache fixup
           }
-          onThemeChange(next.primaryColor, next.secondaryColor)
+          onThemeChange(next.primaryColor, next.secondaryColor, next.tertiaryColor, next.quaternaryColor)
           return next
         })
       })
@@ -583,6 +610,11 @@ function ChatScreen({
     : WALLPAPER_PRESETS.find((w) => w.id === roomInfo.wallpaperPreset)?.css
   const hasWallpaper = Boolean(roomInfo.wallpaperUrl || wallpaperCss)
   const themeColor = roomInfo.primaryColor
+  // Informational highlight color (pinned message, link previews, chosen
+  // reactions) and a quieter secondary accent (outer aurora's extra blob) —
+  // fall back to the fixed app accent/muted styling when a room hasn't set them.
+  const tertiaryColor = roomInfo.tertiaryColor
+  const quaternaryColor = roomInfo.quaternaryColor
   // Applied to the screen's own chrome text (room name, labels, empty
   // states) — never message content, which always sets its own explicit
   // font (see fontStyleFor's default case) and so never inherits this.
@@ -1600,9 +1632,14 @@ function ChatScreen({
 
       {/* ── Pinned message ──────────────────────────────────────── */}
       {pinnedMessage && (
-        <div className="mb-2 flex items-center gap-2.5 rounded-2xl border border-accent/20 bg-accent/[0.07] px-3.5 py-2.5 animate-panel-in">
-          <Pin size={11} className="shrink-0 text-accent-soft" />
-          <span className="flex-1 truncate text-xs text-accent-soft">
+        <div
+          className={`mb-2 flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5 animate-panel-in ${
+            tertiaryColor ? '' : 'border-accent/20 bg-accent/[0.07]'
+          }`}
+          style={tertiaryColor ? { borderColor: `${tertiaryColor}33`, backgroundColor: `${tertiaryColor}12` } : undefined}
+        >
+          <Pin size={11} className={`shrink-0 ${tertiaryColor ? '' : 'text-accent-soft'}`} style={tertiaryColor ? { color: tertiaryColor } : undefined} />
+          <span className={`flex-1 truncate text-xs ${tertiaryColor ? '' : 'text-accent-soft'}`} style={tertiaryColor ? { color: tertiaryColor } : undefined}>
             <b>{pinnedMessage.nickname}:</b> {pinnedMessage.content ?? '[Hình ảnh]'}
           </span>
           <button
@@ -1767,7 +1804,7 @@ function ChatScreen({
                             ...(journalColor ? { borderColor: journalColor } : undefined),
                           }}
                         >
-                          <LinkPreviewCard message={m} opaque={hasWallpaper} />
+                          <LinkPreviewCard message={m} opaque={hasWallpaper} accentColor={tertiaryColor} />
                           <FileAttachment message={m} />
                           {m.content && (
                             <p
@@ -1793,7 +1830,7 @@ function ChatScreen({
                         </div>
                       ) : (
                         <>
-                          <LinkPreviewCard message={m} opaque={hasWallpaper} />
+                          <LinkPreviewCard message={m} opaque={hasWallpaper} accentColor={tertiaryColor} />
                           <FileAttachment message={m} />
                           {m.content && (
                             <div
@@ -1838,9 +1875,14 @@ function ChatScreen({
                             onClick={() => toggleReaction(m.id, emoji)}
                             className={`animate-pop-in rounded-full border px-1.5 py-0.5 text-xs transition-transform hover:scale-110 ${
                               myReaction === emoji
-                                ? 'border-accent/40 bg-accent/[0.15]'
+                                ? quaternaryColor ? '' : 'border-accent/40 bg-accent/[0.15]'
                                 : 'border-overlay/[0.08] bg-overlay/[0.04]'
                             }`}
+                            style={
+                              myReaction === emoji && quaternaryColor
+                                ? { borderColor: `${quaternaryColor}66`, backgroundColor: `${quaternaryColor}26` }
+                                : undefined
+                            }
                           >
                             {emoji} {count > 1 ? count : ''}
                           </button>
@@ -2236,7 +2278,12 @@ function ChatScreen({
 
 export default function PrivateChatPage() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
-  const [theme, setTheme] = useState<{ mine?: string | null; other?: string | null }>({})
+  const [theme, setTheme] = useState<{
+    primary?: string | null
+    secondary?: string | null
+    tertiary?: string | null
+    quaternary?: string | null
+  }>({})
 
   useEffect(() => {
     const raw = localStorage.getItem(SESSION_KEY)
@@ -2251,8 +2298,8 @@ export default function PrivateChatPage() {
       icon="💬"
       description="Đoạn chat riêng tư bằng mã PIN"
       fullBleed
-      backgroundStyle={auroraBackgroundStyle(theme.mine, theme.other)}
-      backgroundClassName={theme.mine || theme.other ? 'animate-aurora-drift' : undefined}
+      backgroundStyle={auroraBackgroundStyle(theme.primary, theme.secondary, theme.quaternary)}
+      backgroundClassName={theme.primary || theme.secondary ? 'animate-aurora-drift' : undefined}
     >
       <div
         className={`contents ${dancingScript.variable} ${baloo2.variable} ${notoSerif.variable} ${pacifico.variable} ${anton.variable} ${mali.variable} ${lobster.variable}`}
@@ -2261,7 +2308,7 @@ export default function PrivateChatPage() {
           <ChatScreen
             session={session}
             onLeave={() => { setSession(null); setTheme({}) }}
-            onThemeChange={(mine, other) => setTheme({ mine, other })}
+            onThemeChange={(primary, secondary, tertiary, quaternary) => setTheme({ primary, secondary, tertiary, quaternary })}
           />
         ) : (
           <div className="flex h-full items-center justify-center overflow-y-auto p-4">
