@@ -274,14 +274,14 @@ function LinkPreviewCard({ message, opaque }: { message: ChatMessage; opaque?: b
       target="_blank"
       rel="noreferrer"
       className={`mb-1.5 flex max-w-[75%] items-center gap-3 overflow-hidden rounded-xl border border-overlay/[0.08] backdrop-blur-md transition-colors ${
-        opaque ? 'bg-background/70 hover:bg-background/80' : 'bg-overlay/[0.04] hover:bg-overlay/[0.07]'
+        opaque ? 'bg-background/45 hover:bg-background/55' : 'bg-overlay/[0.04] hover:bg-overlay/[0.07]'
       }`}
     >
       {preview.image && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={preview.image} alt="" className="h-16 w-16 shrink-0 object-cover" />
       )}
-      <div className="min-w-0 flex-1 py-2 pr-3">
+      <div className={`min-w-0 flex-1 py-2 pr-3 ${preview.image ? '' : 'pl-3'}`}>
         <p className="truncate text-sm font-medium text-fg">{preview.title}</p>
         {preview.description && <p className="line-clamp-2 text-xs text-muted">{preview.description}</p>}
         <span className="mt-0.5 flex items-center gap-1 text-[10px] text-accent-soft">
@@ -1665,7 +1665,7 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
                       ) : isJournal ? (
                         <div
                           className={`w-full overflow-x-auto border-l-2 border-accent/40 ${
-                            hasWallpaper ? 'rounded-r-xl bg-background/70 py-2 pl-4 pr-3 backdrop-blur-md' : 'py-1 pl-4'
+                            hasWallpaper ? 'rounded-r-xl bg-background/40 py-2 pl-4 pr-3 backdrop-blur-md' : 'py-1 pl-4'
                           }`}
                           style={{ touchAction: 'pan-y' }}
                         >
