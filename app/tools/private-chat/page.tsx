@@ -1490,14 +1490,16 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           <button
             onClick={() => { setShowGallery(true); loadGallery() }}
             title="Ảnh & file đã gửi"
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-muted transition-all hover:bg-overlay/[0.06] hover:text-fg"
+            className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-overlay/[0.06] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
+            style={themeColor ? { color: themeColor } : undefined}
           >
             <Images size={16} />
           </button>
           <button
             onClick={() => setShowSearch(true)}
             title="Tìm tin nhắn"
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-muted transition-all hover:bg-overlay/[0.06] hover:text-fg"
+            className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-overlay/[0.06] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
+            style={themeColor ? { color: themeColor } : undefined}
           >
             <Search size={16} />
           </button>
@@ -1514,9 +1516,17 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             onClick={() => setShowMoodPicker((v) => !v)}
             title="Trạng thái cảm xúc"
             className={`flex h-9 w-9 items-center justify-center rounded-xl border text-lg transition-all hover:scale-110 ${
-              showMoodPicker ? (themeColor ? '' : 'border-accent/30 bg-accent/[0.12]') : 'border-transparent hover:bg-overlay/[0.06]'
+              showMoodPicker
+                ? themeColor ? '' : 'border-accent/30 bg-accent/[0.12]'
+                : themeColor ? '' : 'border-transparent hover:bg-overlay/[0.06]'
             }`}
-            style={showMoodPicker && themeColor ? { borderColor: `${themeColor}4D`, backgroundColor: `${themeColor}1F` } : undefined}
+            style={
+              themeColor
+                ? showMoodPicker
+                  ? { borderColor: `${themeColor}4D`, backgroundColor: `${themeColor}1F` }
+                  : { borderColor: `${themeColor}26` }
+                : undefined
+            }
           >
             {moodOptions.find((m) => m.id === ownMood)?.emoji ?? '🙂'}
           </button>
@@ -1540,9 +1550,10 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               title={m.label}
               className={`flex flex-col items-center gap-0.5 rounded-xl border px-3 py-2 transition-all hover:scale-105 ${
                 ownMood === m.id
-                  ? 'border-accent bg-accent/[0.15]'
+                  ? themeColor ? '' : 'border-accent bg-accent/[0.15]'
                   : 'border-overlay/[0.06] bg-overlay/[0.03] hover:border-overlay/[0.14]'
               }`}
+              style={ownMood === m.id && themeColor ? { borderColor: themeColor, backgroundColor: `${themeColor}26` } : undefined}
             >
               <span className="text-xl">{m.emoji}</span>
               <span className="text-[10px] text-muted">{m.label}</span>
@@ -2080,11 +2091,13 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all ${
             showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker
               ? `rotate-45 ${themeColor ? '' : 'border-accent/40 bg-accent/[0.15] text-accent-soft'}`
-              : 'border-overlay/[0.08] bg-overlay/[0.03] text-muted hover:border-overlay/[0.14] hover:text-fg'
+              : `border-overlay/[0.08] bg-overlay/[0.03] ${themeColor ? '' : 'text-muted hover:text-fg'}`
           }`}
           style={
-            (showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker) && themeColor
-              ? { borderColor: `${themeColor}66`, backgroundColor: `${themeColor}26`, color: themeColor }
+            themeColor
+              ? (showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker)
+                ? { borderColor: `${themeColor}66`, backgroundColor: `${themeColor}26`, color: themeColor }
+                : { color: themeColor }
               : undefined
           }
         >
@@ -2096,7 +2109,8 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             <button
               onClick={() => { pickMedia(); setShowToolsMenu(false) }}
               title="Gửi ảnh/video"
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition-all hover:-translate-y-0.5 hover:bg-overlay/[0.08] hover:text-fg"
+              className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
+              style={themeColor ? { color: themeColor } : undefined}
             >
               <ImageIcon size={17} />
             </button>
@@ -2104,9 +2118,9 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               onClick={() => { setShowStylePicker((v) => !v); setShowToolsMenu(false) }}
               title="Tùy chỉnh kiểu chữ"
               className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 ${
-                showStylePicker ? (themeColor ? '' : 'bg-accent/[0.15] text-accent-soft') : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
+                showStylePicker ? (themeColor ? '' : 'bg-accent/[0.15] text-accent-soft') : themeColor ? '' : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
               }`}
-              style={showStylePicker && themeColor ? { backgroundColor: `${themeColor}26`, color: themeColor } : undefined}
+              style={themeColor ? (showStylePicker ? { backgroundColor: `${themeColor}26`, color: themeColor } : { color: themeColor }) : undefined}
             >
               <Type size={15} />
             </button>
@@ -2114,9 +2128,9 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
               onClick={() => { setShowCapsulePicker((v) => !v); setShowToolsMenu(false) }}
               title="Tin nhắn hẹn giờ"
               className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 ${
-                showCapsulePicker || capsuleAt ? (themeColor ? '' : 'bg-accent/[0.15] text-accent-soft') : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
+                showCapsulePicker || capsuleAt ? (themeColor ? '' : 'bg-accent/[0.15] text-accent-soft') : themeColor ? '' : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
               }`}
-              style={(showCapsulePicker || capsuleAt) && themeColor ? { backgroundColor: `${themeColor}26`, color: themeColor } : undefined}
+              style={themeColor ? ((showCapsulePicker || capsuleAt) ? { backgroundColor: `${themeColor}26`, color: themeColor } : { color: themeColor }) : undefined}
             >
               <Clock size={15} />
             </button>
@@ -2133,7 +2147,8 @@ function ChatScreen({ session, onLeave }: { session: Session; onLeave: () => voi
             <button
               onClick={() => { pickAttachment(); setShowToolsMenu(false) }}
               title={`Gửi file/video (tối đa ${CHAT_MAX_FILE_SIZE_MB}MB)`}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition-all hover:-translate-y-0.5 hover:bg-overlay/[0.08] hover:text-fg"
+              className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
+              style={themeColor ? { color: themeColor } : undefined}
             >
               <Paperclip size={16} />
             </button>
