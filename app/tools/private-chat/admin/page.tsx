@@ -147,6 +147,16 @@ function AdminPanel() {
     load()
   }
 
+  const renameRoom = async (id: string, name: string) => {
+    if (!name.trim()) return
+    await fetch(`/api/chat/admin/rooms?id=${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim() }),
+    })
+    load()
+  }
+
   const setAnniversary = async (id: string, date: string) => {
     await fetch(`/api/chat/admin/rooms?id=${id}`, {
       method: 'PATCH',
@@ -245,24 +255,24 @@ function AdminPanel() {
 
       <div className="space-y-3 rounded-xl border border-border bg-surface p-4">
         <p className="text-xs uppercase tracking-widest text-muted">Tạo phòng mới</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
             inputMode="numeric"
             placeholder="PIN (4-10 số)"
-            className="w-32 rounded-lg border border-border bg-background px-3 py-2 text-base text-fg outline-none placeholder-muted focus:border-accent sm:text-sm"
+            className="w-28 min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-base text-fg outline-none placeholder-muted focus:border-accent sm:text-sm"
           />
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Tên phòng"
-            className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-base text-fg outline-none placeholder-muted focus:border-accent sm:text-sm"
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-base text-fg outline-none placeholder-muted focus:border-accent sm:text-sm"
           />
           <button
             onClick={create}
             disabled={loading || !pin.trim() || !name.trim()}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
+            className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
           >
             Tạo
           </button>
@@ -287,8 +297,8 @@ function AdminPanel() {
         {rooms.length === 0 && <p className="text-center text-sm text-muted">Chưa có phòng nào</p>}
         {rooms.map((r) => (
           <div key={r.id} className="space-y-3 rounded-xl border border-border bg-surface p-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
               <div className="shrink-0">
                 <input
                   ref={(el) => { if (el) iconInputRefs.current.set(r.id, el) }}
@@ -321,13 +331,18 @@ function AdminPanel() {
                   </button>
                 )}
               </div>
-              <div>
-                <p className="font-medium text-fg">
-                  {r.name}
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-center gap-2">
+                  <input
+                    defaultValue={r.name}
+                    onBlur={(e) => renameRoom(r.id, e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                    className="w-full min-w-0 rounded-lg border border-transparent bg-transparent px-1.5 py-0.5 font-medium text-fg outline-none transition-colors hover:border-border focus:border-accent focus:bg-background"
+                  />
                   {r.type === 'solo' && (
-                    <span className="ml-2 rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-normal text-rose-400">độc thoại</span>
+                    <span className="shrink-0 rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-normal text-rose-400">độc thoại</span>
                   )}
-                </p>
+                </div>
                 <p className="font-mono text-xs text-muted">PIN: {r.pin} · {r.deviceCount} thiết bị</p>
                 <div className="mt-2 flex items-center gap-2">
                   <span className="text-xs text-muted">💞 Ngày bắt đầu yêu:</span>
@@ -340,7 +355,7 @@ function AdminPanel() {
                 </div>
               </div>
             </div>
-            <button onClick={() => remove(r.id)} className="text-xs text-red-400 hover:text-red-300">Xóa</button>
+            <button onClick={() => remove(r.id)} className="shrink-0 text-xs text-red-400 hover:text-red-300">Xóa</button>
           </div>
 
           <div className="grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
