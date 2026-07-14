@@ -31,6 +31,17 @@ interface ToolShellProps {
   ambientBackgroundStyle?: React.CSSProperties
   /** Optional style override for the sticky header bar (e.g. a subtle theme accent). */
   headerStyle?: React.CSSProperties
+  /**
+   * Lets the ambient background layer bleed through the header instead of
+   * sitting behind an opaque bar — so the header reads as part of the same
+   * themed surface as the rest of the page, rather than a flat strip on top.
+   */
+  headerTranslucent?: boolean
+  /**
+   * Hides the header bar entirely (e.g. a tool's own full-screen overlay,
+   * like a search or media view, that shouldn't be covered by it).
+   */
+  hideHeader?: boolean
 }
 
 export function ToolShell({
@@ -42,6 +53,8 @@ export function ToolShell({
   fullBleed = false,
   ambientBackgroundStyle,
   headerStyle,
+  headerTranslucent = false,
+  hideHeader = false,
 }: ToolShellProps) {
   const maxW = wide ? 'max-w-6xl' : 'max-w-4xl'
   const pathname = usePathname()
@@ -63,7 +76,11 @@ export function ToolShell({
         // positive z-index) to still paint above it.
         <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" style={ambientBackgroundStyle} />
       )}
-      <header className="sticky top-0 z-20 shrink-0 border-b border-border bg-background/85 backdrop-blur-md" style={headerStyle}>
+      {!hideHeader && (
+      <header
+        className={`sticky top-0 z-20 shrink-0 border-b border-border backdrop-blur-md ${headerTranslucent ? 'bg-background/35' : 'bg-background/85'}`}
+        style={headerStyle}
+      >
         <div className={`mx-auto flex ${maxW} items-center gap-3 px-4 py-2.5`}>
           <Link
             href="/"
@@ -99,6 +116,7 @@ export function ToolShell({
           </div>
         </div>
       </header>
+      )}
 
       <main className={fullBleed ? 'relative z-10 min-h-0 flex-1 overflow-hidden' : `relative z-10 mx-auto ${maxW} px-4 py-6`}>
         {children}

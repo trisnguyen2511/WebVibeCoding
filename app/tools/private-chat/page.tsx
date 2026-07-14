@@ -151,9 +151,12 @@ function headerAccentStyle(
   if (!primary && !secondary) return undefined
   const a = primary || secondary!
   const b = secondary || primary!
-  const stops = [`linear-gradient(90deg, ${hexAlpha(a, '29')} 0%, transparent 45%, transparent 55%, ${hexAlpha(b, '29')} 100%)`]
+  // Both colors blended evenly across the whole bar (not one side pure a /
+  // other side pure b) so the header reads as one continuous wash matching
+  // the blurred wallpaper glow below it, instead of a distinct two-tone strip.
+  const stops = [`linear-gradient(90deg, ${hexAlpha(a, '22')} 0%, ${hexAlpha(b, '22')} 50%, ${hexAlpha(a, '22')} 100%)`]
   if (quaternary) {
-    stops.push(`radial-gradient(ellipse 50% 160% at 65% 50%, ${hexAlpha(quaternary, '1f')} 0%, transparent 70%)`)
+    stops.push(`radial-gradient(ellipse 60% 160% at 50% 50%, ${hexAlpha(quaternary, '16')} 0%, transparent 70%)`)
   }
   return { backgroundImage: stops.join(', ') }
 }
@@ -553,7 +556,7 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
           onChange={(e) => setNickname(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') join() }}
           placeholder="Tên hiển thị"
-          className="w-full rounded-2xl border border-overlay/[0.08] bg-overlay/[0.04] px-4 py-3.5 text-base text-fg outline-none transition-all placeholder-muted focus:border-accent/60 focus:bg-overlay/[0.06] focus:ring-2 focus:ring-accent/20"
+          className="w-full rounded-2xl border border-overlay/[0.08] bg-overlay/[0.04] px-4 py-3.5 text-base text-fg outline-none transition-all placeholder-fg/40 focus:border-accent/60 focus:bg-overlay/[0.06] focus:ring-2 focus:ring-accent/20"
         />
 
         {error && (
@@ -585,6 +588,7 @@ function ChatScreen({
   session,
   onLeave,
   onThemeChange,
+  onOverlayChange,
 }: {
   session: Session
   onLeave: () => void
@@ -595,6 +599,7 @@ function ChatScreen({
     quaternary?: string | null,
     wallpaperCss?: string
   ) => void
+  onOverlayChange: (open: boolean) => void
 }) {
   // Room customization (mood/reaction/font options, wallpaper, bubble
   // colors, theme font, name, icon, anniversary) is only ever set on the
@@ -686,6 +691,10 @@ function ChatScreen({
   const [searchResults, setSearchResults] = useState<{ id: string; nickname: string; content: string | null; created_at: string }[] | null>(null)
   const [searchLoading, setSearchLoading] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
+  useEffect(() => {
+    onOverlayChange(showSearch || showGallery)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSearch, showGallery])
   const [galleryItems, setGalleryItems] = useState<
     { id: string; nickname: string; image_url: string | null; file_url: string | null; file_name: string | null; file_resource_type: string | null; created_at: string }[]
   >([])
@@ -1442,7 +1451,7 @@ function ChatScreen({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm tin nhắn..."
-                className="w-full rounded-xl border border-overlay/[0.08] bg-overlay/[0.04] py-2 pl-9 pr-3 text-base text-fg outline-none placeholder-muted focus:border-accent/60 sm:text-sm"
+                className="w-full rounded-xl border border-overlay/[0.08] bg-overlay/[0.04] py-2 pl-9 pr-3 text-base text-fg outline-none placeholder-fg/40 focus:border-accent/60 sm:text-sm"
               />
             </div>
           </div>
@@ -1582,9 +1591,9 @@ function ChatScreen({
             <p className="mt-0.5 truncate text-xs font-medium text-accent-soft">
               💞 Yêu nhau được {daysSince(roomInfo.anniversaryDate)} ngày
             </p>
-          ) : (
-            <p className="mt-0.5 text-xs text-muted">{roomType === 'solo' ? 'Độc thoại' : 'Nhóm'}</p>
-          )}
+          ) : roomType !== 'solo' ? (
+            <p className="mt-0.5 text-xs text-muted">Nhóm</p>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -1635,7 +1644,7 @@ function ChatScreen({
             title="Rời phòng"
             className="flex h-9 w-9 items-center justify-center rounded-xl text-muted transition-all hover:bg-overlay/[0.06] hover:text-fg"
           >
-            <LogOut size={15} />
+            {useMosaicIcons ? <ThemedIcon set="mosaic" name="leave" size={17} /> : <LogOut size={15} />}
           </button>
         </div>
       </div>
@@ -2055,7 +2064,7 @@ function ChatScreen({
               onKeyDown={(e) => { if (e.key === 'Enter') confirmOversizePassword() }}
               placeholder="Mật khẩu admin"
               autoFocus
-              className="mt-3 w-full rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] px-4 py-2.5 text-base text-fg outline-none placeholder-muted focus:border-accent/60 sm:text-sm"
+              className="mt-3 w-full rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] px-4 py-2.5 text-base text-fg outline-none placeholder-fg/40 focus:border-accent/60 sm:text-sm"
             />
             {oversizePasswordError && <p className="mt-1.5 text-xs text-red-400">{oversizePasswordError}</p>}
             <div className="mt-4 flex gap-2">
@@ -2352,7 +2361,7 @@ function ChatScreen({
             fontWeight: style.bold ? 700 : undefined,
             fontStyle: style.italic ? 'italic' : undefined,
           }}
-          className="max-h-[120px] flex-1 resize-none overflow-y-auto rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] px-4 py-2.5 text-base text-fg outline-none transition-all placeholder-muted focus:border-accent/60 focus:bg-overlay/[0.05] focus:ring-2 focus:ring-accent/20 sm:text-sm"
+          className="max-h-[120px] flex-1 resize-none overflow-y-auto rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] px-4 py-2.5 text-base text-fg outline-none transition-all placeholder-fg/40 focus:border-accent/60 focus:bg-overlay/[0.05] focus:ring-2 focus:ring-accent/20 sm:text-sm"
         />
 
         <button
@@ -2379,6 +2388,7 @@ export default function PrivateChatPage() {
     quaternary?: string | null
     wallpaperCss?: string
   }>({})
+  const [overlayOpen, setOverlayOpen] = useState(false)
 
   useEffect(() => {
     const raw = localStorage.getItem(SESSION_KEY)
@@ -2393,8 +2403,10 @@ export default function PrivateChatPage() {
       icon="💬"
       description="Đoạn chat riêng tư bằng mã PIN"
       fullBleed
+      hideHeader={overlayOpen}
       ambientBackgroundStyle={ambientWallpaperStyle(theme.wallpaperCss)}
       headerStyle={headerAccentStyle(theme.primary, theme.secondary, theme.quaternary)}
+      headerTranslucent={Boolean(theme.wallpaperCss)}
     >
       <div
         className={`contents ${dancingScript.variable} ${baloo2.variable} ${notoSerif.variable} ${pacifico.variable} ${anton.variable} ${mali.variable} ${lobster.variable}`}
@@ -2406,6 +2418,7 @@ export default function PrivateChatPage() {
             onThemeChange={(primary, secondary, tertiary, quaternary, wallpaperCss) =>
               setTheme({ primary, secondary, tertiary, quaternary, wallpaperCss })
             }
+            onOverlayChange={setOverlayOpen}
           />
         ) : (
           <div className="flex h-full items-center justify-center overflow-y-auto p-4">
