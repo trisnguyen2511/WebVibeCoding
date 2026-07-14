@@ -1,0 +1,7 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Ôm (Tổ ấm)</title>
+  <circle cx="12" cy="8" r="3.4" fill="#D9A544" stroke="#2B1F16" stroke-width="1.6"/>
+    <path d="M5 20c0-4.4 2.7-6.6 7-6.6s7 2.2 7 6.6" fill="#C1615A" stroke="#2B1F16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M5 15.5c1.6 1.6 2.6 3 2.9 4.5M19 15.5c-1.6 1.6-2.6 3-2.9 4.5" stroke="#3E5C3A" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M18.6 3c1.8-.6 3.2.2 3.6 2 .4 1.8-.6 3.4-2.4 3.8-1.4.3-2.6-.3-3.2-1.4-.2 .9-.9 1.5-1.7 1.4.1-2.7 1.6-4.9 3.7-5.8Z" fill="#4A9B9B" stroke="#2B1F16" stroke-width="1"/><path d="M17 8.3c.7-1.8 2-3.4 3.8-4.4" stroke="#2B1F16" stroke-width="0.7" fill="none" stroke-linecap="round"/>
+</svg>
