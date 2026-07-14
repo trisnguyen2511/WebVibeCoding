@@ -2207,9 +2207,11 @@ function ChatScreen({
                 // With text already typed, the icon becomes part of that
                 // message instead of firing the old standalone fly-over
                 // gesture — lets a message mix typed text and an icon.
+                // Picker stays open after inserting so the user can tap
+                // several icons in a row — it only closes on an outside tap
+                // (handled by the shared popover-group click-away listener).
                 if (hasText) {
                   insertIconToken(g.id)
-                  setShowGesturePicker(false)
                 } else {
                   sendGesture(g.id)
                 }
@@ -2237,7 +2239,9 @@ function ChatScreen({
             <button
               key={s.id}
               title={`Chèn "${s.label.toLowerCase()}" vào tin nhắn`}
-              onClick={() => { insertIconToken(s.id); setShowStickerPicker(false) }}
+              // Stays open after inserting — tap several stickers in a row,
+              // it only closes on an outside tap.
+              onClick={() => insertIconToken(s.id)}
               className="flex flex-col items-center gap-1 rounded-xl border border-overlay/[0.06] bg-overlay/[0.03] py-2 text-[10px] text-muted transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:bg-accent/[0.07] hover:text-white"
             >
               {useMosaicIcons ? (
@@ -2373,27 +2377,27 @@ function ChatScreen({
                 </button>
                 <button
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => { setShowGesturePicker((v) => !v); setShowToolsMenu(false) }}
-                  title="Gửi cử chỉ"
+                  onClick={() => { setShowStickerPicker((v) => !v); setShowToolsMenu(false) }}
+                  title="Chèn biểu cảm"
                   className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 ${
-                    showGesturePicker ? (themeColor ? '' : 'bg-accent/[0.15] text-accent-soft') : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
+                    showStickerPicker ? (themeColor ? '' : 'bg-accent/[0.15] text-accent-soft') : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
                   }`}
-                  style={showGesturePicker && themeColor ? { backgroundColor: `${themeColor}26`, color: themeColor } : undefined}
+                  style={showStickerPicker && themeColor ? { backgroundColor: `${themeColor}26`, color: themeColor } : undefined}
                 >
-                  <span className="text-base">🤗</span>
+                  {useMosaicIcons ? <ThemedIcon set="mosaic" name="sticker-grin" size={19} /> : <span className="text-base">😄</span>}
                 </button>
               </>
             )}
             <button
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { setShowStickerPicker((v) => !v); setShowToolsMenu(false) }}
-              title="Chèn biểu cảm"
+              onClick={() => { setShowGesturePicker((v) => !v); setShowToolsMenu(false) }}
+              title="Gửi cử chỉ"
               className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 ${
-                showStickerPicker ? (themeColor ? '' : 'bg-accent/[0.15] text-accent-soft') : themeColor ? '' : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
+                showGesturePicker ? (themeColor ? '' : 'bg-accent/[0.15] text-accent-soft') : themeColor ? '' : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
               }`}
-              style={themeColor ? (showStickerPicker ? { backgroundColor: `${themeColor}26`, color: themeColor } : { color: themeColor }) : undefined}
+              style={themeColor ? (showGesturePicker ? { backgroundColor: `${themeColor}26`, color: themeColor } : { color: themeColor }) : undefined}
             >
-              {useMosaicIcons ? <ThemedIcon set="mosaic" name="sticker-grin" size={19} /> : <span className="text-base">😄</span>}
+              <span className="text-base">🤗</span>
             </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
@@ -2446,22 +2450,22 @@ function ChatScreen({
           <button
             data-popover-group="tools"
             onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setShowGesturePicker((v) => !v)}
-            title="Gửi cử chỉ"
+            onClick={() => setShowStickerPicker((v) => !v)}
+            title="Chèn biểu cảm"
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all ${
-              showGesturePicker
+              showStickerPicker
                 ? themeColor ? '' : 'border-accent/40 bg-accent/[0.15]'
                 : `border-overlay/[0.08] bg-overlay/[0.03] hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`
             }`}
             style={
               themeColor
-                ? showGesturePicker
+                ? showStickerPicker
                   ? { borderColor: `${themeColor}66`, backgroundColor: `${themeColor}26` }
                   : { color: themeColor }
                 : undefined
             }
           >
-            <span className="text-base">🤗</span>
+            {useMosaicIcons ? <ThemedIcon set="mosaic" name="sticker-grin" size={21} /> : <span className="text-base">😄</span>}
           </button>
         </div>
 
