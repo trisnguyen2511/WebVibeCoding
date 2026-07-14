@@ -124,6 +124,16 @@ function fontStyleFor(font?: string | null): React.CSSProperties {
   }
 }
 
+// One SVG per theme-provided icon set, stored as static assets (not
+// generated at runtime) — see public/icons/<slug>/*.svg. Falls back to
+// whatever lucide icon the caller renders as children when no set applies.
+function ThemedIcon({ set, name, size, className }: { set: string; name: string; size: number; className?: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={`/icons/${set}/${name}.svg`} width={size} height={size} className={className} alt="" />
+  )
+}
+
 function hexAlpha(hex: string, alphaHex: string): string {
   return /^#[0-9a-fA-F]{6}$/.test(hex) ? `${hex}${alphaHex}` : hex
 }
@@ -141,9 +151,12 @@ function headerAccentStyle(
   if (!primary && !secondary) return undefined
   const a = primary || secondary!
   const b = secondary || primary!
-  const stops = [`linear-gradient(90deg, ${hexAlpha(a, '29')} 0%, transparent 45%, transparent 55%, ${hexAlpha(b, '29')} 100%)`]
+  // Both colors blended evenly across the whole bar (not one side pure a /
+  // other side pure b) so the header reads as one continuous wash matching
+  // the blurred wallpaper glow below it, instead of a distinct two-tone strip.
+  const stops = [`linear-gradient(90deg, ${hexAlpha(a, '22')} 0%, ${hexAlpha(b, '22')} 50%, ${hexAlpha(a, '22')} 100%)`]
   if (quaternary) {
-    stops.push(`radial-gradient(ellipse 50% 160% at 65% 50%, ${hexAlpha(quaternary, '1f')} 0%, transparent 70%)`)
+    stops.push(`radial-gradient(ellipse 60% 160% at 50% 50%, ${hexAlpha(quaternary, '16')} 0%, transparent 70%)`)
   }
   return { backgroundImage: stops.join(', ') }
 }
@@ -543,7 +556,7 @@ function JoinScreen({ onJoined }: { onJoined: (session: Session) => void }) {
           onChange={(e) => setNickname(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') join() }}
           placeholder="Tên hiển thị"
-          className="w-full rounded-2xl border border-overlay/[0.08] bg-overlay/[0.04] px-4 py-3.5 text-base text-fg outline-none transition-all placeholder-muted focus:border-accent/60 focus:bg-overlay/[0.06] focus:ring-2 focus:ring-accent/20"
+          className="w-full rounded-2xl border border-overlay/[0.08] bg-overlay/[0.04] px-4 py-3.5 text-base text-fg outline-none transition-all placeholder-fg/40 focus:border-accent/60 focus:bg-overlay/[0.06] focus:ring-2 focus:ring-accent/20"
         />
 
         {error && (
@@ -575,6 +588,7 @@ function ChatScreen({
   session,
   onLeave,
   onThemeChange,
+  onOverlayChange,
 }: {
   session: Session
   onLeave: () => void
@@ -585,6 +599,7 @@ function ChatScreen({
     quaternary?: string | null,
     wallpaperCss?: string
   ) => void
+  onOverlayChange: (open: boolean) => void
 }) {
   // Room customization (mood/reaction/font options, wallpaper, bubble
   // colors, theme font, name, icon, anniversary) is only ever set on the
@@ -626,6 +641,10 @@ function ChatScreen({
   const fontOptions = roomInfo.fontOptions && roomInfo.fontOptions.length > 0 ? roomInfo.fontOptions : FONT_CATALOG
   const wallpaperCss = roomInfo.wallpaperUrl ? undefined : resolveWallpaperCss(roomInfo)
   const hasWallpaper = Boolean(roomInfo.wallpaperUrl || wallpaperCss)
+  // The mosaic (Talavera) theme ships its own hand-drawn icon set — bold
+  // black outlines + the same 4 tile colors — swapped in only for that
+  // preset, never touching the app's default lucide icons elsewhere.
+  const useMosaicIcons = roomInfo.wallpaperPreset === 'mosaic'
   const themeColor = roomInfo.primaryColor
   // Informational highlight color (pinned message, link previews, chosen
   // reactions) and a quieter secondary accent (outer aurora's extra blob) —
@@ -672,6 +691,10 @@ function ChatScreen({
   const [searchResults, setSearchResults] = useState<{ id: string; nickname: string; content: string | null; created_at: string }[] | null>(null)
   const [searchLoading, setSearchLoading] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
+  useEffect(() => {
+    onOverlayChange(showSearch || showGallery)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSearch, showGallery])
   const [galleryItems, setGalleryItems] = useState<
     { id: string; nickname: string; image_url: string | null; file_url: string | null; file_name: string | null; file_resource_type: string | null; created_at: string }[]
   >([])
@@ -1428,7 +1451,7 @@ function ChatScreen({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm tin nhắn..."
-                className="w-full rounded-xl border border-overlay/[0.08] bg-overlay/[0.04] py-2 pl-9 pr-3 text-base text-fg outline-none placeholder-muted focus:border-accent/60 sm:text-sm"
+                className="w-full rounded-xl border border-overlay/[0.08] bg-overlay/[0.04] py-2 pl-9 pr-3 text-base text-fg outline-none placeholder-fg/40 focus:border-accent/60 sm:text-sm"
               />
             </div>
           </div>
@@ -1568,9 +1591,9 @@ function ChatScreen({
             <p className="mt-0.5 truncate text-xs font-medium text-accent-soft">
               💞 Yêu nhau được {daysSince(roomInfo.anniversaryDate)} ngày
             </p>
-          ) : (
-            <p className="mt-0.5 text-xs text-muted">{roomType === 'solo' ? 'Độc thoại' : 'Nhóm'}</p>
-          )}
+          ) : roomType !== 'solo' ? (
+            <p className="mt-0.5 text-xs text-muted">Nhóm</p>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -1579,7 +1602,7 @@ function ChatScreen({
             className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-overlay/[0.06] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
             style={themeColor ? { color: themeColor } : undefined}
           >
-            <Images size={16} />
+            {useMosaicIcons ? <ThemedIcon set="mosaic" name="gallery" size={18} /> : <Images size={16} />}
           </button>
           <button
             onClick={() => setShowSearch(true)}
@@ -1587,7 +1610,7 @@ function ChatScreen({
             className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-overlay/[0.06] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
             style={themeColor ? { color: themeColor } : undefined}
           >
-            <Search size={16} />
+            {useMosaicIcons ? <ThemedIcon set="mosaic" name="search" size={18} /> : <Search size={16} />}
           </button>
           {otherMood && (
             <span
@@ -1621,7 +1644,7 @@ function ChatScreen({
             title="Rời phòng"
             className="flex h-9 w-9 items-center justify-center rounded-xl text-muted transition-all hover:bg-overlay/[0.06] hover:text-fg"
           >
-            <LogOut size={15} />
+            {useMosaicIcons ? <ThemedIcon set="mosaic" name="leave" size={17} /> : <LogOut size={15} />}
           </button>
         </div>
       </div>
@@ -1934,7 +1957,7 @@ function ChatScreen({
                         onClick={() => setReactionPickerFor(reactionPickerFor === m.id ? null : m.id)}
                         className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-overlay/[0.08] hover:text-fg"
                       >
-                        <SmilePlus size={13} />
+                        {useMosaicIcons ? <ThemedIcon set="mosaic" name="reaction" size={16} /> : <SmilePlus size={13} />}
                       </button>
                       {!m.locked && (
                         <button
@@ -2041,7 +2064,7 @@ function ChatScreen({
               onKeyDown={(e) => { if (e.key === 'Enter') confirmOversizePassword() }}
               placeholder="Mật khẩu admin"
               autoFocus
-              className="mt-3 w-full rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] px-4 py-2.5 text-base text-fg outline-none placeholder-muted focus:border-accent/60 sm:text-sm"
+              className="mt-3 w-full rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] px-4 py-2.5 text-base text-fg outline-none placeholder-fg/40 focus:border-accent/60 sm:text-sm"
             />
             {oversizePasswordError && <p className="mt-1.5 text-xs text-red-400">{oversizePasswordError}</p>}
             <div className="mt-4 flex gap-2">
@@ -2078,8 +2101,8 @@ function ChatScreen({
       {/* ── Time capsule picker ─────────────────────────────────── */}
       {showCapsulePicker && (
         <div data-popover-group="tools" className="mt-2 flex items-center gap-2.5 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] p-3 backdrop-blur-xl animate-panel-in">
-          <Clock size={14} className="shrink-0 text-accent-soft" />
-          <span className="text-xs text-muted">Mở lúc</span>
+          {useMosaicIcons ? <ThemedIcon set="mosaic" name="timer" size={16} className="shrink-0" /> : <Clock size={14} className="shrink-0 text-accent-soft" />}
+          <span className="text-xs text-fg/70">Mở lúc</span>
           <input
             type="datetime-local"
             value={capsuleAt}
@@ -2088,7 +2111,7 @@ function ChatScreen({
           />
           <button
             onClick={() => { setCapsuleAt(''); setShowCapsulePicker(false) }}
-            className="text-xs text-muted transition-colors hover:text-fg"
+            className="text-xs text-fg/70 transition-colors hover:text-fg"
           >
             Huỷ
           </button>
@@ -2115,7 +2138,7 @@ function ChatScreen({
       {showStylePicker && (
         <div data-popover-group="tools" className="mt-2 space-y-3 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] p-4 backdrop-blur-xl animate-panel-in">
           <div className="flex items-center gap-3">
-            <span className="w-16 shrink-0 text-xs text-muted">Màu chữ</span>
+            <span className="w-16 shrink-0 text-xs text-fg/70">Màu chữ</span>
             <div className="flex flex-wrap gap-2">
               {COLOR_PRESETS.map((c) => (
                 <button
@@ -2133,7 +2156,7 @@ function ChatScreen({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="w-16 shrink-0 text-xs text-muted">Font chữ</span>
+            <span className="w-16 shrink-0 text-xs text-fg/70">Font chữ</span>
             <div className="flex flex-1 gap-1.5 overflow-x-auto pb-1">
               {fontOptions.map((f) => (
                 <button
@@ -2143,7 +2166,7 @@ function ChatScreen({
                   className={`shrink-0 rounded-xl border px-3 py-1 text-xs transition-all ${
                     (style.font ?? 'sans') === f.id
                       ? 'border-accent bg-accent/[0.15] text-accent-soft shadow-[0_0_12px_rgba(124,58,237,0.2)]'
-                      : 'border-overlay/[0.08] bg-overlay/[0.03] text-muted hover:text-fg'
+                      : 'border-overlay/[0.08] bg-overlay/[0.03] text-fg/70 hover:text-fg'
                   }`}
                 >
                   {f.label}
@@ -2152,14 +2175,14 @@ function ChatScreen({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="w-16 shrink-0 text-xs text-muted">Kiểu chữ</span>
+            <span className="w-16 shrink-0 text-xs text-fg/70">Kiểu chữ</span>
             <div className="flex gap-2">
               <button
                 onClick={() => updateStyle({ bold: !style.bold })}
                 className={`h-8 w-8 rounded-xl border font-bold text-sm transition-all ${
                   style.bold
                     ? 'border-accent bg-accent/[0.15] text-accent-soft'
-                    : 'border-overlay/[0.08] bg-overlay/[0.03] text-muted hover:text-fg'
+                    : 'border-overlay/[0.08] bg-overlay/[0.03] text-fg/70 hover:text-fg'
                 }`}
               >
                 B
@@ -2169,7 +2192,7 @@ function ChatScreen({
                 className={`h-8 w-8 rounded-xl border text-sm italic transition-all ${
                   style.italic
                     ? 'border-accent bg-accent/[0.15] text-accent-soft'
-                    : 'border-overlay/[0.08] bg-overlay/[0.03] text-muted hover:text-fg'
+                    : 'border-overlay/[0.08] bg-overlay/[0.03] text-fg/70 hover:text-fg'
                 }`}
               >
                 I
@@ -2214,7 +2237,7 @@ function ChatScreen({
               : undefined
           }
         >
-          <Plus size={18} />
+          {useMosaicIcons ? <ThemedIcon set="mosaic" name="plus" size={20} /> : <Plus size={18} />}
         </button>
 
         {showToolsMenu && (
@@ -2228,7 +2251,7 @@ function ChatScreen({
                   className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
                   style={themeColor ? { color: themeColor } : undefined}
                 >
-                  <ImageIcon size={17} />
+                  {useMosaicIcons ? <ThemedIcon set="mosaic" name="image" size={19} /> : <ImageIcon size={17} />}
                 </button>
                 <button
                   onMouseDown={(e) => e.preventDefault()}
@@ -2252,7 +2275,7 @@ function ChatScreen({
               }`}
               style={themeColor ? (showStylePicker ? { backgroundColor: `${themeColor}26`, color: themeColor } : { color: themeColor }) : undefined}
             >
-              <Type size={15} />
+              {useMosaicIcons ? <ThemedIcon set="mosaic" name="font" size={17} /> : <Type size={15} />}
             </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
@@ -2263,7 +2286,7 @@ function ChatScreen({
               }`}
               style={themeColor ? ((showCapsulePicker || capsuleAt) ? { backgroundColor: `${themeColor}26`, color: themeColor } : { color: themeColor }) : undefined}
             >
-              <Clock size={15} />
+              {useMosaicIcons ? <ThemedIcon set="mosaic" name="timer" size={17} /> : <Clock size={15} />}
             </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
@@ -2272,7 +2295,7 @@ function ChatScreen({
               className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
               style={themeColor ? { color: themeColor } : undefined}
             >
-              <Paperclip size={16} />
+              {useMosaicIcons ? <ThemedIcon set="mosaic" name="attachment" size={18} /> : <Paperclip size={16} />}
             </button>
           </div>
         )}
@@ -2289,7 +2312,7 @@ function ChatScreen({
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] transition-all hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
             style={themeColor ? { color: themeColor } : undefined}
           >
-            <ImageIcon size={17} />
+            {useMosaicIcons ? <ThemedIcon set="mosaic" name="image" size={19} /> : <ImageIcon size={17} />}
           </button>
           <button
             data-popover-group="tools"
@@ -2338,7 +2361,7 @@ function ChatScreen({
             fontWeight: style.bold ? 700 : undefined,
             fontStyle: style.italic ? 'italic' : undefined,
           }}
-          className="max-h-[120px] flex-1 resize-none overflow-y-auto rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] px-4 py-2.5 text-base text-fg outline-none transition-all placeholder-muted focus:border-accent/60 focus:bg-overlay/[0.05] focus:ring-2 focus:ring-accent/20 sm:text-sm"
+          className="max-h-[120px] flex-1 resize-none overflow-y-auto rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] px-4 py-2.5 text-base text-fg outline-none transition-all placeholder-fg/40 focus:border-accent/60 focus:bg-overlay/[0.05] focus:ring-2 focus:ring-accent/20 sm:text-sm"
         />
 
         <button
@@ -2349,7 +2372,7 @@ function ChatScreen({
           }`}
           style={themeColor ? { backgroundColor: themeColor } : undefined}
         >
-          <Send size={16} />
+          {useMosaicIcons ? <ThemedIcon set="mosaic" name="send" size={18} /> : <Send size={16} />}
         </button>
       </div>
     </div>
@@ -2365,6 +2388,7 @@ export default function PrivateChatPage() {
     quaternary?: string | null
     wallpaperCss?: string
   }>({})
+  const [overlayOpen, setOverlayOpen] = useState(false)
 
   useEffect(() => {
     const raw = localStorage.getItem(SESSION_KEY)
@@ -2379,8 +2403,10 @@ export default function PrivateChatPage() {
       icon="💬"
       description="Đoạn chat riêng tư bằng mã PIN"
       fullBleed
+      hideHeader={overlayOpen}
       ambientBackgroundStyle={ambientWallpaperStyle(theme.wallpaperCss)}
       headerStyle={headerAccentStyle(theme.primary, theme.secondary, theme.quaternary)}
+      headerTranslucent={Boolean(theme.wallpaperCss)}
     >
       <div
         className={`contents ${dancingScript.variable} ${baloo2.variable} ${notoSerif.variable} ${pacifico.variable} ${anton.variable} ${mali.variable} ${lobster.variable}`}
@@ -2392,6 +2418,7 @@ export default function PrivateChatPage() {
             onThemeChange={(primary, secondary, tertiary, quaternary, wallpaperCss) =>
               setTheme({ primary, secondary, tertiary, quaternary, wallpaperCss })
             }
+            onOverlayChange={setOverlayOpen}
           />
         ) : (
           <div className="flex h-full items-center justify-center overflow-y-auto p-4">

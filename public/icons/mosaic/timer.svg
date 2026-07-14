@@ -1,0 +1,12 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Tin nhắn hẹn giờ (Talavera)</title>
+  <circle cx="11.5" cy="13" r="8.5" fill="#F2A80F" stroke="#0B0B0F" stroke-width="1.8"/>
+  <circle cx="11.5" cy="13" r="5.2" fill="none" stroke="#FDF6E3" stroke-width="1.1"/>
+  <path d="M11.5 9.4V13l3 1.8" stroke="#0B0B0F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M9 2.4h5" stroke="#0B0B0F" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M17.2 5.4 18.6 4" stroke="#0B0B0F" stroke-width="1.6" stroke-linecap="round"/>
+  <g stroke="#0B0B0F" stroke-width="0.8" stroke-linecap="round">
+    <path d="M20.3 8.6v-.9M20.3 11.2v.9M22.3 9.9h-.9M18.7 9.9h.9M21.5 8.4l.6-.6M18.5 11.4l-.6.6M21.5 11.4l.6.6M18.5 8.4l-.6-.6"/>
+  </g>
+  <circle cx="20.3" cy="9.9" r="1.4" fill="#2F9E4F" stroke="#0B0B0F" stroke-width="1"/>
+</svg>
