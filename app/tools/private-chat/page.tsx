@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import Link from 'next/link'
 import { LogOut, Pin, Reply, SmilePlus, Clock, Image as ImageIcon, Type, Send, MessageCircle, BookOpen, X, Plus, Lock, Paperclip, FileIcon, Search, Images, ExternalLink, ArrowLeft } from 'lucide-react'
 import { ToolShell } from '@/components/tool-shell'
@@ -132,6 +132,28 @@ function ThemedIcon({ set, name, size, className }: { set: string; name: string;
     // eslint-disable-next-line @next/next/no-img-element
     <img src={`/icons/${set}/${name}.svg`} width={size} height={size} className={className} alt="" />
   )
+}
+
+// Lets a message mix typed text with an inline themed icon (e.g. "Nhớ em
+// quá :hug:") — the gesture picker inserts these tokens into the input
+// instead of only ever sending a whole canned gesture message. Falls back to
+// the gesture's own emoji when the room has no custom icon set, so a token
+// never renders as literal ":hug:" text.
+const GESTURE_TOKEN_RE = /(:hug:|:pat:|:wave:|:kiss:)/g
+
+function renderMessageContent(content: string, useMosaicIcons: boolean): React.ReactNode {
+  const parts = content.split(GESTURE_TOKEN_RE)
+  if (parts.length === 1) return content
+  return parts.map((part, i) => {
+    const id = part.startsWith(':') ? part.slice(1, -1) : null
+    const gesture = id ? GESTURE_OPTIONS.find((g) => g.id === id) : null
+    if (!gesture) return <Fragment key={i}>{part}</Fragment>
+    return useMosaicIcons ? (
+      <ThemedIcon key={i} set="mosaic" name={`gesture-${gesture.id}`} size={20} className="mx-0.5 inline-block align-text-bottom" />
+    ) : (
+      <span key={i} className="mx-0.5">{gesture.emoji}</span>
+    )
+  })
 }
 
 function hexAlpha(hex: string, alphaHex: string): string {
@@ -1871,7 +1893,7 @@ function ChatScreen({
                                 fontStyle: m.italic ? 'italic' : undefined,
                               }}
                             >
-                              {m.content}
+                              {renderMessageContent(m.content, useMosaicIcons)}
                             </p>
                           )}
                           {activeActionsFor === m.id && (
@@ -1905,7 +1927,7 @@ function ChatScreen({
                                 fontStyle: m.italic ? 'italic' : undefined,
                               }}
                             >
-                              {m.content}
+                              {renderMessageContent(m.content, useMosaicIcons)}
                             </div>
                           )}
                         </>
@@ -2128,10 +2150,26 @@ function ChatScreen({
           {GESTURE_OPTIONS.map((g) => (
             <button
               key={g.id}
-              onClick={() => sendGesture(g.id)}
+              title={hasText ? `Chèn ${g.label.toLowerCase()} vào tin nhắn` : `Gửi ${g.label.toLowerCase()}`}
+              onClick={() => {
+                // With text already typed, the icon becomes part of that
+                // message instead of firing the old standalone fly-over
+                // gesture — lets a message mix typed text and an icon.
+                if (hasText) {
+                  handleInputChange(`${input}${input.endsWith(' ') || !input ? '' : ' '}:${g.id}: `)
+                  setShowGesturePicker(false)
+                  messageInputRef.current?.focus()
+                } else {
+                  sendGesture(g.id)
+                }
+              }}
               className="flex flex-col items-center gap-1 rounded-xl border border-overlay/[0.06] bg-overlay/[0.03] py-2.5 text-xs text-muted transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:bg-accent/[0.07] hover:text-white"
             >
-              <span className="text-xl">{g.emoji}</span>
+              {useMosaicIcons ? (
+                <ThemedIcon set="mosaic" name={`gesture-${g.id}`} size={22} />
+              ) : (
+                <span className="text-xl">{g.emoji}</span>
+              )}
               {g.label}
             </button>
           ))}
