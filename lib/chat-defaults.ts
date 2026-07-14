@@ -51,10 +51,9 @@ export const WALLPAPER_PRESETS: { id: WallpaperPresetId; label: string; css: str
   {
     id: 'burrow',
     label: 'Tổ ấm trong hốc cây',
-    // Soft layered glow instead of a literal image — the reference photo is a
-    // busy game-UI screenshot (currency counters, buttons baked in), not
-    // something that tiles cleanly as a chat background.
-    css: 'radial-gradient(circle at 25% 10%, rgba(217,165,68,0.20), transparent 55%), linear-gradient(180deg, rgba(62,92,58,0.22), rgba(43,31,22,0.18) 55%, transparent), radial-gradient(circle at 80% 85%, rgba(74,155,155,0.14), transparent 50%)',
+    // The reference photo cropped down to just the cozy room scene (top
+    // status bar/currency HUD and bottom tool dock removed).
+    css: "url('/wallpapers/burrow-room.jpg')",
   },
 ]
 

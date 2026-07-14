@@ -1,0 +1,8 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Tiệc tùng (Tổ ấm)</title>
+  <circle cx="12" cy="12.5" r="9" fill="#D9A544" stroke="#2B1F16" stroke-width="1.8"/>
+  <circle cx="8.7" cy="11" r="1" fill="#2B1F16"/><circle cx="15.3" cy="11" r="1" fill="#2B1F16"/>
+  <path d="M7.8 14.6c1 2 2.7 3.1 4.2 3.1s3.2-1.1 4.2-3.1c-2.8.8-5.6.8-8.4 0Z" fill="#FBF3E1" stroke="#2B1F16" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M8 4.6 12 2l1.2 4.4Z" fill="#C1615A" stroke="#2B1F16" stroke-width="1.2" stroke-linejoin="round"/><circle cx="9" cy="3.4" r="0.7" fill="#3E5C3A"/><circle cx="12.6" cy="4.2" r="0.6" fill="#4A9B9B"/>
+  <path d="M18.6 3c1.8-.6 3.2.2 3.6 2 .4 1.8-.6 3.4-2.4 3.8-1.4.3-2.6-.3-3.2-1.4-.2 .9-.9 1.5-1.7 1.4.1-2.7 1.6-4.9 3.7-5.8Z" fill="#4A9B9B" stroke="#2B1F16" stroke-width="1"/><path d="M17 8.3c.7-1.8 2-3.4 3.8-4.4" stroke="#2B1F16" stroke-width="0.7" fill="none" stroke-linecap="round"/>
+</svg>

@@ -204,7 +204,7 @@ const ICON_TOKEN_RE = new RegExp(`(${ICON_TOKEN_OPTIONS.map((o) => `:${o.id}:`).
 // Not every icon set has drawn the full 32-sticker pack yet (it's the bulk
 // of the work) — themes not listed here still get their gesture-* icons,
 // they just fall back to the plain emoji for sticker-* until drawn.
-const ICON_SETS_WITH_STICKERS = new Set(['mosaic'])
+const ICON_SETS_WITH_STICKERS = new Set(['mosaic', 'burrow'])
 
 function renderMessageContent(content: string, iconSet: string | null): React.ReactNode {
   const parts = content.split(ICON_TOKEN_RE)

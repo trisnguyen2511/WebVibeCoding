@@ -1,0 +1,10 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Nhìn (Tổ ấm)</title>
+  <ellipse cx="7.8" cy="13" rx="3" ry="3.6" fill="#FBF3E1" stroke="#2B1F16" stroke-width="1.6"/>
+  <ellipse cx="16.2" cy="13" rx="3" ry="3.6" fill="#FBF3E1" stroke="#2B1F16" stroke-width="1.6"/>
+  <circle cx="8.6" cy="13.6" r="1.5" fill="#3E5C3A" stroke="#2B1F16" stroke-width="1"/>
+  <circle cx="17" cy="13.6" r="1.5" fill="#3E5C3A" stroke="#2B1F16" stroke-width="1"/>
+  <circle cx="8.9" cy="13.1" r="0.5" fill="#FBF3E1"/>
+  <circle cx="17.3" cy="13.1" r="0.5" fill="#FBF3E1"/>
+  <path d="M18.6 3c1.8-.6 3.2.2 3.6 2 .4 1.8-.6 3.4-2.4 3.8-1.4.3-2.6-.3-3.2-1.4-.2 .9-.9 1.5-1.7 1.4.1-2.7 1.6-4.9 3.7-5.8Z" fill="#C1615A" stroke="#2B1F16" stroke-width="1"/><path d="M17 8.3c.7-1.8 2-3.4 3.8-4.4" stroke="#2B1F16" stroke-width="0.7" fill="none" stroke-linecap="round"/>
+</svg>

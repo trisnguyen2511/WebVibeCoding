@@ -48,9 +48,12 @@ needs one addition to `ICON_SET_SLUGS`**, not touching every call site again.
 Stickers are the one exception: only sets listed in `ICON_SETS_WITH_STICKERS`
 render themed sticker-*/gesture-* tokens for the 32-item pack — a set not
 yet in that list still gets themed chrome+gesture icons, but falls back to
-the plain emoji for stickers specifically, so a partial-scope theme (see
-`burrow`, which shipped chrome+gesture only) never 404s on a missing SVG.
-Add a theme to `ICON_SETS_WITH_STICKERS` once its 32 sticker-*.svg exist.
+the plain emoji for stickers specifically, so a partial-scope theme never
+404s on a missing SVG mid-rollout. Both `mosaic` and `burrow` now have the
+full 32-sticker set and are in that list — add a new theme to it once its
+own 32 sticker-*.svg exist (burrow's were drawn as a same-day follow-up
+after the chrome+gesture set shipped first, so it's fine to sequence it
+that way if the 46-icon total doesn't fit in one pass).
 
 ## Steps
 
