@@ -86,13 +86,15 @@ lookup wired the same way — this is manual work every time, not automatic.
    currently themeable — check `app/tools/private-chat/page.tsx` for the
    current full list (as of writing: `send`, `image`, `gallery`, `search`,
    `plus`, `reaction`, `font`, `timer`, `attachment`, `leave`, `pin`, `reply`,
-   `gesture-hug`, `gesture-pat`, `gesture-wave`, `gesture-kiss` — **re-check
-   the file, this list grows**; see rule below). The `gesture-*` icons are
-   also inlined *inside* message text via `renderMessageContent()`'s
-   `:hug:`/`:pat:`/`:wave:`/`:kiss:` tokens (inserted by the gesture picker
-   when the input already has text) — not just standalone UI buttons, so
-   don't skip them thinking they're covered by the plain `reaction` icon.
-   Style rules, consistent across
+   4 `gesture-*` icons, and 32 `sticker-*` icons — **re-check the file
+   (`GESTURE_OPTIONS`/`STICKER_OPTIONS`/`ICON_TOKEN_OPTIONS`), this list
+   grows**; see rule below). The `gesture-*` and `sticker-*` icons are
+   inlined *inside* message text via `renderMessageContent()`'s `:id:` tokens
+   (inserted by the gesture/sticker pickers) — not just standalone UI
+   buttons, so don't skip them thinking they're covered by the plain
+   `reaction` icon. A new theme needs all 32 `sticker-*` drawn too, not just
+   the smaller UI-chrome set — budget real time for this, it's the bulk of
+   the work. Style rules, consistent across
    every theme's set so they all feel like "one family" of a shared system:
    - viewBox `0 0 24 24`, bold ~1.5-2px black (`#0B0B0F`) outlines
    - filled with the theme's own 4 palette colors (name which color = which

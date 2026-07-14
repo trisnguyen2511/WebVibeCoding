@@ -93,6 +93,44 @@ const GESTURE_OPTIONS: { id: string; emoji: string; label: string }[] = [
   { id: 'kiss', emoji: '😘', label: 'Hôn' },
 ]
 
+// A separate, larger set of expressive icons that only ever get inserted
+// inline into typed text (":laugh:" etc, via renderMessageContent) — unlike
+// GESTURE_OPTIONS, these have no standalone fly-over send.
+const STICKER_OPTIONS: { id: string; emoji: string; label: string }[] = [
+  { id: 'laugh', emoji: '😆', label: 'Cười ngoác' },
+  { id: 'lol', emoji: '😂', label: 'Cười ra lệ' },
+  { id: 'sob', emoji: '😭', label: 'Khóc to' },
+  { id: 'kiss-closed', emoji: '😚', label: 'Hôn mắt nhắm' },
+  { id: 'blow-kiss', emoji: '😘', label: 'Hôn gió' },
+  { id: 'love', emoji: '🥰', label: 'Yêu' },
+  { id: 'party', emoji: '🥳', label: 'Tiệc tùng' },
+  { id: 'melting', emoji: '🫠', label: 'Tan chảy' },
+  { id: 'smile-tear', emoji: '🥲', label: 'Cười rưng rưng' },
+  { id: 'holding-tears', emoji: '🥹', label: 'Kìm nước mắt' },
+  { id: 'smirk', emoji: '😏', label: 'Nhếch mép' },
+  { id: 'goofy', emoji: '🤪', label: 'Tưng tửng' },
+  { id: 'wink-tongue', emoji: '😜', label: 'Nháy mắt lè lưỡi' },
+  { id: 'tongue-eyes-closed', emoji: '😝', label: 'Lè lưỡi nhắm mắt' },
+  { id: 'blank', emoji: '😑', label: 'Vô cảm' },
+  { id: 'thinking', emoji: '🤔', label: 'Suy nghĩ' },
+  { id: 'giggle', emoji: '🤭', label: 'Che miệng cười' },
+  { id: 'peek', emoji: '🫣', label: 'Nhìn qua kẽ tay' },
+  { id: 'scream', emoji: '😱', label: 'Hét sợ' },
+  { id: 'cursing', emoji: '🤬', label: 'Chửi' },
+  { id: 'angry', emoji: '😡', label: 'Giận dữ' },
+  { id: 'sweat', emoji: '😓', label: 'Toát mồ hôi' },
+  { id: 'angel', emoji: '😇', label: 'Thiên thần' },
+  { id: 'fire', emoji: '🔥', label: 'Lửa' },
+  { id: 'lips', emoji: '💋', label: 'Dấu môi hôn' },
+  { id: 'confetti', emoji: '🎉', label: 'Ăn mừng' },
+  { id: 'eyes', emoji: '👀', label: 'Nhìn' },
+  { id: 'poop', emoji: '💩', label: 'Xui xẻo' },
+  { id: 'vomit', emoji: '🤮', label: 'Buồn nôn' },
+  { id: 'unamused', emoji: '😒', label: 'Chán' },
+  { id: 'heart-eyes', emoji: '😍', label: 'Mắt trái tim' },
+  { id: 'grin', emoji: '😄', label: 'Cười tươi' },
+]
+
 // Fixed mapping of every font id that can ever be stored on a message — kept
 // separate from FONT_CATALOG (which is just id+label metadata a room can
 // pick a subset of) so old messages always render correctly regardless of
@@ -139,19 +177,25 @@ function ThemedIcon({ set, name, size, className }: { set: string; name: string;
 // instead of only ever sending a whole canned gesture message. Falls back to
 // the gesture's own emoji when the room has no custom icon set, so a token
 // never renders as literal ":hug:" text.
-const GESTURE_TOKEN_RE = /(:hug:|:pat:|:wave:|:kiss:)/g
+// Every id from both option lists can appear as an inline ":id:" token —
+// gestures via the empty-input-fallback path too, stickers only ever this way.
+const ICON_TOKEN_OPTIONS = [
+  ...GESTURE_OPTIONS.map((g) => ({ ...g, assetName: `gesture-${g.id}` })),
+  ...STICKER_OPTIONS.map((s) => ({ ...s, assetName: `sticker-${s.id}` })),
+]
+const ICON_TOKEN_RE = new RegExp(`(${ICON_TOKEN_OPTIONS.map((o) => `:${o.id}:`).join('|')})`, 'g')
 
 function renderMessageContent(content: string, useMosaicIcons: boolean): React.ReactNode {
-  const parts = content.split(GESTURE_TOKEN_RE)
+  const parts = content.split(ICON_TOKEN_RE)
   if (parts.length === 1) return content
   return parts.map((part, i) => {
     const id = part.startsWith(':') ? part.slice(1, -1) : null
-    const gesture = id ? GESTURE_OPTIONS.find((g) => g.id === id) : null
-    if (!gesture) return <Fragment key={i}>{part}</Fragment>
+    const option = id ? ICON_TOKEN_OPTIONS.find((o) => o.id === id) : null
+    if (!option) return <Fragment key={i}>{part}</Fragment>
     return useMosaicIcons ? (
-      <ThemedIcon key={i} set="mosaic" name={`gesture-${gesture.id}`} size={20} className="mx-0.5 inline-block align-text-bottom" />
+      <ThemedIcon key={i} set="mosaic" name={option.assetName} size={20} className="mx-0.5 inline-block align-text-bottom" />
     ) : (
-      <span key={i} className="mx-0.5">{gesture.emoji}</span>
+      <span key={i} className="mx-0.5">{option.emoji}</span>
     )
   })
 }
@@ -706,6 +750,7 @@ function ChatScreen({
   const [otherMood, setOtherMood] = useState<string | null>(null)
   const [showMoodPicker, setShowMoodPicker] = useState(false)
   const [showGesturePicker, setShowGesturePicker] = useState(false)
+  const [showStickerPicker, setShowStickerPicker] = useState(false)
   const [gestureOverlay, setGestureOverlay] = useState<{ emoji: string; nickname: string; label: string } | null>(null)
   const [showToolsMenu, setShowToolsMenu] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
@@ -1203,6 +1248,13 @@ function ChatScreen({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roomId: session.roomId, deviceId: deviceId.current, gesture: gestureId }),
     })
+  }
+
+  // Inserts an ":id:" token at the end of whatever's already typed, so a
+  // sticker/gesture icon becomes part of the same message as regular text.
+  const insertIconToken = (id: string) => {
+    handleInputChange(`${input}${input.endsWith(' ') || !input ? '' : ' '}:${id}: `)
+    messageInputRef.current?.focus()
   }
 
   const toggleReaction = (messageId: string, emoji: string) => {
@@ -2156,9 +2208,8 @@ function ChatScreen({
                 // message instead of firing the old standalone fly-over
                 // gesture — lets a message mix typed text and an icon.
                 if (hasText) {
-                  handleInputChange(`${input}${input.endsWith(' ') || !input ? '' : ' '}:${g.id}: `)
+                  insertIconToken(g.id)
                   setShowGesturePicker(false)
-                  messageInputRef.current?.focus()
                 } else {
                   sendGesture(g.id)
                 }
@@ -2171,6 +2222,30 @@ function ChatScreen({
                 <span className="text-xl">{g.emoji}</span>
               )}
               {g.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Sticker picker ──────────────────────────────────────── */}
+      {showStickerPicker && (
+        <div
+          data-popover-group="tools"
+          className="mt-2 grid max-h-56 grid-cols-5 gap-2 overflow-y-auto rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] p-3 backdrop-blur-xl animate-panel-in"
+        >
+          {STICKER_OPTIONS.map((s) => (
+            <button
+              key={s.id}
+              title={`Chèn "${s.label.toLowerCase()}" vào tin nhắn`}
+              onClick={() => { insertIconToken(s.id); setShowStickerPicker(false) }}
+              className="flex flex-col items-center gap-1 rounded-xl border border-overlay/[0.06] bg-overlay/[0.03] py-2 text-[10px] text-muted transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:bg-accent/[0.07] hover:text-white"
+            >
+              {useMosaicIcons ? (
+                <ThemedIcon set="mosaic" name={`sticker-${s.id}`} size={22} />
+              ) : (
+                <span className="text-xl">{s.emoji}</span>
+              )}
+              <span className="truncate">{s.label}</span>
             </button>
           ))}
         </div>
@@ -2255,25 +2330,26 @@ function ChatScreen({
           // otherwise move focus to this button and blur the textarea first.
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
-            const anyOpen = showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker
+            const anyOpen = showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker || showStickerPicker
             if (anyOpen) {
               setShowToolsMenu(false)
               setShowStylePicker(false)
               setShowCapsulePicker(false)
               setShowGesturePicker(false)
+              setShowStickerPicker(false)
             } else {
               setShowToolsMenu(true)
             }
           }}
           title="Thêm"
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all ${
-            showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker
+            showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker || showStickerPicker
               ? `rotate-45 ${themeColor ? '' : 'border-accent/40 bg-accent/[0.15] text-accent-soft'}`
               : `border-overlay/[0.08] bg-overlay/[0.03] ${themeColor ? '' : 'text-muted hover:text-fg'}`
           }`}
           style={
             themeColor
-              ? (showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker)
+              ? (showToolsMenu || showStylePicker || showCapsulePicker || showGesturePicker || showStickerPicker)
                 ? { borderColor: `${themeColor}66`, backgroundColor: `${themeColor}26`, color: themeColor }
                 : { color: themeColor }
               : undefined
@@ -2308,6 +2384,17 @@ function ChatScreen({
                 </button>
               </>
             )}
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { setShowStickerPicker((v) => !v); setShowToolsMenu(false) }}
+              title="Chèn biểu cảm"
+              className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 ${
+                showStickerPicker ? (themeColor ? '' : 'bg-accent/[0.15] text-accent-soft') : themeColor ? '' : 'text-muted hover:bg-overlay/[0.08] hover:text-fg'
+              }`}
+              style={themeColor ? (showStickerPicker ? { backgroundColor: `${themeColor}26`, color: themeColor } : { color: themeColor }) : undefined}
+            >
+              {useMosaicIcons ? <ThemedIcon set="mosaic" name="sticker-grin" size={19} /> : <span className="text-base">😄</span>}
+            </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => { setShowStylePicker((v) => !v); setShowToolsMenu(false) }}
