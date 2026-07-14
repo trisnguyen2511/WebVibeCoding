@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { data: rooms, error } = await supabase
     .from('chat_rooms')
-    .select('id, pin, name, type, anniversary_date, icon_url, mood_options, reaction_emojis, font_options, wallpaper_preset, wallpaper_url, created_at')
+    .select('id, pin, name, type, anniversary_date, icon_url, mood_options, reaction_emojis, font_options, wallpaper_preset, wallpaper_url, primary_color, secondary_color, tertiary_color, quaternary_color, theme_font, created_at')
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -78,6 +78,11 @@ export async function PATCH(req: NextRequest) {
     wallpaperPreset,
     wallpaperDataUrl,
     removeWallpaperImage,
+    primaryColor,
+    secondaryColor,
+    tertiaryColor,
+    quaternaryColor,
+    themeFont,
   } = body as {
     name?: string
     anniversaryDate?: string | null
@@ -89,7 +94,14 @@ export async function PATCH(req: NextRequest) {
     wallpaperPreset?: string | null
     wallpaperDataUrl?: string
     removeWallpaperImage?: boolean
+    primaryColor?: string | null
+    secondaryColor?: string | null
+    tertiaryColor?: string | null
+    quaternaryColor?: string | null
+    themeFont?: string | null
   }
+
+  const HEX_RE = /^#[0-9a-fA-F]{6}$/
 
   const supabase = getSupabaseAdmin()
   const update: {
@@ -103,7 +115,29 @@ export async function PATCH(req: NextRequest) {
     wallpaper_preset?: string | null
     wallpaper_url?: string | null
     wallpaper_public_id?: string | null
+    primary_color?: string | null
+    secondary_color?: string | null
+    tertiary_color?: string | null
+    quaternary_color?: string | null
+    theme_font?: string | null
   } = {}
+
+  if (primaryColor !== undefined) {
+    update.primary_color = primaryColor && HEX_RE.test(primaryColor) ? primaryColor : null
+  }
+  if (secondaryColor !== undefined) {
+    update.secondary_color = secondaryColor && HEX_RE.test(secondaryColor) ? secondaryColor : null
+  }
+  if (tertiaryColor !== undefined) {
+    update.tertiary_color = tertiaryColor && HEX_RE.test(tertiaryColor) ? tertiaryColor : null
+  }
+  if (quaternaryColor !== undefined) {
+    update.quaternary_color = quaternaryColor && HEX_RE.test(quaternaryColor) ? quaternaryColor : null
+  }
+  if (themeFont !== undefined) {
+    const catalogIds = new Set(FONT_CATALOG.map((f) => f.id as string))
+    update.theme_font = themeFont && catalogIds.has(themeFont) ? themeFont : null
+  }
 
   if (name !== undefined) {
     if (!name.trim()) return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 })

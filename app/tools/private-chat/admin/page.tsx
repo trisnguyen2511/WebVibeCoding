@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ToolShell } from '@/components/tool-shell'
 import { compressImageToDataUrl } from '@/lib/compress-image'
-import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, FONT_CATALOG, WALLPAPER_PRESETS, type MoodOption, type FontOption } from '@/lib/chat-defaults'
+import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, FONT_CATALOG, WALLPAPER_PRESETS, THEME_PRESETS, type MoodOption, type FontOption } from '@/lib/chat-defaults'
 
 type Room = {
   id: string
@@ -16,6 +16,11 @@ type Room = {
   font_options: FontOption[] | null
   wallpaper_preset: string | null
   wallpaper_url: string | null
+  primary_color: string | null
+  secondary_color: string | null
+  tertiary_color: string | null
+  quaternary_color: string | null
+  theme_font: string | null
   created_at: string
   deviceCount: number
 }
@@ -279,6 +284,42 @@ function AdminPanel() {
     load()
   }
 
+  const setBubbleColor = async (
+    id: string,
+    key: 'primaryColor' | 'secondaryColor' | 'tertiaryColor' | 'quaternaryColor',
+    color: string
+  ) => {
+    await fetch(`/api/chat/admin/rooms?id=${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: color }),
+    })
+    load()
+  }
+
+  const applyThemePreset = async (room: Room, theme: (typeof THEME_PRESETS)[number]) => {
+    // Puts the theme's recommended font first in the picker (a suggestion,
+    // not forced — whoever's typing still picks their own style per message).
+    const reordered = [
+      FONT_CATALOG.find((f) => f.id === theme.fontId)!,
+      ...FONT_CATALOG.filter((f) => f.id !== theme.fontId),
+    ]
+    await fetch(`/api/chat/admin/rooms?id=${room.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        wallpaperPreset: theme.wallpaperPreset,
+        primaryColor: theme.primaryColor,
+        secondaryColor: theme.secondaryColor,
+        tertiaryColor: theme.tertiaryColor,
+        quaternaryColor: theme.quaternaryColor,
+        fontOptions: reordered,
+        themeFont: theme.fontId,
+      }),
+    })
+    load()
+  }
+
   const logout = async () => {
     await fetch('/api/chat/admin/logout', { method: 'POST' })
     window.location.reload()
@@ -455,7 +496,11 @@ function AdminPanel() {
                         ? 'border-accent scale-110'
                         : 'border-transparent hover:border-border'
                     }`}
-                    style={{ background: w.css || 'linear-gradient(135deg, #1A1A2E, #0F0F1A)' }}
+                    style={{
+                      background: w.css || 'linear-gradient(135deg, #1A1A2E, #0F0F1A)',
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }}
                   />
                 ))}
                 <div className="h-6 w-px bg-border" />
@@ -484,6 +529,57 @@ function AdminPanel() {
                     Xoá ảnh
                   </button>
                 )}
+              </div>
+            </div>
+            <div className="sm:col-span-2">
+              <span className="text-xs text-muted">🎨 Màu theme (4 vai trò)</span>
+              <div className="mt-1 flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs text-muted">
+                  Màu chính (của bạn)
+                  <input
+                    type="color"
+                    value={r.primary_color ?? '#7C3AED'}
+                    onChange={(e) => setBubbleColor(r.id, 'primaryColor', e.target.value)}
+                    className="h-7 w-7 cursor-pointer rounded border border-border bg-transparent p-0"
+                  />
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-muted">
+                  Màu phụ (đối phương)
+                  <input
+                    type="color"
+                    value={r.secondary_color ?? '#1A1A2E'}
+                    onChange={(e) => setBubbleColor(r.id, 'secondaryColor', e.target.value)}
+                    className="h-7 w-7 cursor-pointer rounded border border-border bg-transparent p-0"
+                  />
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-muted">
+                  Màu điểm nhấn
+                  <input
+                    type="color"
+                    value={r.tertiary_color ?? '#FBBF24'}
+                    onChange={(e) => setBubbleColor(r.id, 'tertiaryColor', e.target.value)}
+                    className="h-7 w-7 cursor-pointer rounded border border-border bg-transparent p-0"
+                  />
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-muted">
+                  Màu bổ trợ
+                  <input
+                    type="color"
+                    value={r.quaternary_color ?? '#34D399'}
+                    onChange={(e) => setBubbleColor(r.id, 'quaternaryColor', e.target.value)}
+                    className="h-7 w-7 cursor-pointer rounded border border-border bg-transparent p-0"
+                  />
+                </label>
+                <div className="h-6 w-px bg-border" />
+                {THEME_PRESETS.map((theme) => (
+                  <button
+                    key={theme.id}
+                    onClick={() => applyThemePreset(r, theme)}
+                    className="rounded-lg border border-accent/30 bg-accent/[0.08] px-2.5 py-1.5 text-xs text-accent-soft transition-colors hover:bg-accent/[0.15]"
+                  >
+                    ✨ Áp dụng theme: {theme.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
