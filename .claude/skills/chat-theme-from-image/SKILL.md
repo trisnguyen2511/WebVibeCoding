@@ -38,12 +38,22 @@ The outer/header ambient background (`ToolShell`'s `ambientBackgroundStyle` /
 `headerStyle`) already reads `primaryColor`/`secondaryColor`/`quaternaryColor`/
 `wallpaperCss` generically — no code changes needed there for a new theme.
 
-Icons are different: there is no generic "icon set" reader. Each theme's icon
-set is a real folder of hand-drawn SVGs under `public/icons/<slug>/`, and the
-render call sites in `app/tools/private-chat/page.tsx` pick a theme's set by
-checking `roomInfo.wallpaperPreset === '<slug>'` (see `useMosaicIcons` for the
-existing example). A new theme needs its own folder and its own boolean/
-lookup wired the same way — this is manual work every time, not automatic.
+Icons ARE generalized now (as of the `burrow` theme) — each theme's icon set
+is still a real folder of hand-drawn SVGs under `public/icons/<slug>/`, but
+the render call sites read a single `iconSet` variable
+(`ICON_SET_SLUGS.includes(roomInfo.wallpaperPreset) ? roomInfo.wallpaperPreset
+: null`, then `iconSet ? <ThemedIcon set={iconSet} name="..." /> : <Fallback
+/>`) instead of one boolean per theme. **Adding a new theme's icon set only
+needs one addition to `ICON_SET_SLUGS`**, not touching every call site again.
+Stickers are the one exception: only sets listed in `ICON_SETS_WITH_STICKERS`
+render themed sticker-*/gesture-* tokens for the 32-item pack — a set not
+yet in that list still gets themed chrome+gesture icons, but falls back to
+the plain emoji for stickers specifically, so a partial-scope theme never
+404s on a missing SVG mid-rollout. Both `mosaic` and `burrow` now have the
+full 32-sticker set and are in that list — add a new theme to it once its
+own 32 sticker-*.svg exist (burrow's were drawn as a same-day follow-up
+after the chrome+gesture set shipped first, so it's fine to sequence it
+that way if the 46-icon total doesn't fit in one pass).
 
 ## Steps
 
@@ -96,19 +106,24 @@ lookup wired the same way — this is manual work every time, not automatic.
    the smaller UI-chrome set — budget real time for this, it's the bulk of
    the work. Style rules, consistent across
    every theme's set so they all feel like "one family" of a shared system:
-   - viewBox `0 0 24 24`, bold ~1.5-2px black (`#0B0B0F`) outlines
+   - viewBox `0 0 24 24`, bold ~1.5-2px outlines in a color that fits the
+     theme's own mood (the mosaic set uses near-black `#0B0B0F`; the burrow
+     set uses a warm cocoa `#2B1F16` instead — don't default to pure black
+     for every theme, pick what actually reads as "this theme's ink color")
    - filled with the theme's own 4 palette colors (name which color = which
      hex in a comment, matching step 1)
-   - a small recurring corner accent (the mosaic set uses a tiny 4-point
-     quatrefoil/dot cluster in one corner) so icons in the same set are
-     visually related to each other, not just same-color-different-shape
+   - a small recurring corner accent unique to this theme (mosaic uses a tiny
+     quatrefoil/dot cluster; burrow uses a tiny leaf) — every icon in one
+     theme's set should share the same corner motif, but different themes
+     should use *different* motifs so sets don't all look identical
    - validate each file parses as XML before committing (a stray unescaped
      `&` broke one of the mosaic icons before — check with e.g.
      `python3 -c "import xml.dom.minidom as m; m.parse('file.svg')"`)
-   Wire them in with the same pattern as `useMosaicIcons`: a boolean derived
-   from `roomInfo.wallpaperPreset === '<slug>'`, and a `<ThemedIcon set="<slug>"
-   name="..." size={..} />` conditional at each icon call site, falling back to
-   the existing lucide icon when the boolean is false.
+   Wire a new theme in by adding its slug to `ICON_SET_SLUGS` (and to
+   `ICON_SETS_WITH_STICKERS` once its 32 stickers exist) — the `iconSet`
+   variable and every `<ThemedIcon set={iconSet} .../>` call site already
+   read from that list generically, no per-theme boolean/call-site edits
+   needed anymore.
 
 5. **Whenever you add a new icon-using feature to the chat** (a new button,
    picker, or action — regardless of which theme prompted it), add the new
@@ -177,11 +192,10 @@ lookup wired the same way — this is manual work every time, not automatic.
   `scripts/icon/generate.py` needs `GEMINI_API_KEY`, which isn't set up here.
   Default to hand-drawing the SVGs directly (as done for every icon so far)
   unless the user has explicitly provided a key for that session.
-- **Icon sets go stale silently**: because each icon set is a manually-wired
-  folder (not a generic reader), adding a new icon feature without updating
-  every existing theme's set doesn't error — it just quietly falls back to
-  the default lucide icon for that one theme, which reads as an inconsistency
-  bug days later. Grep for the existing `useMosaicIcons` (or equivalent)
-  boolean and its `<ThemedIcon .../>` call sites whenever adding a themeable
-  icon, and mirror the same call site for every other theme folder that
-  exists at the time.
+- **Icon sets go stale silently**: the `iconSet` lookup is generic, but the
+  actual SVG *files* per theme are not — adding a new icon-using feature and
+  drawing it for only one theme's folder doesn't error for the others, it
+  just falls back to the default lucide icon (or emoji, for gesture/sticker
+  tokens), which reads as an inconsistency bug days later. When adding a
+  themeable icon, draw it for every folder under `public/icons/` that already
+  exists, not just the one you're working on.

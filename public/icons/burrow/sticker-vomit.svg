@@ -1,0 +1,8 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Buồn nôn (Tổ ấm)</title>
+  <circle cx="12" cy="12.5" r="9" fill="#3E5C3A" stroke="#2B1F16" stroke-width="1.8"/>
+  <path d="M7.4 10.6h2.6M14 10.6h2.6" stroke="#2B1F16" stroke-width="1.6" stroke-linecap="round"/>
+  <ellipse cx="12" cy="15.4" rx="2.2" ry="1.6" fill="#2B1F16"/>
+  <path d="M9.6 16.6c-.4 1.6-1.4 2.8-2.6 3M14.4 16.6c.4 1.6 1.4 2.8 2.6 3" stroke="#D9A544" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+  <path d="M18.6 3c1.8-.6 3.2.2 3.6 2 .4 1.8-.6 3.4-2.4 3.8-1.4.3-2.6-.3-3.2-1.4-.2 .9-.9 1.5-1.7 1.4.1-2.7 1.6-4.9 3.7-5.8Z" fill="#D9A544" stroke="#2B1F16" stroke-width="1"/><path d="M17 8.3c.7-1.8 2-3.4 3.8-4.4" stroke="#2B1F16" stroke-width="0.7" fill="none" stroke-linecap="round"/>
+</svg>
