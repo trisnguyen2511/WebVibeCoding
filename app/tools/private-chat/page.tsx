@@ -84,7 +84,23 @@ type MessageStyle = { color: string | null; font: FontId | null; bold: boolean; 
 const STYLE_KEY = 'wv-chat-style'
 const DEFAULT_STYLE: MessageStyle = { color: null, font: null, bold: false, italic: false }
 
-const COLOR_PRESETS = ['#FAFAFA', '#F87171', '#FBBF24', '#34D399', '#60A5FA', '#A78BFA', '#F472B6']
+const COLOR_PRESETS = [
+  '#FAFAFA', // mặc định
+  '#F87171', // đỏ
+  '#FB923C', // cam
+  '#FBBF24', // hổ phách
+  '#A3E635', // chanh
+  '#34D399', // ngọc lục bảo
+  '#2DD4BF', // ngọc lam
+  '#22D3EE', // xanh biển
+  '#60A5FA', // xanh dương
+  '#818CF8', // chàm
+  '#A78BFA', // tím
+  '#E879F9', // hồng tím
+  '#F472B6', // hồng
+  '#FB7185', // hồng cam
+  '#94A3B8', // xám
+]
 
 const GESTURE_OPTIONS: { id: string; emoji: string; label: string }[] = [
   { id: 'hug', emoji: '🤗', label: 'Ôm' },
@@ -415,7 +431,7 @@ function LinkPreviewCard({
       target="_blank"
       rel="noreferrer"
       className={`mb-1.5 flex max-w-[75%] items-center gap-3 overflow-hidden rounded-xl border border-overlay/[0.08] backdrop-blur-md transition-colors ${
-        opaque ? 'bg-background/45 hover:bg-background/55' : 'bg-overlay/[0.04] hover:bg-overlay/[0.07]'
+        opaque ? 'bg-background/60 hover:bg-background/70' : 'bg-overlay/[0.04] hover:bg-overlay/[0.07]'
       }`}
     >
       {preview.image && (
@@ -1918,7 +1934,7 @@ function ChatScreen({
                         <div
                           className={`w-full overflow-x-auto border-l-2 ${journalColor ? '' : 'border-accent/40'} ${
                             hasWallpaper
-                              ? 'rounded-r-xl bg-background/40 py-2 pl-4 pr-3 backdrop-blur-md'
+                              ? 'rounded-r-xl bg-background/60 py-2 pl-4 pr-3 backdrop-blur-md'
                               : journalColor
                                 ? 'rounded-r-xl py-2 pl-4 pr-3'
                                 : 'py-1 pl-4'
@@ -1931,7 +1947,7 @@ function ChatScreen({
                             // read as themed blocks — skipped over a wallpaper,
                             // where the translucent backing above already exists
                             // purely for text legibility and shouldn't be recolored.
-                            ...(journalColor && !hasWallpaper ? { backgroundColor: `${journalColor}14` } : undefined),
+                            ...(journalColor && !hasWallpaper ? { backgroundColor: `${journalColor}22` } : undefined),
                           }}
                         >
                           <LinkPreviewCard message={m} opaque={hasWallpaper} accentColor={tertiaryColor} />
@@ -1967,13 +1983,13 @@ function ChatScreen({
                               className={`max-w-[75%] overflow-x-auto rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${tailClass} ${
                                 mine
                                   ? `text-white shadow-[0_2px_16px_rgba(124,58,237,0.35)] ${roomInfo.primaryColor ? '' : 'bg-gradient-to-br from-accent to-[#5b21b6]'}`
-                                  : `text-fg backdrop-blur-sm ${roomInfo.secondaryColor ? 'border' : 'border border-overlay/[0.08] bg-overlay/[0.06]'}`
+                                  : `text-fg backdrop-blur-sm ${roomInfo.secondaryColor ? 'border' : 'border border-overlay/[0.08] bg-overlay/[0.1]'}`
                               }`}
                               style={{
                                 ...fontStyleFor(m.font_family),
                                 ...(mine && roomInfo.primaryColor ? { backgroundColor: roomInfo.primaryColor } : undefined),
                                 ...(!mine && roomInfo.secondaryColor
-                                  ? { backgroundColor: `${roomInfo.secondaryColor}1A`, borderColor: `${roomInfo.secondaryColor}55` }
+                                  ? { backgroundColor: `${roomInfo.secondaryColor}30`, borderColor: `${roomInfo.secondaryColor}55` }
                                   : undefined),
                                 color: m.text_color ?? undefined,
                                 fontWeight: m.bold ? 700 : undefined,
