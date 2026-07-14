@@ -2092,7 +2092,7 @@ function ChatScreen({
       {/* ── Time capsule picker ─────────────────────────────────── */}
       {showCapsulePicker && (
         <div data-popover-group="tools" className="mt-2 flex items-center gap-2.5 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] p-3 backdrop-blur-xl animate-panel-in">
-          <Clock size={14} className="shrink-0 text-accent-soft" />
+          {useMosaicIcons ? <ThemedIcon set="mosaic" name="timer" size={16} className="shrink-0" /> : <Clock size={14} className="shrink-0 text-accent-soft" />}
           <span className="text-xs text-muted">Mở lúc</span>
           <input
             type="datetime-local"
@@ -2266,7 +2266,7 @@ function ChatScreen({
               }`}
               style={themeColor ? (showStylePicker ? { backgroundColor: `${themeColor}26`, color: themeColor } : { color: themeColor }) : undefined}
             >
-              <Type size={15} />
+              {useMosaicIcons ? <ThemedIcon set="mosaic" name="font" size={17} /> : <Type size={15} />}
             </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
@@ -2277,7 +2277,7 @@ function ChatScreen({
               }`}
               style={themeColor ? ((showCapsulePicker || capsuleAt) ? { backgroundColor: `${themeColor}26`, color: themeColor } : { color: themeColor }) : undefined}
             >
-              <Clock size={15} />
+              {useMosaicIcons ? <ThemedIcon set="mosaic" name="timer" size={17} /> : <Clock size={15} />}
             </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
@@ -2286,7 +2286,7 @@ function ChatScreen({
               className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
               style={themeColor ? { color: themeColor } : undefined}
             >
-              <Paperclip size={16} />
+              {useMosaicIcons ? <ThemedIcon set="mosaic" name="attachment" size={18} /> : <Paperclip size={16} />}
             </button>
           </div>
         )}
