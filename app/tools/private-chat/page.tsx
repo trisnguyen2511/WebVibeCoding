@@ -124,6 +124,16 @@ function fontStyleFor(font?: string | null): React.CSSProperties {
   }
 }
 
+// One SVG per theme-provided icon set, stored as static assets (not
+// generated at runtime) — see public/icons/<slug>/*.svg. Falls back to
+// whatever lucide icon the caller renders as children when no set applies.
+function ThemedIcon({ set, name, size, className }: { set: string; name: string; size: number; className?: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={`/icons/${set}/${name}.svg`} width={size} height={size} className={className} alt="" />
+  )
+}
+
 function hexAlpha(hex: string, alphaHex: string): string {
   return /^#[0-9a-fA-F]{6}$/.test(hex) ? `${hex}${alphaHex}` : hex
 }
@@ -626,6 +636,10 @@ function ChatScreen({
   const fontOptions = roomInfo.fontOptions && roomInfo.fontOptions.length > 0 ? roomInfo.fontOptions : FONT_CATALOG
   const wallpaperCss = roomInfo.wallpaperUrl ? undefined : resolveWallpaperCss(roomInfo)
   const hasWallpaper = Boolean(roomInfo.wallpaperUrl || wallpaperCss)
+  // The mosaic (Talavera) theme ships its own hand-drawn icon set — bold
+  // black outlines + the same 4 tile colors — swapped in only for that
+  // preset, never touching the app's default lucide icons elsewhere.
+  const useMosaicIcons = roomInfo.wallpaperPreset === 'mosaic'
   const themeColor = roomInfo.primaryColor
   // Informational highlight color (pinned message, link previews, chosen
   // reactions) and a quieter secondary accent (outer aurora's extra blob) —
@@ -1579,7 +1593,7 @@ function ChatScreen({
             className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-overlay/[0.06] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
             style={themeColor ? { color: themeColor } : undefined}
           >
-            <Images size={16} />
+            {useMosaicIcons ? <ThemedIcon set="mosaic" name="gallery" size={18} /> : <Images size={16} />}
           </button>
           <button
             onClick={() => setShowSearch(true)}
@@ -1587,7 +1601,7 @@ function ChatScreen({
             className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-overlay/[0.06] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
             style={themeColor ? { color: themeColor } : undefined}
           >
-            <Search size={16} />
+            {useMosaicIcons ? <ThemedIcon set="mosaic" name="search" size={18} /> : <Search size={16} />}
           </button>
           {otherMood && (
             <span
@@ -1934,7 +1948,7 @@ function ChatScreen({
                         onClick={() => setReactionPickerFor(reactionPickerFor === m.id ? null : m.id)}
                         className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-overlay/[0.08] hover:text-fg"
                       >
-                        <SmilePlus size={13} />
+                        {useMosaicIcons ? <ThemedIcon set="mosaic" name="reaction" size={16} /> : <SmilePlus size={13} />}
                       </button>
                       {!m.locked && (
                         <button
@@ -2214,7 +2228,7 @@ function ChatScreen({
               : undefined
           }
         >
-          <Plus size={18} />
+          {useMosaicIcons ? <ThemedIcon set="mosaic" name="plus" size={20} /> : <Plus size={18} />}
         </button>
 
         {showToolsMenu && (
@@ -2228,7 +2242,7 @@ function ChatScreen({
                   className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
                   style={themeColor ? { color: themeColor } : undefined}
                 >
-                  <ImageIcon size={17} />
+                  {useMosaicIcons ? <ThemedIcon set="mosaic" name="image" size={19} /> : <ImageIcon size={17} />}
                 </button>
                 <button
                   onMouseDown={(e) => e.preventDefault()}
@@ -2289,7 +2303,7 @@ function ChatScreen({
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] transition-all hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
             style={themeColor ? { color: themeColor } : undefined}
           >
-            <ImageIcon size={17} />
+            {useMosaicIcons ? <ThemedIcon set="mosaic" name="image" size={19} /> : <ImageIcon size={17} />}
           </button>
           <button
             data-popover-group="tools"
@@ -2349,7 +2363,7 @@ function ChatScreen({
           }`}
           style={themeColor ? { backgroundColor: themeColor } : undefined}
         >
-          <Send size={16} />
+          {useMosaicIcons ? <ThemedIcon set="mosaic" name="send" size={18} /> : <Send size={16} />}
         </button>
       </div>
     </div>
