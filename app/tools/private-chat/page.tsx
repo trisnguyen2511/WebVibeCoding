@@ -1477,10 +1477,16 @@ function ChatScreen({
   }
 
   const leave = () => {
+    // keepalive lets the browser finish this request even if the tab/app is
+    // closed right after tapping "Rời phòng" (a very common sequence on
+    // mobile) — without it, a fire-and-forget fetch can get cancelled
+    // mid-flight, leaving push_subscription un-cleared server-side so the
+    // device keeps getting notified for a room it thinks it already left.
     fetch('/api/chat/leave', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roomId: session.roomId, deviceId: deviceId.current }),
+      keepalive: true,
     }).catch(() => {})
     localStorage.removeItem(SESSION_KEY)
     onLeave()
