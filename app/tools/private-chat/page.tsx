@@ -1679,7 +1679,11 @@ function ChatScreen({
           }`}
           style={tertiaryColor ? { borderColor: `${tertiaryColor}33`, backgroundColor: `${tertiaryColor}12` } : undefined}
         >
-          <Pin size={11} className={`shrink-0 ${tertiaryColor ? '' : 'text-accent-soft'}`} style={tertiaryColor ? { color: tertiaryColor } : undefined} />
+          {useMosaicIcons ? (
+            <ThemedIcon set="mosaic" name="pin" size={13} className="shrink-0" />
+          ) : (
+            <Pin size={11} className={`shrink-0 ${tertiaryColor ? '' : 'text-accent-soft'}`} style={tertiaryColor ? { color: tertiaryColor } : undefined} />
+          )}
           <span className={`flex-1 truncate text-xs ${tertiaryColor ? '' : 'text-accent-soft'}`} style={tertiaryColor ? { color: tertiaryColor } : undefined}>
             <b>{pinnedMessage.nickname}:</b> {pinnedMessage.content ?? '[Hình ảnh]'}
           </span>
@@ -1814,7 +1818,7 @@ function ChatScreen({
                           borderColor: (isJournal ? journalColor : mine ? roomInfo.primaryColor : roomInfo.secondaryColor) ?? undefined,
                         }}
                       >
-                        <Reply size={10} className="mt-0.5 shrink-0 text-accent-soft/70" />
+                        {useMosaicIcons ? <ThemedIcon set="mosaic" name="reply" size={12} className="mt-0.5 shrink-0" /> : <Reply size={10} className="mt-0.5 shrink-0 text-accent-soft/70" />}
                         <span className="min-w-0 truncate">
                           <b className="text-accent-soft">{m.reply_to_nickname}</b>: {m.reply_to_content}
                         </span>
@@ -1968,7 +1972,7 @@ function ChatScreen({
                           }}
                           className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-overlay/[0.08] hover:text-fg"
                         >
-                          <Reply size={13} />
+                          {useMosaicIcons ? <ThemedIcon set="mosaic" name="reply" size={15} /> : <Reply size={13} />}
                         </button>
                       )}
                       <button
@@ -1979,7 +1983,7 @@ function ChatScreen({
                         }}
                         className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-overlay/[0.08] hover:text-fg"
                       >
-                        <Pin size={13} />
+                        {useMosaicIcons ? <ThemedIcon set="mosaic" name="pin" size={15} /> : <Pin size={13} />}
                       </button>
                     </div>
                     </div>
@@ -2029,7 +2033,7 @@ function ChatScreen({
       {/* ── Reply bar ───────────────────────────────────────────── */}
       {replyingTo && (
         <div className="mt-2 flex items-center gap-2.5 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] px-3.5 py-2.5 text-xs animate-panel-in">
-          <Reply size={12} className="shrink-0 text-accent-soft" />
+          {useMosaicIcons ? <ThemedIcon set="mosaic" name="reply" size={14} className="shrink-0" /> : <Reply size={12} className="shrink-0 text-accent-soft" />}
           <span className="flex-1 truncate text-muted">
             Trả lời <b className="text-accent-soft">{replyingTo.nickname}</b>: {replyingTo.preview}
           </span>

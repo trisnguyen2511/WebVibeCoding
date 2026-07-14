@@ -85,8 +85,8 @@ lookup wired the same way — this is manual work every time, not automatic.
    separately). Create `public/icons/<slug>/` with one hand-drawn SVG per icon
    currently themeable — check `app/tools/private-chat/page.tsx` for the
    current full list (as of writing: `send`, `image`, `gallery`, `search`,
-   `plus`, `reaction`, `font`, `timer`, `attachment`, `leave` — **re-check the
-   file, this list grows**; see rule below). Style rules, consistent across
+   `plus`, `reaction`, `font`, `timer`, `attachment`, `leave`, `pin`, `reply` —
+   **re-check the file, this list grows**; see rule below). Style rules, consistent across
    every theme's set so they all feel like "one family" of a shared system:
    - viewBox `0 0 24 24`, bold ~1.5-2px black (`#0B0B0F`) outlines
    - filled with the theme's own 4 palette colors (name which color = which
