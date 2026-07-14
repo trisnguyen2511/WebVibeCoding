@@ -56,7 +56,12 @@ export function ToolShell({
       style={fullBleed ? { overscrollBehavior: 'none' } : undefined}
     >
       {ambientBackgroundStyle && (
-        <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" style={ambientBackgroundStyle} />
+        // A *negative* z-index here would paint below this wrapper's own
+        // opaque bg-background (static content still paints above negative-
+        // z-index layers), making it invisible — so this uses z-0 instead,
+        // and header/main each get their own stacking context (relative +
+        // positive z-index) to still paint above it.
+        <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" style={ambientBackgroundStyle} />
       )}
       <header className="sticky top-0 z-20 shrink-0 border-b border-border bg-background/85 backdrop-blur-md" style={headerStyle}>
         <div className={`mx-auto flex ${maxW} items-center gap-3 px-4 py-2.5`}>
@@ -95,7 +100,7 @@ export function ToolShell({
         </div>
       </header>
 
-      <main className={fullBleed ? 'min-h-0 flex-1 overflow-hidden' : `mx-auto ${maxW} px-4 py-6`}>
+      <main className={fullBleed ? 'relative z-10 min-h-0 flex-1 overflow-hidden' : `relative z-10 mx-auto ${maxW} px-4 py-6`}>
         {children}
       </main>
     </div>
