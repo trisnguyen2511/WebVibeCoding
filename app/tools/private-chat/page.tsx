@@ -201,15 +201,21 @@ const ICON_TOKEN_OPTIONS = [
 ]
 const ICON_TOKEN_RE = new RegExp(`(${ICON_TOKEN_OPTIONS.map((o) => `:${o.id}:`).join('|')})`, 'g')
 
-function renderMessageContent(content: string, useMosaicIcons: boolean): React.ReactNode {
+// Not every icon set has drawn the full 32-sticker pack yet (it's the bulk
+// of the work) — themes not listed here still get their gesture-* icons,
+// they just fall back to the plain emoji for sticker-* until drawn.
+const ICON_SETS_WITH_STICKERS = new Set(['mosaic'])
+
+function renderMessageContent(content: string, iconSet: string | null): React.ReactNode {
   const parts = content.split(ICON_TOKEN_RE)
   if (parts.length === 1) return content
   return parts.map((part, i) => {
     const id = part.startsWith(':') ? part.slice(1, -1) : null
     const option = id ? ICON_TOKEN_OPTIONS.find((o) => o.id === id) : null
     if (!option) return <Fragment key={i}>{part}</Fragment>
-    return useMosaicIcons ? (
-      <ThemedIcon key={i} set="mosaic" name={option.assetName} size={20} className="mx-0.5 inline-block align-text-bottom" />
+    const themed = iconSet && (!option.assetName.startsWith('sticker-') || ICON_SETS_WITH_STICKERS.has(iconSet))
+    return themed ? (
+      <ThemedIcon key={i} set={iconSet as string} name={option.assetName} size={20} className="mx-0.5 inline-block align-text-bottom" />
     ) : (
       <span key={i} className="mx-0.5">{option.emoji}</span>
     )
@@ -723,10 +729,12 @@ function ChatScreen({
   const fontOptions = roomInfo.fontOptions && roomInfo.fontOptions.length > 0 ? roomInfo.fontOptions : FONT_CATALOG
   const wallpaperCss = roomInfo.wallpaperUrl ? undefined : resolveWallpaperCss(roomInfo)
   const hasWallpaper = Boolean(roomInfo.wallpaperUrl || wallpaperCss)
-  // The mosaic (Talavera) theme ships its own hand-drawn icon set — bold
-  // black outlines + the same 4 tile colors — swapped in only for that
-  // preset, never touching the app's default lucide icons elsewhere.
-  const useMosaicIcons = roomInfo.wallpaperPreset === 'mosaic'
+  // Themes with their own hand-drawn icon set (see public/icons/<slug>/) —
+  // swapped in only for a room actually using that wallpaper preset, never
+  // touching the app's default lucide icons for any other room.
+  const ICON_SET_SLUGS = ['mosaic', 'burrow']
+  const iconSet = ICON_SET_SLUGS.includes(roomInfo.wallpaperPreset ?? '') ? (roomInfo.wallpaperPreset as string) : null
+  const hasStickerSet = iconSet !== null && ICON_SETS_WITH_STICKERS.has(iconSet)
   const themeColor = roomInfo.primaryColor
   // Informational highlight color (pinned message, link previews, chosen
   // reactions) and a quieter secondary accent (outer aurora's extra blob) —
@@ -1699,7 +1707,7 @@ function ChatScreen({
             className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-overlay/[0.06] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
             style={themeColor ? { color: themeColor } : undefined}
           >
-            {useMosaicIcons ? <ThemedIcon set="mosaic" name="gallery" size={18} /> : <Images size={16} />}
+            {iconSet ? <ThemedIcon set={iconSet} name="gallery" size={18} /> : <Images size={16} />}
           </button>
           <button
             onClick={() => setShowSearch(true)}
@@ -1707,7 +1715,7 @@ function ChatScreen({
             className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:bg-overlay/[0.06] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
             style={themeColor ? { color: themeColor } : undefined}
           >
-            {useMosaicIcons ? <ThemedIcon set="mosaic" name="search" size={18} /> : <Search size={16} />}
+            {iconSet ? <ThemedIcon set={iconSet} name="search" size={18} /> : <Search size={16} />}
           </button>
           {otherMood && (
             <span
@@ -1741,7 +1749,7 @@ function ChatScreen({
             title="Rời phòng"
             className="flex h-9 w-9 items-center justify-center rounded-xl text-muted transition-all hover:bg-overlay/[0.06] hover:text-fg"
           >
-            {useMosaicIcons ? <ThemedIcon set="mosaic" name="leave" size={17} /> : <LogOut size={15} />}
+            {iconSet ? <ThemedIcon set={iconSet} name="leave" size={17} /> : <LogOut size={15} />}
           </button>
         </div>
       </div>
@@ -1776,8 +1784,8 @@ function ChatScreen({
           }`}
           style={tertiaryColor ? { borderColor: `${tertiaryColor}33`, backgroundColor: `${tertiaryColor}12` } : undefined}
         >
-          {useMosaicIcons ? (
-            <ThemedIcon set="mosaic" name="pin" size={13} className="shrink-0" />
+          {iconSet ? (
+            <ThemedIcon set={iconSet} name="pin" size={13} className="shrink-0" />
           ) : (
             <Pin size={11} className={`shrink-0 ${tertiaryColor ? '' : 'text-accent-soft'}`} style={tertiaryColor ? { color: tertiaryColor } : undefined} />
           )}
@@ -1915,7 +1923,7 @@ function ChatScreen({
                           borderColor: (isJournal ? journalColor : mine ? roomInfo.primaryColor : roomInfo.secondaryColor) ?? undefined,
                         }}
                       >
-                        {useMosaicIcons ? <ThemedIcon set="mosaic" name="reply" size={12} className="mt-0.5 shrink-0" /> : <Reply size={10} className="mt-0.5 shrink-0 text-accent-soft/70" />}
+                        {iconSet ? <ThemedIcon set={iconSet} name="reply" size={12} className="mt-0.5 shrink-0" /> : <Reply size={10} className="mt-0.5 shrink-0 text-accent-soft/70" />}
                         <span className="min-w-0 truncate">
                           <b className="text-accent-soft">{m.reply_to_nickname}</b>: {m.reply_to_content}
                         </span>
@@ -1968,7 +1976,7 @@ function ChatScreen({
                                 fontStyle: m.italic ? 'italic' : undefined,
                               }}
                             >
-                              {renderMessageContent(m.content, useMosaicIcons)}
+                              {renderMessageContent(m.content, iconSet)}
                             </p>
                           )}
                           {activeActionsFor === m.id && (
@@ -2002,7 +2010,7 @@ function ChatScreen({
                                 fontStyle: m.italic ? 'italic' : undefined,
                               }}
                             >
-                              {renderMessageContent(m.content, useMosaicIcons)}
+                              {renderMessageContent(m.content, iconSet)}
                             </div>
                           )}
                         </>
@@ -2058,7 +2066,7 @@ function ChatScreen({
                         onClick={() => setReactionPickerFor(reactionPickerFor === m.id ? null : m.id)}
                         className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-overlay/[0.08] hover:text-fg"
                       >
-                        {useMosaicIcons ? <ThemedIcon set="mosaic" name="reaction" size={16} /> : <SmilePlus size={13} />}
+                        {iconSet ? <ThemedIcon set={iconSet} name="reaction" size={16} /> : <SmilePlus size={13} />}
                       </button>
                       {!m.locked && (
                         <button
@@ -2069,7 +2077,7 @@ function ChatScreen({
                           }}
                           className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-overlay/[0.08] hover:text-fg"
                         >
-                          {useMosaicIcons ? <ThemedIcon set="mosaic" name="reply" size={15} /> : <Reply size={13} />}
+                          {iconSet ? <ThemedIcon set={iconSet} name="reply" size={15} /> : <Reply size={13} />}
                         </button>
                       )}
                       <button
@@ -2080,7 +2088,7 @@ function ChatScreen({
                         }}
                         className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-all hover:scale-110 hover:bg-overlay/[0.08] hover:text-fg"
                       >
-                        {useMosaicIcons ? <ThemedIcon set="mosaic" name="pin" size={15} /> : <Pin size={13} />}
+                        {iconSet ? <ThemedIcon set={iconSet} name="pin" size={15} /> : <Pin size={13} />}
                       </button>
                     </div>
                     </div>
@@ -2130,7 +2138,7 @@ function ChatScreen({
       {/* ── Reply bar ───────────────────────────────────────────── */}
       {replyingTo && (
         <div className="mt-2 flex items-center gap-2.5 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] px-3.5 py-2.5 text-xs animate-panel-in">
-          {useMosaicIcons ? <ThemedIcon set="mosaic" name="reply" size={14} className="shrink-0" /> : <Reply size={12} className="shrink-0 text-accent-soft" />}
+          {iconSet ? <ThemedIcon set={iconSet} name="reply" size={14} className="shrink-0" /> : <Reply size={12} className="shrink-0 text-accent-soft" />}
           <span className="flex-1 truncate text-muted">
             Trả lời <b className="text-accent-soft">{replyingTo.nickname}</b>: {replyingTo.preview}
           </span>
@@ -2202,7 +2210,7 @@ function ChatScreen({
       {/* ── Time capsule picker ─────────────────────────────────── */}
       {showCapsulePicker && (
         <div data-popover-group="tools" className="mt-2 flex items-center gap-2.5 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] p-3 backdrop-blur-xl animate-panel-in">
-          {useMosaicIcons ? <ThemedIcon set="mosaic" name="timer" size={16} className="shrink-0" /> : <Clock size={14} className="shrink-0 text-accent-soft" />}
+          {iconSet ? <ThemedIcon set={iconSet} name="timer" size={16} className="shrink-0" /> : <Clock size={14} className="shrink-0 text-accent-soft" />}
           <span className="text-xs text-fg/70">Mở lúc</span>
           <input
             type="datetime-local"
@@ -2242,8 +2250,8 @@ function ChatScreen({
               }}
               className="flex flex-col items-center gap-1 rounded-xl border border-overlay/[0.06] bg-overlay/[0.03] py-2.5 text-xs text-muted transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:bg-accent/[0.07] hover:text-white"
             >
-              {useMosaicIcons ? (
-                <ThemedIcon set="mosaic" name={`gesture-${g.id}`} size={22} />
+              {iconSet ? (
+                <ThemedIcon set={iconSet} name={`gesture-${g.id}`} size={22} />
               ) : (
                 <span className="text-xl">{g.emoji}</span>
               )}
@@ -2269,8 +2277,8 @@ function ChatScreen({
               onClick={() => insertIconToken(s.id)}
               className="flex flex-col items-center gap-1 rounded-xl border border-overlay/[0.06] bg-overlay/[0.03] py-2 text-[10px] text-muted transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:bg-accent/[0.07] hover:text-white"
             >
-              {useMosaicIcons ? (
-                <ThemedIcon set="mosaic" name={`sticker-${s.id}`} size={22} />
+              {hasStickerSet ? (
+                <ThemedIcon set={iconSet as string} name={`sticker-${s.id}`} size={22} />
               ) : (
                 <span className="text-xl">{s.emoji}</span>
               )}
@@ -2384,7 +2392,7 @@ function ChatScreen({
               : undefined
           }
         >
-          {useMosaicIcons ? <ThemedIcon set="mosaic" name="plus" size={20} /> : <Plus size={18} />}
+          {iconSet ? <ThemedIcon set={iconSet} name="plus" size={20} /> : <Plus size={18} />}
         </button>
 
         {showToolsMenu && (
@@ -2398,7 +2406,7 @@ function ChatScreen({
                   className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
                   style={themeColor ? { color: themeColor } : undefined}
                 >
-                  {useMosaicIcons ? <ThemedIcon set="mosaic" name="image" size={19} /> : <ImageIcon size={17} />}
+                  {iconSet ? <ThemedIcon set={iconSet} name="image" size={19} /> : <ImageIcon size={17} />}
                 </button>
                 <button
                   onMouseDown={(e) => e.preventDefault()}
@@ -2409,7 +2417,7 @@ function ChatScreen({
                   }`}
                   style={showStickerPicker && themeColor ? { backgroundColor: `${themeColor}26`, color: themeColor } : undefined}
                 >
-                  {useMosaicIcons ? <ThemedIcon set="mosaic" name="sticker-grin" size={19} /> : <span className="text-base">😄</span>}
+                  {hasStickerSet ? <ThemedIcon set={iconSet as string} name="sticker-grin" size={19} /> : <span className="text-base">😄</span>}
                 </button>
               </>
             )}
@@ -2433,7 +2441,7 @@ function ChatScreen({
               }`}
               style={themeColor ? (showStylePicker ? { backgroundColor: `${themeColor}26`, color: themeColor } : { color: themeColor }) : undefined}
             >
-              {useMosaicIcons ? <ThemedIcon set="mosaic" name="font" size={17} /> : <Type size={15} />}
+              {iconSet ? <ThemedIcon set={iconSet} name="font" size={17} /> : <Type size={15} />}
             </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
@@ -2444,7 +2452,7 @@ function ChatScreen({
               }`}
               style={themeColor ? ((showCapsulePicker || capsuleAt) ? { backgroundColor: `${themeColor}26`, color: themeColor } : { color: themeColor }) : undefined}
             >
-              {useMosaicIcons ? <ThemedIcon set="mosaic" name="timer" size={17} /> : <Clock size={15} />}
+              {iconSet ? <ThemedIcon set={iconSet} name="timer" size={17} /> : <Clock size={15} />}
             </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
@@ -2453,7 +2461,7 @@ function ChatScreen({
               className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all hover:-translate-y-0.5 hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
               style={themeColor ? { color: themeColor } : undefined}
             >
-              {useMosaicIcons ? <ThemedIcon set="mosaic" name="attachment" size={18} /> : <Paperclip size={16} />}
+              {iconSet ? <ThemedIcon set={iconSet} name="attachment" size={18} /> : <Paperclip size={16} />}
             </button>
           </div>
         )}
@@ -2470,7 +2478,7 @@ function ChatScreen({
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-overlay/[0.08] bg-overlay/[0.03] transition-all hover:bg-overlay/[0.08] ${themeColor ? '' : 'text-muted hover:text-fg'}`}
             style={themeColor ? { color: themeColor } : undefined}
           >
-            {useMosaicIcons ? <ThemedIcon set="mosaic" name="image" size={19} /> : <ImageIcon size={17} />}
+            {iconSet ? <ThemedIcon set={iconSet} name="image" size={19} /> : <ImageIcon size={17} />}
           </button>
           <button
             data-popover-group="tools"
@@ -2490,7 +2498,7 @@ function ChatScreen({
                 : undefined
             }
           >
-            {useMosaicIcons ? <ThemedIcon set="mosaic" name="sticker-grin" size={21} /> : <span className="text-base">😄</span>}
+            {hasStickerSet ? <ThemedIcon set={iconSet as string} name="sticker-grin" size={21} /> : <span className="text-base">😄</span>}
           </button>
         </div>
 
@@ -2530,7 +2538,7 @@ function ChatScreen({
           }`}
           style={themeColor ? { backgroundColor: themeColor } : undefined}
         >
-          {useMosaicIcons ? <ThemedIcon set="mosaic" name="send" size={18} /> : <Send size={16} />}
+          {iconSet ? <ThemedIcon set={iconSet} name="send" size={18} /> : <Send size={16} />}
         </button>
       </div>
     </div>

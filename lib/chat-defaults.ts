@@ -38,7 +38,7 @@ export const FONT_CATALOG: FontOption[] = [
 // Wallpaper presets are CSS background-image values (gradients or a bundled
 // static image) rendered behind the message list — fixed in code, a room
 // picks one by id or uploads a fully custom image instead.
-export type WallpaperPresetId = 'none' | 'nebula' | 'sunset' | 'ocean' | 'blush' | 'forest' | 'midnight' | 'mosaic'
+export type WallpaperPresetId = 'none' | 'nebula' | 'sunset' | 'ocean' | 'blush' | 'forest' | 'midnight' | 'mosaic' | 'burrow'
 export const WALLPAPER_PRESETS: { id: WallpaperPresetId; label: string; css: string }[] = [
   { id: 'none', label: 'Mặc định', css: '' },
   { id: 'nebula', label: 'Tinh vân', css: 'radial-gradient(circle at 20% 20%, rgba(124,58,237,0.25), transparent 55%), radial-gradient(circle at 80% 70%, rgba(167,139,250,0.18), transparent 50%)' },
@@ -48,6 +48,14 @@ export const WALLPAPER_PRESETS: { id: WallpaperPresetId; label: string; css: str
   { id: 'forest', label: 'Rừng xanh', css: 'linear-gradient(160deg, rgba(52,211,153,0.16), rgba(96,165,250,0.10) 60%, transparent)' },
   { id: 'midnight', label: 'Đêm sâu', css: 'radial-gradient(circle at 50% 0%, rgba(129,140,248,0.20), transparent 60%)' },
   { id: 'mosaic', label: 'Gạch hoa', css: "url('/wallpapers/mosaic-tiles.jpg')" },
+  {
+    id: 'burrow',
+    label: 'Tổ ấm trong hốc cây',
+    // Soft layered glow instead of a literal image — the reference photo is a
+    // busy game-UI screenshot (currency counters, buttons baked in), not
+    // something that tiles cleanly as a chat background.
+    css: 'radial-gradient(circle at 25% 10%, rgba(217,165,68,0.20), transparent 55%), linear-gradient(180deg, rgba(62,92,58,0.22), rgba(43,31,22,0.18) 55%, transparent), radial-gradient(circle at 80% 85%, rgba(74,155,155,0.14), transparent 50%)',
+  },
 ]
 
 // One-click "apply this whole look" presets — bundles a wallpaper with
@@ -73,6 +81,16 @@ export const THEME_PRESETS: ThemePreset[] = [
     secondaryColor: '#E23B2E', // vermillion tile
     tertiaryColor: '#F2A80F', // marigold tile
     quaternaryColor: '#2F9E4F', // leaf-green tile
+    fontId: 'rounded',
+  },
+  {
+    id: 'burrow',
+    label: 'Tổ ấm trong hốc cây',
+    wallpaperPreset: 'burrow',
+    primaryColor: '#3E5C3A', // forest canopy green
+    secondaryColor: '#C1615A', // terracotta/rose bed linens
+    tertiaryColor: '#D9A544', // golden lantern glow
+    quaternaryColor: '#4A9B9B', // teal bathtub
     fontId: 'rounded',
   },
 ]
