@@ -57,10 +57,6 @@
   animation: fade-up 400ms ease both;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .animate-aurora-drift { animation: none; }
-}
-
 .animate-shimmer {
   background: linear-gradient(
     90deg,
