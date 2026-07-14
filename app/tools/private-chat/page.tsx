@@ -789,6 +789,7 @@ function ChatScreen({
         setShowStylePicker(false)
         setShowCapsulePicker(false)
         setShowGesturePicker(false)
+        setShowStickerPicker(false)
       }
       if (!target.closest('[data-popover-group="mood"]')) setShowMoodPicker(false)
       if (!target.closest('[data-popover-group="actions"]')) {
@@ -2203,6 +2204,7 @@ function ChatScreen({
             <button
               key={g.id}
               title={hasText ? `Chèn ${g.label.toLowerCase()} vào tin nhắn` : `Gửi ${g.label.toLowerCase()}`}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 // With text already typed, the icon becomes part of that
                 // message instead of firing the old standalone fly-over
@@ -2239,6 +2241,7 @@ function ChatScreen({
             <button
               key={s.id}
               title={`Chèn "${s.label.toLowerCase()}" vào tin nhắn`}
+              onMouseDown={(e) => e.preventDefault()}
               // Stays open after inserting — tap several stickers in a row,
               // it only closes on an outside tap.
               onClick={() => insertIconToken(s.id)}
