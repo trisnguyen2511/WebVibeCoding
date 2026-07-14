@@ -1,13 +1,19 @@
 ---
 name: chat-theme-from-image
-description: "Add or update a Private Chat room theme (app/tools/private-chat) from a reference image the user sends — wallpaper + 4-color palette + font + icon tint, bundled into one THEME_PRESETS entry with a one-click admin apply button. Use whenever the user says things like 'làm theme này cho tôi', 'đổi theme chat theo hình', 'thêm theme mới theo hình tôi gửi', or attaches a photo/pattern/mood board and asks the chat to match it."
+description: "Add or update a Private Chat room theme (app/tools/private-chat) from a reference image the user sends — wallpaper + 4-color palette + font + a full matching hand-drawn icon set, bundled into one THEME_PRESETS entry with a one-click admin apply button. Use whenever the user says things like 'làm theme này cho tôi', 'đổi theme chat theo hình', 'thêm theme mới theo hình tôi gửi', or attaches a photo/pattern/mood board and asks the chat to match it."
 ---
 
 # Private Chat: theme-from-image
 
 Turns a reference image into a full Private Chat theme: wallpaper, 4-role color
-palette, suggested font, and icon/aurora-background tinting — all bundled into
-one `THEME_PRESETS` entry the admin applies with a single button.
+palette, suggested font, ambient/header background tinting, **and a full
+matching hand-drawn icon set** — all bundled into one `THEME_PRESETS` entry
+the admin applies with a single button.
+
+**A theme-from-image request always includes a matching icon set.** Don't
+treat the icon set as optional or a separate follow-up — build it in the same
+pass as the wallpaper/palette/font, the same way the mosaic (Talavera) theme
+now has one. See "Icon set" step below.
 
 This encodes what was learned building the mosaic/Talavera theme in this repo:
 color renames, the 4-color system, the outer aurora background, and the
@@ -28,9 +34,16 @@ Everything visually driven by the room's theme, all wired through
 | Quaternary | `quaternaryColor` | chosen-reaction chip tint, outer aurora's 3rd blob (liveliness) |
 | Font | `fontId` | suggested chrome/message font, reordered first in the picker |
 
-Icons and the outer page background (`ToolShell`'s `backgroundStyle`) already
-read `primaryColor`/`secondaryColor`/`quaternaryColor` generically — you do
-not need to touch icon code again for a new theme, only add the preset data.
+The outer/header ambient background (`ToolShell`'s `ambientBackgroundStyle` /
+`headerStyle`) already reads `primaryColor`/`secondaryColor`/`quaternaryColor`/
+`wallpaperCss` generically — no code changes needed there for a new theme.
+
+Icons are different: there is no generic "icon set" reader. Each theme's icon
+set is a real folder of hand-drawn SVGs under `public/icons/<slug>/`, and the
+render call sites in `app/tools/private-chat/page.tsx` pick a theme's set by
+checking `roomInfo.wallpaperPreset === '<slug>'` (see `useMosaicIcons` for the
+existing example). A new theme needs its own folder and its own boolean/
+lookup wired the same way — this is manual work every time, not automatic.
 
 ## Steps
 
@@ -68,37 +81,68 @@ not need to touch icon code again for a new theme, only add the preset data.
    pattern → `rounded`; an elegant/luxury photo → `serif` or `display`; a
    playful pattern → `cute`/`funky`). Don't default to `sans` without looking.
 
-4. **No new admin/API/client code needed for a new preset** — `THEME_PRESETS`
-   is already read generically by:
+4. **Draw the matching icon set** (always do this, not just when asked
+   separately). Create `public/icons/<slug>/` with one hand-drawn SVG per icon
+   currently themeable — check `app/tools/private-chat/page.tsx` for the
+   current full list (as of writing: `send`, `image`, `gallery`, `search`,
+   `plus`, `reaction`, `font`, `timer`, `attachment`, `leave` — **re-check the
+   file, this list grows**; see rule below). Style rules, consistent across
+   every theme's set so they all feel like "one family" of a shared system:
+   - viewBox `0 0 24 24`, bold ~1.5-2px black (`#0B0B0F`) outlines
+   - filled with the theme's own 4 palette colors (name which color = which
+     hex in a comment, matching step 1)
+   - a small recurring corner accent (the mosaic set uses a tiny 4-point
+     quatrefoil/dot cluster in one corner) so icons in the same set are
+     visually related to each other, not just same-color-different-shape
+   - validate each file parses as XML before committing (a stray unescaped
+     `&` broke one of the mosaic icons before — check with e.g.
+     `python3 -c "import xml.dom.minidom as m; m.parse('file.svg')"`)
+   Wire them in with the same pattern as `useMosaicIcons`: a boolean derived
+   from `roomInfo.wallpaperPreset === '<slug>'`, and a `<ThemedIcon set="<slug>"
+   name="..." size={..} />` conditional at each icon call site, falling back to
+   the existing lucide icon when the boolean is false.
+
+5. **Whenever you add a new icon-using feature to the chat** (a new button,
+   picker, or action — regardless of which theme prompted it), add the new
+   icon to **every existing theme's icon set**, not just the one you're
+   currently working on. An icon set that only covers some buttons looks
+   broken/inconsistent the moment a themed room hits the one button still
+   showing a bare lucide icon. Treat "add an icon set entry" as part of
+   "add the feature," the same way a new field needs updating in `Session`,
+   `join`, `room-info`, and the admin route all together.
+
+6. **No new admin/API/client code needed for the preset data itself** —
+   `THEME_PRESETS` is already read generically by:
    - `app/tools/private-chat/admin/page.tsx`'s `applyThemePreset()` (renders a
      "✨ Áp dụng theme: {label}" button per entry automatically)
    - the client already reads all 4 colors + font + wallpaper from `roomInfo`
-   Only add code elsewhere if the image implies something genuinely new (e.g.
+   (Icons are the one exception — see step 4/5 above, they need explicit wiring.)
+   Only add other code if the image implies something genuinely new (e.g.
    a 5th color role, or a wallpaper behavior that doesn't fit the existing
    preset/custom-upload model) — ask the user first if so, don't build it
    speculatively.
 
-5. **If you DO add a new color role or field** (extending beyond the existing
+7. **If you DO add a new color role or field** (extending beyond the existing
    4), it needs a migration: `alter table chat_rooms add column if not exists
    <role>_color text;` in a new `supabase/migrations/00NN_....sql` file — tell
    the user to run it in Supabase SQL Editor, and remind them again in your
    final report. Never run it yourself.
 
-6. **Verify before shipping:**
+8. **Verify before shipping:**
    ```bash
    npx tsc --noEmit
    rm -rf .next public/sw.js public/workbox-*.js public/worker-*.js
    NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder npm run build
    ```
 
-7. **Ship per this repo's branch workflow** (see root `CLAUDE.md`): new
+9. **Ship per this repo's branch workflow** (see root `CLAUDE.md`): new
    `claude/<slug>-theme` branch → commit → push → merge `--no-ff` into
    `staging` → push `staging` → report to the user and **stop before
    `master`** until they explicitly say "lên prod".
 
-8. **After pushing to staging, tell the user to actually click "✨ Áp dụng
-   theme"** in the admin panel for the room they want it on — adding the
-   preset alone doesn't change any existing room until applied.
+10. **After pushing to staging, tell the user to actually click "✨ Áp dụng
+    theme"** in the admin panel for the room they want it on — adding the
+    preset alone doesn't change any existing room until applied.
 
 ## Known pitfalls from building this system (avoid repeating)
 
@@ -121,3 +165,15 @@ not need to touch icon code again for a new theme, only add the preset data.
   `fontFamily: 'var(--font-inter), sans-serif'` so messages never inherit the
   chrome wrapper's font via CSS inheritance. Keep this invariant if you touch
   font logic.
+- **No AI icon-generation API key in this environment**: the `design` skill's
+  `scripts/icon/generate.py` needs `GEMINI_API_KEY`, which isn't set up here.
+  Default to hand-drawing the SVGs directly (as done for every icon so far)
+  unless the user has explicitly provided a key for that session.
+- **Icon sets go stale silently**: because each icon set is a manually-wired
+  folder (not a generic reader), adding a new icon feature without updating
+  every existing theme's set doesn't error — it just quietly falls back to
+  the default lucide icon for that one theme, which reads as an inconsistency
+  bug days later. Grep for the existing `useMosaicIcons` (or equivalent)
+  boolean and its `<ThemedIcon .../>` call sites whenever adding a themeable
+  icon, and mirror the same call site for every other theme folder that
+  exists at the time.
