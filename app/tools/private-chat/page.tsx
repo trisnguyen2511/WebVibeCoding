@@ -2102,7 +2102,7 @@ function ChatScreen({
       {showCapsulePicker && (
         <div data-popover-group="tools" className="mt-2 flex items-center gap-2.5 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] p-3 backdrop-blur-xl animate-panel-in">
           {useMosaicIcons ? <ThemedIcon set="mosaic" name="timer" size={16} className="shrink-0" /> : <Clock size={14} className="shrink-0 text-accent-soft" />}
-          <span className="text-xs text-muted">Mở lúc</span>
+          <span className="text-xs text-fg/70">Mở lúc</span>
           <input
             type="datetime-local"
             value={capsuleAt}
@@ -2111,7 +2111,7 @@ function ChatScreen({
           />
           <button
             onClick={() => { setCapsuleAt(''); setShowCapsulePicker(false) }}
-            className="text-xs text-muted transition-colors hover:text-fg"
+            className="text-xs text-fg/70 transition-colors hover:text-fg"
           >
             Huỷ
           </button>
@@ -2138,7 +2138,7 @@ function ChatScreen({
       {showStylePicker && (
         <div data-popover-group="tools" className="mt-2 space-y-3 rounded-2xl border border-overlay/[0.08] bg-overlay/[0.03] p-4 backdrop-blur-xl animate-panel-in">
           <div className="flex items-center gap-3">
-            <span className="w-16 shrink-0 text-xs text-muted">Màu chữ</span>
+            <span className="w-16 shrink-0 text-xs text-fg/70">Màu chữ</span>
             <div className="flex flex-wrap gap-2">
               {COLOR_PRESETS.map((c) => (
                 <button
@@ -2156,7 +2156,7 @@ function ChatScreen({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="w-16 shrink-0 text-xs text-muted">Font chữ</span>
+            <span className="w-16 shrink-0 text-xs text-fg/70">Font chữ</span>
             <div className="flex flex-1 gap-1.5 overflow-x-auto pb-1">
               {fontOptions.map((f) => (
                 <button
@@ -2166,7 +2166,7 @@ function ChatScreen({
                   className={`shrink-0 rounded-xl border px-3 py-1 text-xs transition-all ${
                     (style.font ?? 'sans') === f.id
                       ? 'border-accent bg-accent/[0.15] text-accent-soft shadow-[0_0_12px_rgba(124,58,237,0.2)]'
-                      : 'border-overlay/[0.08] bg-overlay/[0.03] text-muted hover:text-fg'
+                      : 'border-overlay/[0.08] bg-overlay/[0.03] text-fg/70 hover:text-fg'
                   }`}
                 >
                   {f.label}
@@ -2175,14 +2175,14 @@ function ChatScreen({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="w-16 shrink-0 text-xs text-muted">Kiểu chữ</span>
+            <span className="w-16 shrink-0 text-xs text-fg/70">Kiểu chữ</span>
             <div className="flex gap-2">
               <button
                 onClick={() => updateStyle({ bold: !style.bold })}
                 className={`h-8 w-8 rounded-xl border font-bold text-sm transition-all ${
                   style.bold
                     ? 'border-accent bg-accent/[0.15] text-accent-soft'
-                    : 'border-overlay/[0.08] bg-overlay/[0.03] text-muted hover:text-fg'
+                    : 'border-overlay/[0.08] bg-overlay/[0.03] text-fg/70 hover:text-fg'
                 }`}
               >
                 B
@@ -2192,7 +2192,7 @@ function ChatScreen({
                 className={`h-8 w-8 rounded-xl border text-sm italic transition-all ${
                   style.italic
                     ? 'border-accent bg-accent/[0.15] text-accent-soft'
-                    : 'border-overlay/[0.08] bg-overlay/[0.03] text-muted hover:text-fg'
+                    : 'border-overlay/[0.08] bg-overlay/[0.03] text-fg/70 hover:text-fg'
                 }`}
               >
                 I
