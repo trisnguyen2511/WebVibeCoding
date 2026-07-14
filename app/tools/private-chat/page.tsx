@@ -1798,11 +1798,21 @@ function ChatScreen({
                       ) : isJournal ? (
                         <div
                           className={`w-full overflow-x-auto border-l-2 ${journalColor ? '' : 'border-accent/40'} ${
-                            hasWallpaper ? 'rounded-r-xl bg-background/40 py-2 pl-4 pr-3 backdrop-blur-md' : 'py-1 pl-4'
+                            hasWallpaper
+                              ? 'rounded-r-xl bg-background/40 py-2 pl-4 pr-3 backdrop-blur-md'
+                              : journalColor
+                                ? 'rounded-r-xl py-2 pl-4 pr-3'
+                                : 'py-1 pl-4'
                           }`}
                           style={{
                             touchAction: 'pan-y',
                             ...(journalColor ? { borderColor: journalColor } : undefined),
+                            // Tint each entry's own fill (not just the border) with
+                            // its sender's theme color, so already-sent messages
+                            // read as themed blocks — skipped over a wallpaper,
+                            // where the translucent backing above already exists
+                            // purely for text legibility and shouldn't be recolored.
+                            ...(journalColor && !hasWallpaper ? { backgroundColor: `${journalColor}14` } : undefined),
                           }}
                         >
                           <LinkPreviewCard message={m} opaque={hasWallpaper} accentColor={tertiaryColor} />
