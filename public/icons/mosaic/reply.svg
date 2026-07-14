@@ -1,0 +1,10 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Trả lời (Talavera)</title>
+  <path d="M11 6 4 12l7 6v-3.6c5.2 0 8.4 1.4 10.4 5-.6-6.4-3.6-10-10.4-10.4V6Z"
+        fill="#2F9E4F" stroke="#0B0B0F" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M11 6 4 12l7 6" stroke="#0B0B0F" stroke-width="0.7" stroke-linejoin="round" stroke-linecap="round"/>
+  <g stroke="#0B0B0F" stroke-width="0.8" stroke-linecap="round">
+    <path d="M19.4 3.4v-.9M19.4 6v.9M21.4 4.7h-.9M17.8 4.7h.9M20.6 3.2l.6-.6M17.6 6.2l-.6.6M20.6 6.2l.6.6M17.6 3.2l-.6-.6"/>
+  </g>
+  <circle cx="19.4" cy="4.7" r="1.4" fill="#E23B2E" stroke="#0B0B0F" stroke-width="1"/>
+</svg>
