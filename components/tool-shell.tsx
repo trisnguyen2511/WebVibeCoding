@@ -22,13 +22,15 @@ interface ToolShellProps {
    */
   fullBleed?: boolean
   /**
-   * Optional inline background override for the outer page frame (e.g. a
-   * theme-derived gradient). Painted on top of the default `bg-background`
-   * class, which still shows through any transparent gradient stops.
+   * Optional style for a full-viewport ambient background layer, rendered as
+   * a fixed, negative-z-index, empty div behind everything (header + main).
+   * Meant for a blurred/scaled backdrop (e.g. a room's own wallpaper) — since
+   * the layer has no children, a `filter: blur(...)` on it is safe and won't
+   * blur any real content.
    */
-  backgroundStyle?: React.CSSProperties
-  /** Extra class names appended to the outer frame's animation/utility classes. */
-  backgroundClassName?: string
+  ambientBackgroundStyle?: React.CSSProperties
+  /** Optional style override for the sticky header bar (e.g. a subtle theme accent). */
+  headerStyle?: React.CSSProperties
 }
 
 export function ToolShell({
@@ -38,8 +40,8 @@ export function ToolShell({
   children,
   wide = false,
   fullBleed = false,
-  backgroundStyle,
-  backgroundClassName,
+  ambientBackgroundStyle,
+  headerStyle,
 }: ToolShellProps) {
   const maxW = wide ? 'max-w-6xl' : 'max-w-4xl'
   const pathname = usePathname()
@@ -50,10 +52,13 @@ export function ToolShell({
 
   return (
     <div
-      className={`${fullBleed ? 'flex h-dvh flex-col overflow-hidden bg-background' : 'min-h-screen bg-background'} ${backgroundClassName ?? ''}`}
-      style={{ ...(fullBleed ? { overscrollBehavior: 'none' } : undefined), ...backgroundStyle }}
+      className={fullBleed ? 'flex h-dvh flex-col overflow-hidden bg-background' : 'min-h-screen bg-background'}
+      style={fullBleed ? { overscrollBehavior: 'none' } : undefined}
     >
-      <header className="sticky top-0 z-20 shrink-0 border-b border-border bg-background/85 backdrop-blur-md">
+      {ambientBackgroundStyle && (
+        <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" style={ambientBackgroundStyle} />
+      )}
+      <header className="sticky top-0 z-20 shrink-0 border-b border-border bg-background/85 backdrop-blur-md" style={headerStyle}>
         <div className={`mx-auto flex ${maxW} items-center gap-3 px-4 py-2.5`}>
           <Link
             href="/"
