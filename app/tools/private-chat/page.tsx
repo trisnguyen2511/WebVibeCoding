@@ -1264,6 +1264,9 @@ function ChatScreen({
     ])
 
     performSend(clientId, payload)
+    // Keep the textarea focused (and the on-screen keyboard open) after
+    // sending — tapping the Send button would otherwise steal focus.
+    messageInputRef.current?.focus()
   }, [input, style, replyingTo, capsuleAt, session.roomId, session.nickname, performSend])
 
   const sendGesture = async (gestureId: string) => {
@@ -2531,6 +2534,9 @@ function ChatScreen({
         />
 
         <button
+          // Keeps the on-screen keyboard open after sending — a click would
+          // otherwise move focus to this button and blur the textarea first.
+          onMouseDown={(e) => e.preventDefault()}
           onClick={send}
           disabled={!input.trim()}
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-[0_4px_16px_rgba(124,58,237,0.4)] transition-all hover:shadow-[0_6px_24px_rgba(124,58,237,0.55)] active:scale-95 disabled:opacity-40 disabled:shadow-none ${
