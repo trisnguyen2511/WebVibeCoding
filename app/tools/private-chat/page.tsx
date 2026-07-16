@@ -236,43 +236,47 @@ function seededRandom(seed: string): number {
 // grain stretches correctly to fit each message's own width/height instead
 // of a fixed-size texture repeating oddly on short vs. long messages.
 function woodPlankStyle(seed: string): React.CSSProperties {
-  const r = (i: number) => seededRandom(`${seed}-${i}`)
-  const plankHeight = 16 + r(1) * 7 // 16-23px per plank board
-
-  // Curved, almond-shaped grain "eyes" (elongated ellipses) instead of
-  // straight streaks — closer to the reference's swirling grain lines than
-  // plain repeating stripes can get with pure CSS.
-  const eyes = [0, 1, 2, 3].map((i) => {
-    const rx = 22 + r(10 + i) * 22
-    const ry = 3 + r(20 + i) * 3
-    const x = 10 + r(30 + i) * 80
-    const y = 10 + r(40 + i) * 80
-    return `radial-gradient(ellipse ${rx}px ${ry}px at ${x}% ${y}%, rgba(70,42,18,0.42) 0%, transparent 78%)`
-  })
-
+  const r1 = seededRandom(seed)
+  const r2 = seededRandom(`${seed}-b`)
+  const angle = 88 + r1 * 4 // near-vertical grain, varies slightly per message
+  const stripe = 9 + r2 * 10
   return {
     backgroundImage: [
-      ...eyes,
-      // beveled plank boards: a light highlight along each board's top edge,
-      // a dark groove along its bottom, like individual stacked planks
-      `repeating-linear-gradient(
-        0deg,
-        rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 1.5px,
-        transparent 1.5px, transparent ${plankHeight - 2}px,
-        rgba(20,12,5,0.5) ${plankHeight - 2}px, rgba(20,12,5,0.5) ${plankHeight}px
-      )`,
-      'linear-gradient(160deg, #B9814B, #8A5A2E)',
+      `repeating-linear-gradient(${angle}deg, rgba(122,75,38,0.32) 0px, rgba(122,75,38,0.32) 1.5px, transparent 1.5px, transparent ${stripe}px)`,
+      `repeating-linear-gradient(${angle}deg, rgba(74,46,24,0.22) 0px, transparent 2.5px, transparent ${stripe * 1.7}px)`,
+      'linear-gradient(155deg, #CBA06B, #9C6B3E)',
     ].join(', '),
-    backgroundColor: '#8A5A2E',
   }
 }
 
 // A few light, randomly-placed leaf sprigs decorating each burrow-theme
 // bubble — position/rotation seeded per message so it's stable, not
 // re-randomized on every render.
-function LeafSprig({ seed }: { seed: string }) {
+// Fixed, well-spread anchor slots (corners + mid-edges) — picking distinct
+// slots out of this fixed set guarantees leaves never land too close to
+// each other, regardless of how the seeded shuffle picks them.
+const LEAF_ANCHORS: React.CSSProperties[] = [
+  { top: 3, left: 4 },
+  { top: 3, right: 4 },
+  { bottom: 3, left: 4 },
+  { bottom: 3, right: 4 },
+  { top: '45%', left: 2 },
+  { top: '45%', right: 2 },
+]
+
+// Seeded Fisher-Yates pick of `count` distinct anchors — stable per message
+// (same shuffle every render), not just per-bubble-random each time.
+function pickLeafAnchors(seed: string, count: number): React.CSSProperties[] {
+  const indices = LEAF_ANCHORS.map((_, i) => i)
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(seededRandom(`${seed}-shuffle-${i}`) * (i + 1))
+    ;[indices[i], indices[j]] = [indices[j], indices[i]]
+  }
+  return indices.slice(0, count).map((idx) => LEAF_ANCHORS[idx])
+}
+
+function LeafSprig({ seed, anchor }: { seed: string; anchor: React.CSSProperties }) {
   const r = seededRandom(`${seed}-leaf`)
-  const corner: React.CSSProperties = r < 0.5 ? { top: 3, right: 4 } : { bottom: 3, left: 4 }
   const rotate = -20 + r * 40
   return (
     <svg
@@ -280,7 +284,7 @@ function LeafSprig({ seed }: { seed: string }) {
       width={15}
       height={15}
       className="pointer-events-none absolute opacity-70"
-      style={{ ...corner, transform: `rotate(${rotate}deg)` }}
+      style={{ ...anchor, transform: `rotate(${rotate}deg)` }}
       aria-hidden="true"
     >
       <path d="M12 3c4 2 6 6 5 11-4 1-8-1-9-5-1-3 .5-5 4-6Z" fill="#3E5C3A" stroke="#2B1F16" strokeWidth="1" />
@@ -803,9 +807,9 @@ function ChatScreen({
   const iconSet = ICON_SET_SLUGS.includes(roomInfo.wallpaperPreset ?? '') ? (roomInfo.wallpaperPreset as string) : null
   const hasStickerSet = iconSet !== null && ICON_SETS_WITH_STICKERS.has(iconSet)
   // Burrow's bubbles get a wood-plank look instead of the usual theme-color
-  // fill — a dark cocoa ink for text, matching the medium-brown plank base.
+  // fill — a dark cocoa ink for text so it reads over the light tan wood.
   const isBurrow = roomInfo.wallpaperPreset === 'burrow'
-  const burrowInk = '#2B1A0C'
+  const burrowInk = '#2B1F16'
   const themeColor = roomInfo.primaryColor
   // Informational highlight color (pinned message, link previews, chosen
   // reactions) and a quieter secondary accent (outer aurora's extra blob) —
@@ -2046,7 +2050,10 @@ function ChatScreen({
                             ...(journalColor && !hasWallpaper && !isBurrow ? { backgroundColor: `${journalColor}22` } : undefined),
                           }}
                         >
-                          {isBurrow && <LeafSprig seed={m.id} />}
+                          {isBurrow &&
+                            pickLeafAnchors(m.id, 3).map((anchor, i) => (
+                              <LeafSprig key={i} seed={`${m.id}-${i}`} anchor={anchor} />
+                            ))}
                           <LinkPreviewCard message={m} opaque={hasWallpaper} accentColor={tertiaryColor} />
                           <FileAttachment message={m} />
                           {m.content && (
@@ -2098,7 +2105,10 @@ function ChatScreen({
                                 fontStyle: m.italic ? 'italic' : undefined,
                               }}
                             >
-                              {isBurrow && <LeafSprig seed={m.id} />}
+                              {isBurrow &&
+                            pickLeafAnchors(m.id, 3).map((anchor, i) => (
+                              <LeafSprig key={i} seed={`${m.id}-${i}`} anchor={anchor} />
+                            ))}
                               {renderMessageContent(m.content, iconSet)}
                             </div>
                           )}
