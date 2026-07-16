@@ -844,6 +844,9 @@ function ChatScreen({
     messages.forEach((m) => seenMsgIdsRef.current.add(m.id))
   }, [messages])
   const [input, setInput] = useState('')
+  // Bumped every time a message is sent — Tsuki (burrow theme) watches this
+  // to play a little jump-and-cheer celebration.
+  const [sendSignal, setSendSignal] = useState(0)
   const hasText = Boolean(input.trim())
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -1308,6 +1311,7 @@ function ChatScreen({
   const send = useCallback(() => {
     const content = input.trim()
     if (!content) return
+    setSendSignal((n) => n + 1)
     const reply = replyingTo
     const revealAt = capsuleAt ? new Date(capsuleAt).toISOString() : undefined
     const sentStyle = style
@@ -2239,7 +2243,7 @@ function ChatScreen({
           ↓ {newMessageCount} tin nhắn mới
         </button>
       )}
-      {isBurrow && <TsukiCompanion scrollRef={scrollRef} />}
+      {isBurrow && <TsukiCompanion scrollRef={scrollRef} typingLength={input.length} sendSignal={sendSignal} />}
       </div>
 
       {/* ── Reply bar ───────────────────────────────────────────── */}
