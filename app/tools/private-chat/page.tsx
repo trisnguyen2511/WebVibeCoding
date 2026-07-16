@@ -6,7 +6,7 @@ import { ToolShell } from '@/components/tool-shell'
 import { TsukiCompanion } from '@/components/tsuki-companion'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { CHAT_MAX_FILE_SIZE_BYTES, CHAT_MAX_FILE_SIZE_MB, CHAT_OVERSIZE_DISMISS_DAYS } from '@/lib/chat-limits'
-import { loadCachedMessages, saveCachedMessages } from '@/lib/chat-cache'
+import { loadCachedMessages, saveCachedMessages, CACHE_MAX_MESSAGES } from '@/lib/chat-cache'
 import { DEFAULT_MOOD_OPTIONS, DEFAULT_REACTION_EMOJIS, FONT_CATALOG, WALLPAPER_PRESETS, type MoodOption, type FontId, type FontOption } from '@/lib/chat-defaults'
 import { Dancing_Script, Baloo_2, Noto_Serif, Pacifico, Anton, Mali, Lobster } from 'next/font/google'
 
@@ -948,7 +948,11 @@ function ChatScreen({
     const cached = loadCachedMessages<ChatMessage>(session.roomId)
     if (cached) {
       setMessages(cached)
-      setHasMore(true)
+      // The cache is truncated to the last CACHE_MAX_MESSAGES — if it's
+      // shorter than that, we know it holds the room's entire history and
+      // there's nothing older to page in, so don't fire a wasted "before"
+      // fetch the first time the user scrolls near the top.
+      setHasMore(cached.length >= CACHE_MAX_MESSAGES)
       initialLoadDone.current = true
       setInitialLoading(false)
       markSeen()
