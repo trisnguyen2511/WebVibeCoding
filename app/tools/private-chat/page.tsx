@@ -238,22 +238,37 @@ function seededRandom(seed: string): number {
 function woodPlankStyle(seed: string): React.CSSProperties {
   const r1 = seededRandom(seed)
   const r2 = seededRandom(`${seed}-b`)
-  const r3 = seededRandom(`${seed}-c`)
-  const r4 = seededRandom(`${seed}-d`)
   const angle = 88 + r1 * 4 // near-vertical main grain, varies slightly per message
   const stripe = 16 + r2 * 18 // bigger, bolder streaks than before
-  // A second, gently slanted layer crossing the main grain at its own angle
-  // and spacing — real wood grain isn't perfectly parallel lines, so this
-  // breaks up the uniformity of the straight streaks above.
-  const tiltAngle = angle + (r3 < 0.5 ? -1 : 1) * (14 + r4 * 12)
-  const tiltStripe = 26 + r4 * 22
+
+  // A handful of short, individually-placed diagonal marks instead of a
+  // repeating pattern — real wood grain has a few scattered slanted marks
+  // crossing the main grain, not a second uniformly-repeating layer.
+  const markCount = 2 + Math.floor(seededRandom(`${seed}-n`) * 2) // 2-3 marks
+  const marks = Array.from({ length: markCount }, (_, i) => {
+    const ra = seededRandom(`${seed}-tilt-${i}`)
+    const rb = seededRandom(`${seed}-x-${i}`)
+    const rc = seededRandom(`${seed}-y-${i}`)
+    const rl = seededRandom(`${seed}-len-${i}`)
+    const tiltAngle = angle + (ra < 0.5 ? -1 : 1) * (16 + ra * 20)
+    const len = 34 + rl * 26
+    return {
+      image: `linear-gradient(${tiltAngle}deg, transparent 42%, rgba(74,46,24,0.3) 50%, transparent 58%)`,
+      size: `${len}px ${len}px`,
+      position: `${8 + rb * 80}% ${8 + rc * 80}%`,
+    }
+  })
+
   return {
     backgroundImage: [
+      ...marks.map((m) => m.image),
       `repeating-linear-gradient(${angle}deg, rgba(122,75,38,0.34) 0px, rgba(122,75,38,0.34) 3px, transparent 3px, transparent ${stripe}px)`,
       `repeating-linear-gradient(${angle}deg, rgba(74,46,24,0.24) 0px, transparent 4px, transparent ${stripe * 1.7}px)`,
-      `repeating-linear-gradient(${tiltAngle}deg, rgba(74,46,24,0.16) 0px, transparent 3px, transparent ${tiltStripe}px)`,
       'linear-gradient(155deg, #CBA06B, #9C6B3E)',
     ].join(', '),
+    backgroundSize: [...marks.map((m) => m.size), 'auto', 'auto', 'auto'].join(', '),
+    backgroundPosition: [...marks.map((m) => m.position), '0 0', '0 0', '0 0'].join(', '),
+    backgroundRepeat: [...marks.map(() => 'no-repeat'), 'repeat', 'repeat', 'no-repeat'].join(', '),
   }
 }
 
