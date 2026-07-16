@@ -11,15 +11,18 @@ import { useEffect, useRef, useState } from 'react'
 
 // Local part-coordinate box (px). Every sprite is absolutely positioned inside
 // this box; the numbers come from compositing the real cut parts to scale.
-const RABBIT_W = 37
+const RABBIT_W = 45
 const RABBIT_H = 66
+// Legless/armless "loaf" body already has the neckerchief fused on (no
+// separate neck part) — arms are two copies of the same hand-picked sprite:
+// one in front (visible, rabbit's own right) and one tucked behind the body
+// silhouette (rabbit's own left), matching the rabbit's own point of view.
 const PARTS = {
-  body: { left: 0.6, top: 28.8, width: 36.0, height: 35.5 },
-  feet: { left: 2.9, top: 45.6, width: 31.5, height: 20.6 },
-  armL: { left: 0.9, top: 38.7, width: 12.3, height: 12.0 },
-  armR: { left: 24.0, top: 38.7, width: 12.3, height: 12.0 },
-  head: { left: -0.1, top: -0.1, width: 37.5, height: 39.8 },
-  neck: { left: 7.5, top: 26.7, width: 22.2, height: 18.9 },
+  feet: { left: 2.8, top: 41.1, width: 37.9, height: 24.9 },
+  armBack: { left: 33.5, top: 35.9, width: 12.0, height: 16.5 },
+  body: { left: -0.2, top: 18.1, width: 43.9, height: 44.7 },
+  armFront: { left: 0.4, top: 39.9, width: 12.0, height: 16.5 },
+  head: { left: 0.4, top: -0.2, width: 42.7, height: 45.3 },
 } as const
 
 type TState =
@@ -272,13 +275,12 @@ export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLD
                   </g>
                 </svg>
                 <img className="tsuki-part tsuki-feet" src="/tsuki/feet.png" {...imgProps} style={partStyle(PARTS.feet)} />
+                <img className="tsuki-part tsuki-arm tsuki-arm-back" src="/tsuki/arm-left.png" {...imgProps} style={partStyle(PARTS.armBack)} />
                 <img className="tsuki-part tsuki-body" src="/tsuki/body.png" {...imgProps} style={partStyle(PARTS.body)} />
-                <img className="tsuki-part tsuki-arm tsuki-arm-l" src="/tsuki/arm.png" {...imgProps} style={partStyle(PARTS.armL)} />
-                <img className="tsuki-part tsuki-arm tsuki-arm-r" src="/tsuki/arm-right.png" {...imgProps} style={partStyle(PARTS.armR)} />
+                <img className="tsuki-part tsuki-arm tsuki-arm-front" src="/tsuki/arm.png" {...imgProps} style={partStyle(PARTS.armFront)} />
                 <img className="tsuki-part tsuki-head" src={headSrc} {...imgProps} style={partStyle(PARTS.head)} />
-                <img className="tsuki-part tsuki-neck" src="/tsuki/neckerchief.png" {...imgProps} style={partStyle(PARTS.neck)} />
                 <img className="tsuki-part tsuki-carrot" src="/tsuki/carrot.png" {...imgProps}
-                  style={{ position: 'absolute', left: 11.5, top: 33, width: 15, height: 15.4 }} />
+                  style={{ position: 'absolute', left: 15, top: 34, width: 14, height: 14.4 }} />
               </>
             )}
           </div>
@@ -315,32 +317,32 @@ const TSUKI_CSS = `
 
 /* wave */
 @keyframes tsuki-wave { 0%,100% { transform: rotate(6deg); } 50% { transform: rotate(-46deg); } }
-.tsuki[data-state="wave"] .tsuki-arm-r { animation: tsuki-wave 0.42s ease-in-out 3; }
+.tsuki[data-state="wave"] .tsuki-arm-back { animation: tsuki-wave 0.42s ease-in-out 3; }
 .tsuki[data-state="wave"] .tsuki-body { animation: tsuki-breathe 2.6s ease-in-out infinite; }
 
 /* arm swing (shared by walk) */
-@keyframes tsuki-arm-l { 0%,100% { transform: rotate(-18deg); } 50% { transform: rotate(-52deg); } }
-@keyframes tsuki-arm-r { 0%,100% { transform: rotate(52deg); } 50% { transform: rotate(18deg); } }
+@keyframes tsuki-arm-front { 0%,100% { transform: rotate(-18deg); } 50% { transform: rotate(-52deg); } }
+@keyframes tsuki-arm-back { 0%,100% { transform: rotate(52deg); } 50% { transform: rotate(18deg); } }
 
 /* walk: upright gentle hop + a little head/ear sway */
 @keyframes tsuki-run { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
 @keyframes tsuki-headbob { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
 .tsuki[data-state="run"] .tsuki-bob { animation: tsuki-run 0.42s ease-in-out infinite; }
-.tsuki[data-state="run"] .tsuki-arm-l { animation: tsuki-arm-l 0.42s ease-in-out infinite; }
-.tsuki[data-state="run"] .tsuki-arm-r { animation: tsuki-arm-r 0.42s ease-in-out infinite; }
+.tsuki[data-state="run"] .tsuki-arm-front { animation: tsuki-arm-front 0.42s ease-in-out infinite; }
+.tsuki[data-state="run"] .tsuki-arm-back { animation: tsuki-arm-back 0.42s ease-in-out infinite; }
 .tsuki[data-state="run"] .tsuki-head { animation: tsuki-headbob 0.42s ease-in-out infinite; }
 
 /* fall */
 @keyframes tsuki-fall { 0% { transform: translateY(-1px); } 100% { transform: translateY(2px); } }
 .tsuki[data-state="fall"] .tsuki-bob { animation: tsuki-fall 0.3s ease-in-out infinite alternate; }
-.tsuki[data-state="fall"] .tsuki-arm-l { transform: rotate(-125deg); }
-.tsuki[data-state="fall"] .tsuki-arm-r { transform: rotate(125deg); }
+.tsuki[data-state="fall"] .tsuki-arm-front { transform: rotate(-125deg); }
+.tsuki[data-state="fall"] .tsuki-arm-back { transform: rotate(125deg); }
 
 /* drag */
 @keyframes tsuki-dangle { 0%,100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
 .tsuki[data-state="drag"] .tsuki-bob { animation: tsuki-dangle 0.6s ease-in-out infinite; }
-.tsuki[data-state="drag"] .tsuki-arm-l { transform: rotate(-150deg); }
-.tsuki[data-state="drag"] .tsuki-arm-r { transform: rotate(150deg); }
+.tsuki[data-state="drag"] .tsuki-arm-front { transform: rotate(-150deg); }
+.tsuki[data-state="drag"] .tsuki-arm-back { transform: rotate(150deg); }
 
 /* happy hop */
 @keyframes tsuki-hop {
@@ -374,8 +376,8 @@ const TSUKI_CSS = `
 @keyframes tsuki-chew { 0%,100% { transform: translateY(0); } 50% { transform: translateY(1.2px); } }
 .tsuki[data-state="carrot"] .tsuki-carrot { opacity: 1; }
 .tsuki[data-state="carrot"] .tsuki-head { animation: tsuki-chew 0.22s ease-in-out infinite; }
-.tsuki[data-state="carrot"] .tsuki-arm-l { transform: rotate(-58deg); }
-.tsuki[data-state="carrot"] .tsuki-arm-r { transform: rotate(58deg); }
+.tsuki[data-state="carrot"] .tsuki-arm-front { transform: rotate(-58deg); }
+.tsuki[data-state="carrot"] .tsuki-arm-back { transform: rotate(58deg); }
 
 /* yawn (head tilts back; closed-eye head swapped in) */
 @keyframes tsuki-yawn-head { 0%,100% { transform: rotate(0); } 35%,70% { transform: rotate(-5deg); } }
