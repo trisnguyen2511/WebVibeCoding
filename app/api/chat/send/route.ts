@@ -5,9 +5,16 @@ import { enforceStorageQuota } from '@/lib/chat-storage-quota'
 import { verifyAdminPassword } from '@/lib/chat-admin-auth'
 import { CHAT_MAX_FILE_SIZE_BYTES } from '@/lib/chat-limits'
 import { fetchLinkPreview, findFirstUrl } from '@/lib/link-preview'
+import { FONT_CATALOG } from '@/lib/chat-defaults'
 
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/
-const FONT_FAMILIES = new Set(['sans', 'display', 'mono', 'cursive'])
+// Read from the shared catalog instead of a hand-copied list — this hardcoded
+// set previously only had the original 4 fonts, so every message sent with
+// one of the 6 fonts added later (rounded/serif/script/impact/cute/funky)
+// silently had its font_family stripped to null here, even though the input
+// box itself (which reads style.font directly, no server round-trip) showed
+// the chosen font correctly right up until send.
+const FONT_FAMILIES = new Set(FONT_CATALOG.map((f) => f.id as string))
 const REPLY_PREVIEW_MAX_LENGTH = 140
 
 const GESTURES: Record<string, string> = {
