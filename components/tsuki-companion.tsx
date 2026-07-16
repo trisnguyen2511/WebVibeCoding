@@ -1,19 +1,29 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 
-// Tsuki — a cute cream bunny with a red neckerchief (chibi nod to the theme
-// image's rabbit) that lives in the burrow-theme chat: it perches on the
-// newest message near the input, chases it as you scroll (climbing up /
-// falling down), can be dragged around, and does idle antics (wave, nibble a
-// carrot, yawn/ear-twitch, and curls up to sleep when left alone). Built with
-// CSS keyframes + a rAF chase loop rather than a sprite sheet so it scales and
-// stays crisp. If this lands well, it's the template for per-theme companions.
+// Tsuki — a cute cream bunny with a red neckerchief (nod to the burrow theme's
+// rabbit) that lives in the burrow-theme chat: it wanders the floor, rests and
+// does idle antics (wave, nibble a carrot, yawn, curl up to sleep), can be
+// dragged around, and trips adorably when dropped. Built from a rigged set of
+// hand-cut sprite parts (head/body/arms/feet/neckerchief) generated from the
+// Tsuki-Odyssey-inspired asset sheets, driven by CSS keyframes + a rAF loop —
+// expressions are whole-head swaps, and sleeping swaps to a lying pose.
 
-const RABBIT_W = 46
-const RABBIT_H = 54
+// Local part-coordinate box (px). Every sprite is absolutely positioned inside
+// this box; the numbers come from compositing the real cut parts to scale.
+const RABBIT_W = 37
+const RABBIT_H = 66
+const PARTS = {
+  body: { left: 0.6, top: 28.8, width: 36.0, height: 35.5 },
+  feet: { left: 2.9, top: 45.6, width: 31.5, height: 20.6 },
+  armL: { left: 0.9, top: 38.7, width: 12.3, height: 12.0 },
+  armR: { left: 24.0, top: 38.7, width: 12.3, height: 12.0 },
+  head: { left: -0.1, top: -0.1, width: 37.5, height: 39.8 },
+  neck: { left: 7.5, top: 26.7, width: 22.2, height: 18.9 },
+} as const
 
 type TState =
-  | 'idle' | 'climb' | 'fall' | 'run' | 'drag' | 'trip' | 'happy' | 'wave' | 'carrot' | 'yawn' | 'sleep'
+  | 'idle' | 'fall' | 'run' | 'drag' | 'trip' | 'happy' | 'wave' | 'carrot' | 'yawn' | 'sleep'
 type Phase = 'walk' | 'rest' | 'fall' | 'trip'
 
 const ACTION_MS: Record<string, number> = { wave: 1500, carrot: 2600, yawn: 1400, happy: 900 }
@@ -214,14 +224,25 @@ export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLD
     }
   }, [scrollRef])
 
+  // Expression is a whole-head swap now (the sprite sheet gives 3 full heads).
+  const headSrc =
+    state === 'yawn' ? '/tsuki/head-closed.png'
+      : state === 'trip' ? '/tsuki/head-ouch.png'
+        : '/tsuki/head-neutral.png'
+
+  const partStyle = (p: { left: number; top: number; width: number; height: number }): React.CSSProperties => ({
+    left: p.left, top: p.top, width: p.width, height: p.height,
+  })
+  const imgProps = { draggable: false, alt: '' } as const
+
   return (
     <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
       <style dangerouslySetInnerHTML={{ __html: TSUKI_CSS }} />
       <div
         ref={rabbitRef}
         data-state={state}
-        className="tsuki pointer-events-auto absolute left-0 top-0 cursor-grab active:cursor-grabbing"
-        style={{ width: RABBIT_W, height: RABBIT_H, touchAction: 'none', willChange: 'transform' }}
+        className="tsuki pointer-events-auto absolute left-0 top-0 cursor-grab select-none active:cursor-grabbing"
+        style={{ width: RABBIT_W, height: RABBIT_H, touchAction: 'none', willChange: 'transform', overflow: 'visible' }}
         title="Tsuki"
       >
         <div className="tsuki-facing" style={facingLeft ? { transform: 'scaleX(-1)' } : undefined}>
@@ -229,86 +250,37 @@ export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLD
             {hearts.map((h) => (
               <span key={h.id} className="tsuki-heart" style={{ left: RABBIT_W / 2 + h.dx }}>♥</span>
             ))}
-            <svg viewBox="0 0 46 54" width={RABBIT_W} height={RABBIT_H} style={{ overflow: 'visible' }}>
-              {/* comic impact burst (only shows on trip) — behind everything */}
-              <g className="tsuki-pow-pos" transform="translate(23 44)">
-                <g className="tsuki-pow">
-                  <polygon
-                    points="0.0,-19.0 2.4,-8.2 10.3,-16.0 6.4,-5.6 17.3,-7.9 8.4,-1.2 18.8,2.7 7.7,3.5 14.4,12.4 4.6,7.2 5.4,18.2 0.0,8.5 -5.4,18.2 -4.6,7.2 -14.4,12.4 -7.7,3.5 -18.8,2.7 -8.4,-1.2 -17.3,-7.9 -6.4,-5.6 -10.3,-16.0 -2.4,-8.2"
-                    fill="#F5A623" stroke="#2B1F16" strokeWidth="1.6" strokeLinejoin="round" transform="translate(1 1)"
-                  />
-                  <polygon
-                    points="0.0,-19.0 2.4,-8.2 10.3,-16.0 6.4,-5.6 17.3,-7.9 8.4,-1.2 18.8,2.7 7.7,3.5 14.4,12.4 4.6,7.2 5.4,18.2 0.0,8.5 -5.4,18.2 -4.6,7.2 -14.4,12.4 -7.7,3.5 -18.8,2.7 -8.4,-1.2 -17.3,-7.9 -6.4,-5.6 -10.3,-16.0 -2.4,-8.2"
-                    fill="#FFD21E" stroke="#2B1F16" strokeWidth="1.6" strokeLinejoin="round"
-                  />
-                </g>
-              </g>
-              {/* ears */}
-              <g className="tsuki-ear tsuki-ear-l">
-                <rect x="13" y="3" width="7.5" height="21" rx="3.75" fill="#FDF7EC" stroke="#3A2A1C" strokeWidth="1.5" />
-                <rect x="15.4" y="6" width="2.8" height="14" rx="1.4" fill="#EBA0A6" />
-              </g>
-              <g className="tsuki-ear tsuki-ear-r">
-                <rect x="25.5" y="3" width="7.5" height="21" rx="3.75" fill="#FDF7EC" stroke="#3A2A1C" strokeWidth="1.5" />
-                <rect x="27.8" y="6" width="2.8" height="14" rx="1.4" fill="#EBA0A6" />
-              </g>
-              {/* body + feet */}
-              <ellipse className="tsuki-body" cx="23" cy="45" rx="10.5" ry="8.2" fill="#FDF7EC" stroke="#3A2A1C" strokeWidth="1.6" />
-              <ellipse cx="17.5" cy="51.5" rx="3.2" ry="2.1" fill="#FDF7EC" stroke="#3A2A1C" strokeWidth="1.3" />
-              <ellipse cx="28.5" cy="51.5" rx="3.2" ry="2.1" fill="#FDF7EC" stroke="#3A2A1C" strokeWidth="1.3" />
-              {/* arms */}
-              <ellipse className="tsuki-arm tsuki-arm-l" cx="13.5" cy="43" rx="2.7" ry="4.6" fill="#FDF7EC" stroke="#3A2A1C" strokeWidth="1.3" />
-              <ellipse className="tsuki-arm tsuki-arm-r" cx="32.5" cy="43" rx="2.7" ry="4.6" fill="#FDF7EC" stroke="#3A2A1C" strokeWidth="1.3" />
-              {/* neckerchief */}
-              <path d="M13.5 35.5c6 4 12.5 4 19 0l-2 4.5c-5 2.5-10 2.5-15 0Z" fill="#D0483F" stroke="#3A2A1C" strokeWidth="1.4" strokeLinejoin="round" />
-              <path d="M20.5 38.5c1.6 1 3.4 1 5 0" stroke="#9E2F28" strokeWidth="1" fill="none" strokeLinecap="round" />
-              {/* head */}
-              <g className="tsuki-head">
-                <ellipse cx="23" cy="26.5" rx="13" ry="11.8" fill="#FDF7EC" stroke="#3A2A1C" strokeWidth="1.6" />
-                <ellipse cx="14" cy="30.5" rx="2.2" ry="1.5" fill="#F4A9AE" opacity="0.7" />
-                <ellipse cx="32" cy="30.5" rx="2.2" ry="1.5" fill="#F4A9AE" opacity="0.7" />
-                {/* eyes open — big, round, glossy */}
-                <g className="tsuki-eyes-open">
-                  <ellipse cx="17.3" cy="26.6" rx="2.5" ry="3.2" fill="#3A2A1C" />
-                  <ellipse cx="28.7" cy="26.6" rx="2.5" ry="3.2" fill="#3A2A1C" />
-                  <circle cx="18.3" cy="25" r="1" fill="#FFFFFF" />
-                  <circle cx="29.7" cy="25" r="1" fill="#FFFFFF" />
-                  <circle cx="16.5" cy="27.7" r="0.5" fill="#FFFFFF" opacity="0.75" />
-                  <circle cx="27.9" cy="27.7" r="0.5" fill="#FFFFFF" opacity="0.75" />
-                </g>
-                {/* eyes closed (sleep/yawn) */}
-                <g className="tsuki-eyes-closed">
-                  <path d="M14.8 26.8q2.5 2.1 5 0" stroke="#3A2A1C" strokeWidth="1.4" fill="none" strokeLinecap="round" />
-                  <path d="M26.2 26.8q2.5 2.1 5 0" stroke="#3A2A1C" strokeWidth="1.4" fill="none" strokeLinecap="round" />
-                </g>
-                {/* eyes ouch (trip) — scrunched >< */}
-                <g className="tsuki-eyes-ouch">
-                  <path d="M15 24.6l3.2 2-3.2 2" stroke="#3A2A1C" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M31 24.6l-3.2 2 3.2 2" stroke="#3A2A1C" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                </g>
-                {/* rabbit nose (rounded Y) + philtrum + 3-shaped mouth */}
-                <path d="M21.6 29.9h2.8a1.4 1.4 0 0 1-1.4 1.4a1.4 1.4 0 0 1-1.4-1.4z" fill="#E58E94" stroke="#3A2A1C" strokeWidth="0.7" strokeLinejoin="round" />
-                <path d="M23 31.3v1.3" stroke="#3A2A1C" strokeWidth="0.8" strokeLinecap="round" />
-                <path d="M23 32.6q-1.5 1.5-2.9.4M23 32.6q1.5 1.5 2.9.4" stroke="#3A2A1C" strokeWidth="0.9" fill="none" strokeLinecap="round" />
-                {/* buck teeth */}
-                <rect x="21.85" y="32.7" width="2.3" height="2.5" rx="0.7" fill="#FFFFFF" stroke="#3A2A1C" strokeWidth="0.7" />
-                <path d="M23 32.8v2.3" stroke="#3A2A1C" strokeWidth="0.6" />
-                {/* open mouth (yawn / ouch) */}
-                <ellipse className="tsuki-mouth-o" cx="23" cy="33.4" rx="1.6" ry="2" fill="#B5595B" />
-                {/* sweat drop (ouch) */}
-                <path className="tsuki-sweat" d="M33 20c1.2 1.5 1.8 2.7 1.8 3.5a1.8 1.8 0 0 1-3.6 0c0-.8.6-2 1.8-3.5z" fill="#8FD0EC" stroke="#3A2A1C" strokeWidth="0.7" />
-              </g>
-              {/* carrot (idle nibble) */}
-              <g className="tsuki-carrot">
-                <path d="M20.6 41l2.4-9 2.4 9z" fill="#E08A3C" stroke="#3A2A1C" strokeWidth="1" strokeLinejoin="round" />
-                <path d="M23 32.5l-1.8-3M23 32.5v-3.4M23 32.5l1.8-3" stroke="#4C7A3A" strokeWidth="1.3" strokeLinecap="round" />
-              </g>
-              {/* Zzz (sleep) */}
-              <g className="tsuki-zzz" fill="#3A2A1C" fontWeight="700" fontFamily="sans-serif">
-                <text x="33" y="16" fontSize="6">z</text>
-                <text x="37" y="11" fontSize="8">Z</text>
-              </g>
-            </svg>
+            {state === 'sleep' ? (
+              <>
+                <img className="tsuki-sleeping" src="/tsuki/pose-sleeping.png" {...imgProps}
+                  style={{ position: 'absolute', left: -6, top: 36, width: 49, height: 30 }} />
+                <img className="tsuki-zzz" src="/tsuki/zzz.png" {...imgProps}
+                  style={{ position: 'absolute', left: 25, top: 8, width: 11, height: 15 }} />
+              </>
+            ) : (
+              <>
+                {/* comic impact burst (trip only) — behind everything */}
+                <svg className="tsuki-pow" viewBox="0 0 48 48" width={56} height={56}
+                  style={{ position: 'absolute', left: -9.5, top: 18, overflow: 'visible' }} aria-hidden="true">
+                  <g transform="translate(24 24)">
+                    <polygon
+                      points="0,-19 2.4,-8.2 10.3,-16 6.4,-5.6 17.3,-7.9 8.4,-1.2 18.8,2.7 7.7,3.5 14.4,12.4 4.6,7.2 5.4,18.2 0,8.5 -5.4,18.2 -4.6,7.2 -14.4,12.4 -7.7,3.5 -18.8,2.7 -8.4,-1.2 -17.3,-7.9 -6.4,-5.6 -10.3,-16 -2.4,-8.2"
+                      fill="#F5A623" stroke="#2B1F16" strokeWidth="1.6" strokeLinejoin="round" transform="translate(1 1)" />
+                    <polygon
+                      points="0,-19 2.4,-8.2 10.3,-16 6.4,-5.6 17.3,-7.9 8.4,-1.2 18.8,2.7 7.7,3.5 14.4,12.4 4.6,7.2 5.4,18.2 0,8.5 -5.4,18.2 -4.6,7.2 -14.4,12.4 -7.7,3.5 -18.8,2.7 -8.4,-1.2 -17.3,-7.9 -6.4,-5.6 -10.3,-16 -2.4,-8.2"
+                      fill="#FFD21E" stroke="#2B1F16" strokeWidth="1.6" strokeLinejoin="round" />
+                  </g>
+                </svg>
+                <img className="tsuki-part tsuki-feet" src="/tsuki/feet.png" {...imgProps} style={partStyle(PARTS.feet)} />
+                <img className="tsuki-part tsuki-body" src="/tsuki/body.png" {...imgProps} style={partStyle(PARTS.body)} />
+                <img className="tsuki-part tsuki-arm tsuki-arm-l" src="/tsuki/arm.png" {...imgProps} style={partStyle(PARTS.armL)} />
+                <img className="tsuki-part tsuki-arm tsuki-arm-r" src="/tsuki/arm-right.png" {...imgProps} style={partStyle(PARTS.armR)} />
+                <img className="tsuki-part tsuki-head" src={headSrc} {...imgProps} style={partStyle(PARTS.head)} />
+                <img className="tsuki-part tsuki-neck" src="/tsuki/neckerchief.png" {...imgProps} style={partStyle(PARTS.neck)} />
+                <img className="tsuki-part tsuki-carrot" src="/tsuki/carrot.png" {...imgProps}
+                  style={{ position: 'absolute', left: 11.5, top: 33, width: 15, height: 15.4 }} />
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -317,19 +289,18 @@ export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLD
 }
 
 const TSUKI_CSS = `
-.tsuki-facing, .tsuki-bob { width: 100%; height: 100%; }
-.tsuki-bob { position: relative; transform-origin: 50% 100%; }
-.tsuki-ear { transform-box: fill-box; transform-origin: 50% 100%; }
+.tsuki-facing { position: absolute; inset: 0; transform-origin: 50% 50%; }
+.tsuki-bob { position: absolute; inset: 0; transform-origin: 50% 100%; }
+.tsuki-part { position: absolute; -webkit-user-drag: none; user-select: none; }
 .tsuki-arm { transform-box: fill-box; transform-origin: 50% 0%; }
-.tsuki-head { transform-box: fill-box; transform-origin: 50% 90%; }
+.tsuki-head { transform-box: fill-box; transform-origin: 50% 92%; }
 .tsuki-body { transform-box: fill-box; transform-origin: 50% 100%; }
-.tsuki-eyes-closed, .tsuki-mouth-o, .tsuki-carrot, .tsuki-zzz,
-.tsuki-eyes-ouch, .tsuki-sweat, .tsuki-pow { opacity: 0; }
-.tsuki-pow { transform-box: fill-box; transform-origin: center; }
+.tsuki-carrot { opacity: 0; }
+.tsuki-pow { opacity: 0; transform-box: fill-box; transform-origin: center; }
 
 .tsuki-heart {
   position: absolute; top: -2px; font-size: 12px; color: #D0483F;
-  transform: translateX(-50%); pointer-events: none;
+  transform: translateX(-50%); pointer-events: none; z-index: 5;
   animation: tsuki-heart 0.9s ease-out forwards;
 }
 @keyframes tsuki-heart {
@@ -339,42 +310,31 @@ const TSUKI_CSS = `
 }
 
 /* idle breathing */
-@keyframes tsuki-breathe { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.05); } }
+@keyframes tsuki-breathe { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.04); } }
 .tsuki[data-state="idle"] .tsuki-body { animation: tsuki-breathe 2.6s ease-in-out infinite; }
 
 /* wave */
-@keyframes tsuki-wave { 0%,100% { transform: rotate(6deg); } 50% { transform: rotate(-42deg); } }
+@keyframes tsuki-wave { 0%,100% { transform: rotate(6deg); } 50% { transform: rotate(-46deg); } }
 .tsuki[data-state="wave"] .tsuki-arm-r { animation: tsuki-wave 0.42s ease-in-out 3; }
 .tsuki[data-state="wave"] .tsuki-body { animation: tsuki-breathe 2.6s ease-in-out infinite; }
 
-/* climb */
-@keyframes tsuki-climb { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-3px) rotate(2deg); } }
-@keyframes tsuki-climb-arm-l { 0%,100% { transform: rotate(-25deg); } 50% { transform: rotate(-72deg); } }
-@keyframes tsuki-climb-arm-r { 0%,100% { transform: rotate(72deg); } 50% { transform: rotate(25deg); } }
-.tsuki[data-state="climb"] .tsuki-bob { animation: tsuki-climb 0.42s ease-in-out infinite; }
-.tsuki[data-state="climb"] .tsuki-arm-l { animation: tsuki-climb-arm-l 0.42s ease-in-out infinite; }
-.tsuki[data-state="climb"] .tsuki-arm-r { animation: tsuki-climb-arm-r 0.42s ease-in-out infinite; }
+/* arm swing (shared by walk) */
+@keyframes tsuki-arm-l { 0%,100% { transform: rotate(-18deg); } 50% { transform: rotate(-52deg); } }
+@keyframes tsuki-arm-r { 0%,100% { transform: rotate(52deg); } 50% { transform: rotate(18deg); } }
+
+/* walk: upright gentle hop + a little head/ear sway */
+@keyframes tsuki-run { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+@keyframes tsuki-headbob { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+.tsuki[data-state="run"] .tsuki-bob { animation: tsuki-run 0.42s ease-in-out infinite; }
+.tsuki[data-state="run"] .tsuki-arm-l { animation: tsuki-arm-l 0.42s ease-in-out infinite; }
+.tsuki[data-state="run"] .tsuki-arm-r { animation: tsuki-arm-r 0.42s ease-in-out infinite; }
+.tsuki[data-state="run"] .tsuki-head { animation: tsuki-headbob 0.42s ease-in-out infinite; }
 
 /* fall */
 @keyframes tsuki-fall { 0% { transform: translateY(-1px); } 100% { transform: translateY(2px); } }
-@keyframes tsuki-earflop { 0%,100% { transform: rotate(0); } 50% { transform: rotate(10deg); } }
 .tsuki[data-state="fall"] .tsuki-bob { animation: tsuki-fall 0.3s ease-in-out infinite alternate; }
 .tsuki[data-state="fall"] .tsuki-arm-l { transform: rotate(-125deg); }
 .tsuki[data-state="fall"] .tsuki-arm-r { transform: rotate(125deg); }
-.tsuki[data-state="fall"] .tsuki-ear-l { animation: tsuki-earflop 0.3s ease-in-out infinite; }
-.tsuki[data-state="fall"] .tsuki-ear-r { animation: tsuki-earflop 0.3s ease-in-out infinite reverse; }
-
-/* run */
-/* walk: upright gentle hop (no body lean) */
-@keyframes tsuki-run {
-  0%,100% { transform: translateY(0); }
-  50% { transform: translateY(-2.5px); }
-}
-.tsuki[data-state="run"] .tsuki-bob { animation: tsuki-run 0.42s ease-in-out infinite; }
-.tsuki[data-state="run"] .tsuki-arm-l { animation: tsuki-climb-arm-l 0.42s ease-in-out infinite; }
-.tsuki[data-state="run"] .tsuki-arm-r { animation: tsuki-climb-arm-r 0.42s ease-in-out infinite; }
-.tsuki[data-state="run"] .tsuki-ear-l { animation: tsuki-earflop 0.42s ease-in-out infinite; }
-.tsuki[data-state="run"] .tsuki-ear-r { animation: tsuki-earflop 0.42s ease-in-out infinite reverse; }
 
 /* drag */
 @keyframes tsuki-dangle { 0%,100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
@@ -385,14 +345,14 @@ const TSUKI_CSS = `
 /* happy hop */
 @keyframes tsuki-hop {
   0% { transform: translateY(0) scale(1,1); }
-  18% { transform: translateY(0) scale(1.12,0.88); }
-  55% { transform: translateY(-15px) scale(0.94,1.09); }
+  18% { transform: translateY(0) scale(1.1,0.9); }
+  55% { transform: translateY(-15px) scale(0.95,1.08); }
   100% { transform: translateY(0) scale(1,1); }
 }
 .tsuki[data-state="happy"] .tsuki-bob { animation: tsuki-hop 0.9s cubic-bezier(0.3,1.4,0.5,1); }
 
 /* trip / tumble on landing after a fall — squashes on impact then tips over
-   one way and the other before righting itself */
+   one way and the other before righting itself (head shows the >< ouch face) */
 @keyframes tsuki-trip {
   0% { transform: translateY(-6px) scale(0.88,1.12); }
   22% { transform: translateY(0) scale(1.2,0.8) rotate(0deg); }
@@ -402,13 +362,6 @@ const TSUKI_CSS = `
   100% { transform: rotate(0deg); }
 }
 .tsuki[data-state="trip"] .tsuki-bob { animation: tsuki-trip 0.48s ease-out; }
-.tsuki[data-state="trip"] .tsuki-ear-l { animation: tsuki-earflop 0.24s ease-in-out 2; }
-.tsuki[data-state="trip"] .tsuki-ear-r { animation: tsuki-earflop 0.24s ease-in-out 2 reverse; }
-/* pained-but-cute >< face + sweat drop + comic impact burst on trip */
-.tsuki[data-state="trip"] .tsuki-eyes-open { opacity: 0; }
-.tsuki[data-state="trip"] .tsuki-eyes-ouch { opacity: 1; }
-.tsuki[data-state="trip"] .tsuki-mouth-o { opacity: 1; }
-.tsuki[data-state="trip"] .tsuki-sweat { opacity: 1; }
 @keyframes tsuki-pow {
   0% { opacity: 0; transform: scale(0.2) rotate(-10deg); }
   25% { opacity: 1; transform: scale(1.12) rotate(5deg); }
@@ -421,28 +374,18 @@ const TSUKI_CSS = `
 @keyframes tsuki-chew { 0%,100% { transform: translateY(0); } 50% { transform: translateY(1.2px); } }
 .tsuki[data-state="carrot"] .tsuki-carrot { opacity: 1; }
 .tsuki[data-state="carrot"] .tsuki-head { animation: tsuki-chew 0.22s ease-in-out infinite; }
-.tsuki[data-state="carrot"] .tsuki-arm-l { transform: rotate(-52deg); }
-.tsuki[data-state="carrot"] .tsuki-arm-r { transform: rotate(52deg); }
+.tsuki[data-state="carrot"] .tsuki-arm-l { transform: rotate(-58deg); }
+.tsuki[data-state="carrot"] .tsuki-arm-r { transform: rotate(58deg); }
 
-/* yawn / ear-twitch */
-@keyframes tsuki-yawn-head { 0%,100% { transform: rotate(0); } 35%,70% { transform: rotate(-4deg); } }
-@keyframes tsuki-yawn-mouth { 0%,100% { opacity: 0; } 35%,70% { opacity: 1; } }
-@keyframes tsuki-twitch { 0%,100% { transform: rotate(0); } 20% { transform: rotate(-9deg); } 40% { transform: rotate(0); } }
+/* yawn (head tilts back; closed-eye head swapped in) */
+@keyframes tsuki-yawn-head { 0%,100% { transform: rotate(0); } 35%,70% { transform: rotate(-5deg); } }
 .tsuki[data-state="yawn"] .tsuki-head { animation: tsuki-yawn-head 1.4s ease-in-out; }
-.tsuki[data-state="yawn"] .tsuki-mouth-o { animation: tsuki-yawn-mouth 1.4s ease-in-out; }
-.tsuki[data-state="yawn"] .tsuki-eyes-open { opacity: 0; }
-.tsuki[data-state="yawn"] .tsuki-eyes-closed { opacity: 1; }
-.tsuki[data-state="yawn"] .tsuki-ear-l { animation: tsuki-twitch 1.4s ease-in-out; }
 
-/* sleep */
-@keyframes tsuki-sleep { 0%,100% { transform: rotate(-5deg) scaleY(1); } 50% { transform: rotate(-3deg) scaleY(1.04); } }
+/* sleep (lying pose) */
+@keyframes tsuki-sleepbob { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-1px) rotate(1.2deg); } }
+.tsuki[data-state="sleep"] .tsuki-sleeping { transform-box: fill-box; transform-origin: 50% 100%; animation: tsuki-sleepbob 4s ease-in-out infinite; }
 @keyframes tsuki-zzz { 0% { opacity: 0; transform: translateY(2px) scale(0.6); } 30% { opacity: 0.9; } 100% { opacity: 0; transform: translateY(-12px) scale(1.1); } }
-.tsuki[data-state="sleep"] .tsuki-bob { animation: tsuki-sleep 4s ease-in-out infinite; }
-.tsuki[data-state="sleep"] .tsuki-eyes-open { opacity: 0; }
-.tsuki[data-state="sleep"] .tsuki-eyes-closed { opacity: 1; }
-.tsuki[data-state="sleep"] .tsuki-zzz { animation: tsuki-zzz 2.6s ease-in-out infinite; }
-.tsuki[data-state="sleep"] .tsuki-ear-l { transform: rotate(6deg); }
-.tsuki[data-state="sleep"] .tsuki-ear-r { transform: rotate(-6deg); }
+.tsuki-zzz { animation: tsuki-zzz 2.6s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   .tsuki *, .tsuki-heart { animation: none !important; }
