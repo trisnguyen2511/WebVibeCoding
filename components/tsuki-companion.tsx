@@ -14,16 +14,14 @@ const RABBIT_H = 54
 
 type TState =
   | 'idle' | 'climb' | 'fall' | 'run' | 'drag' | 'trip' | 'happy' | 'wave' | 'carrot' | 'yawn' | 'sleep'
-type Phase = 'settle' | 'fall' | 'trip' | 'walk' | 'climb'
+type Phase = 'walk' | 'rest' | 'fall' | 'trip'
 
 const ACTION_MS: Record<string, number> = { wave: 1500, carrot: 2600, yawn: 1400, happy: 900 }
 // Movement tuning (px per frame @60fps)
 const GRAVITY = 0.9
 const MAX_VY = 22
-const WALK_SPEED = 2.4
-const CLIMB_SPEED = 2.6
+const WALK_SPEED = 2.2
 const TRIP_MS = 480
-const TARGET_MSG_INDEX = 2 // 3rd message from the top of the viewport
 
 export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement | null> }) {
   const overlayRef = useRef<HTMLDivElement>(null)
@@ -41,124 +39,111 @@ export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLD
 
     const s = {
       x: 30, y: 30, vy: 0, init: false,
-      phase: 'settle' as Phase,
-      jtx: 0, jty: 0, floor: 0, // journey target + floor (frame-local)
-      tripUntil: 0, settledAt: 0, nextAction: 0, actionEnds: 0,
-      pending: false, quietUntil: 0,
+      phase: 'rest' as Phase,
+      wtx: 0, floor: 0, // wander target x + floor (frame-local)
+      tripUntil: 0, restUntil: 0, actionEnds: 0,
+      napping: false, napAt: 0,
     }
     const drag = { on: false, x: 0, y: 0, moved: 0, downAt: 0 }
     let curState: TState = 'idle'
     let raf = 0
 
     const setSt = (v: TState) => { if (v !== curState) { curState = v; setState(v) } }
-
-    // Any scroll defers the next re-perch until scrolling pauses ~420ms.
-    const onScroll = () => { s.pending = true; s.quietUntil = performance.now() + 420; s.settledAt = 0 }
-    scroller?.addEventListener('scroll', onScroll, { passive: true })
-
-    // Target = the 3rd message currently visible from the top of the frame
-    // (deliberately NOT the newest message). Also returns the floor line the
-    // rabbit walks along.
-    const computeTarget = () => {
-      const frame = overlay.getBoundingClientRect()
-      const floor = frame.height - RABBIT_H - 6
-      let tx = frame.width / 2 - RABBIT_W / 2
-      let ty = floor
-      if (scroller) {
-        const all = Array.from(scroller.querySelectorAll('[data-message-id]')) as HTMLElement[]
-        const visible = all.filter((n) => {
-          const r = n.getBoundingClientRect()
-          return r.bottom > frame.top + 6 && r.top < frame.bottom - 6
-        })
-        const pick = visible[Math.min(TARGET_MSG_INDEX, visible.length - 1)]
-        if (pick) {
-          const r = pick.getBoundingClientRect()
-          tx = r.left - frame.left + 2
-          ty = r.top - frame.top - RABBIT_H * 0.6
-        }
-      }
-      tx = Math.max(4, Math.min(frame.width - RABBIT_W - 4, tx))
-      ty = Math.max(4, Math.min(floor, ty))
-      return { tx, ty, floor }
-    }
-
     const render = () => { el.style.transform = `translate(${s.x}px, ${s.y}px)` }
 
-    const runAntics = (now: number) => {
-      if (s.settledAt === 0) { s.settledAt = now; s.nextAction = now + 2200; setSt('idle') }
-      if (curState === 'wave' || curState === 'carrot' || curState === 'yawn') {
-        if (now >= s.actionEnds) setSt('idle')
-        return
+    // Pick a fresh random spot to stroll to (meaningfully far from the current
+    // one so it actually paces back and forth), then start walking.
+    const startWander = (now: number, minX: number, maxX: number) => {
+      const range = Math.max(1, maxX - minX)
+      let tx = s.x
+      for (let i = 0; i < 6; i++) {
+        tx = minX + Math.random() * range
+        if (Math.abs(tx - s.x) > range * 0.28) break
       }
-      if (curState === 'sleep') return
-      if (now - s.settledAt > 18000) { setSt('sleep'); return }
-      if (now >= s.nextAction) {
-        const acts: TState[] = ['wave', 'carrot', 'yawn']
+      s.wtx = tx
+      s.phase = 'walk'
+      void now
+    }
+
+    // Stop and do something in place: mostly a quick antic then a short pause,
+    // sometimes a longer nap that turns into sleep.
+    const enterRest = (now: number) => {
+      s.phase = 'rest'
+      if (Math.random() < 0.26) {
+        s.napping = true
+        s.napAt = now + 1500
+        s.restUntil = now + 6000 + Math.random() * 4500
+        setSt('idle')
+      } else {
+        s.napping = false
+        const acts: TState[] = ['wave', 'carrot', 'yawn', 'idle', 'idle']
         const a = acts[Math.floor(Math.random() * acts.length)]
         setSt(a)
-        s.actionEnds = now + ACTION_MS[a]
-        s.nextAction = now + ACTION_MS[a] + 2500 + Math.random() * 3500
+        s.actionEnds = now + (ACTION_MS[a] ?? 1200)
+        s.restUntil = now + 2600 + Math.random() * 3400
       }
     }
+
+    // Waking a sleeping bunny on scroll adds a touch of life.
+    const onScroll = () => { if (curState === 'sleep') { s.napping = false; s.restUntil = performance.now() } }
+    scroller?.addEventListener('scroll', onScroll, { passive: true })
 
     const tick = () => {
       raf = requestAnimationFrame(tick)
       const now = performance.now()
-      const t = computeTarget()
-      s.floor = t.floor
-      if (!s.init) { s.x = t.tx; s.y = t.ty; s.init = true; el.style.opacity = '1'; render() }
+      const frame = overlay.getBoundingClientRect()
+      const floor = frame.height - RABBIT_H - 6
+      const minX = 6
+      const maxX = Math.max(minX, frame.width - RABBIT_W - 6)
+      s.floor = floor
+
+      if (!s.init) {
+        s.x = frame.width / 2 - RABBIT_W / 2
+        s.y = floor
+        s.init = true
+        el.style.opacity = '1'
+        s.phase = 'rest'
+        s.restUntil = now + 900
+        setSt('idle')
+        render()
+        return
+      }
 
       if (drag.on) { s.x = drag.x; s.y = drag.y; render(); return }
       if (curState === 'happy' && now < s.actionEnds) { render(); return }
 
-      if (reduced) {
-        // Minimal: just ease onto the target, no journeys/antics.
-        s.x += (t.tx - s.x) * 0.14
-        s.y += (t.ty - s.y) * 0.14
-        setSt('idle'); render(); return
-      }
-
-      if (s.phase === 'settle') {
-        const dist = Math.abs(t.tx - s.x) + Math.abs(t.ty - s.y)
-        // Kick off a relocate journey when scrolling paused, or the target
-        // jumped far (e.g. a new message shifted the layout).
-        if ((s.pending && now >= s.quietUntil) || (!s.pending && dist > 60)) {
-          s.jtx = t.tx; s.jty = t.ty; s.pending = false; s.vy = 0
-          s.phase = s.y < t.floor - 6 ? 'fall' : 'walk'
-        } else if (s.pending) {
-          // still scrolling — hold position
-          render(); return
-        } else {
-          // gentle drift to keep glued as the message nudges around
-          s.x += (t.tx - s.x) * 0.12
-          s.y += (t.ty - s.y) * 0.12
-          runAntics(now)
-          render(); return
-        }
-      }
+      if (reduced) { s.y = floor; setSt('idle'); render(); return }
 
       if (s.phase === 'fall') {
         setSt('fall'); setFacingLeft(false)
         s.vy = Math.min(MAX_VY, s.vy + GRAVITY)
-        s.y += s.vy // straight down — x is untouched
-        if (s.y >= s.floor) {
-          s.y = s.floor
+        s.y += s.vy // straight down — x untouched
+        if (s.y >= floor) {
+          s.y = floor
           if (s.vy > 6) { s.phase = 'trip'; s.tripUntil = now + TRIP_MS; setSt('trip') }
-          else s.phase = 'walk'
+          else startWander(now, minX, maxX)
           s.vy = 0
         }
       } else if (s.phase === 'trip') {
         setSt('trip')
-        if (now >= s.tripUntil) s.phase = 'walk'
+        if (now >= s.tripUntil) startWander(now, minX, maxX)
       } else if (s.phase === 'walk') {
-        const dx = s.jtx - s.x
-        if (Math.abs(dx) < 3) { s.x = s.jtx; s.phase = 'climb' }
-        else { setSt('run'); setFacingLeft(dx < 0); s.x += Math.sign(dx) * WALK_SPEED; s.y = s.floor }
-      } else if (s.phase === 'climb') {
-        setSt('climb'); setFacingLeft(false)
-        s.x = s.jtx
-        if (s.y - s.jty <= 2) { s.y = s.jty; s.phase = 'settle'; s.settledAt = now; s.nextAction = now + 2000; setSt('idle') }
-        else s.y -= CLIMB_SPEED
+        s.y = floor
+        const dx = s.wtx - s.x
+        if (Math.abs(dx) < 3) { s.x = s.wtx; enterRest(now) }
+        else { setSt('run'); setFacingLeft(dx < 0); s.x += Math.sign(dx) * WALK_SPEED }
+      } else {
+        // rest: stand still and do antics, then stroll somewhere new
+        s.y = floor
+        if (s.napping) {
+          if (now >= s.napAt && curState !== 'sleep') setSt('sleep')
+          if (now >= s.restUntil) { s.napping = false; startWander(now, minX, maxX) }
+        } else {
+          if ((curState === 'wave' || curState === 'carrot' || curState === 'yawn' || curState === 'happy') && now >= s.actionEnds) {
+            setSt('idle')
+          }
+          if (now >= s.restUntil) startWander(now, minX, maxX)
+        }
       }
       render()
     }
@@ -196,21 +181,23 @@ export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLD
       s.y = drag.y
       const quick = performance.now() - drag.downAt < 250
       if (drag.moved < 8 && quick) {
-        // A tap (not a drag) → happy hop + a little burst of hearts.
+        // A tap (not a drag) → happy hop + a little burst of hearts, then it
+        // rests briefly in place before strolling off again.
         setSt('happy')
-        s.actionEnds = performance.now() + ACTION_MS.happy
-        s.phase = 'settle'
-        s.settledAt = 0
+        const now = performance.now()
+        s.actionEnds = now + ACTION_MS.happy
+        s.phase = 'rest'
+        s.napping = false
+        s.restUntil = s.actionEnds + 1400
         const base = Date.now()
         const hs = [0, 1, 2].map((i) => ({ id: base + i, dx: -12 + i * 12 }))
         setHearts((prev) => [...prev, ...hs])
         setTimeout(() => setHearts((prev) => prev.filter((h) => !hs.some((x) => x.id === h.id))), 900)
       } else {
-        // Dropped: fall straight down (gravity), trip, walk over, climb the
-        // 3rd visible message.
+        // Dropped: fall straight down (gravity), tumble on landing, then
+        // resume wandering.
         s.phase = 'fall'
         s.vy = 0
-        s.settledAt = 0
       }
     }
     el.addEventListener('pointerdown', onDown)
