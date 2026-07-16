@@ -125,7 +125,24 @@ that way if the 46-icon total doesn't fit in one pass).
    read from that list generically, no per-theme boolean/call-site edits
    needed anymore.
 
-5. **Whenever you add a new icon-using feature to the chat** (a new button,
+5. **If the theme also calls for a companion/mascot character** (like the
+   burrow theme's Tsuki rabbit — a draggable animated creature, not just a
+   static icon), **ask the user which art pipeline they want before
+   building it**, don't default to either:
+   - **Hand-drawn SVG rig** — you draw the parts yourself directly in code
+     (same approach as the icon set), fastest to iterate on but limited to
+     what you can draw well as flat vector shapes.
+   - **Gemini-generated art** — you draft a part-sheet prompt for the user
+     to run in Gemini (character-consistency block + labeled cells), they
+     send back the sheet, you cut/composite the sprites into the same
+     rig/animation system. Higher visual quality but needs a round-trip
+     through the user and no AI image-gen key is set up in this
+     environment (see pitfall below), so you can't generate it yourself.
+   This ask only applies to a full mascot character — the regular icon set
+   (buttons, gestures, stickers) always stays hand-drawn SVG by default per
+   step 4, no need to ask about that.
+
+6. **Whenever you add a new icon-using feature to the chat** (a new button,
    picker, or action — regardless of which theme prompted it), add the new
    icon to **every existing theme's icon set**, not just the one you're
    currently working on. An icon set that only covers some buttons looks
@@ -134,7 +151,7 @@ that way if the 46-icon total doesn't fit in one pass).
    "add the feature," the same way a new field needs updating in `Session`,
    `join`, `room-info`, and the admin route all together.
 
-6. **No new admin/API/client code needed for the preset data itself** —
+7. **No new admin/API/client code needed for the preset data itself** —
    `THEME_PRESETS` is already read generically by:
    - `app/tools/private-chat/admin/page.tsx`'s `applyThemePreset()` (renders a
      "✨ Áp dụng theme: {label}" button per entry automatically)
@@ -145,25 +162,25 @@ that way if the 46-icon total doesn't fit in one pass).
    preset/custom-upload model) — ask the user first if so, don't build it
    speculatively.
 
-7. **If you DO add a new color role or field** (extending beyond the existing
+8. **If you DO add a new color role or field** (extending beyond the existing
    4), it needs a migration: `alter table chat_rooms add column if not exists
    <role>_color text;` in a new `supabase/migrations/00NN_....sql` file — tell
    the user to run it in Supabase SQL Editor, and remind them again in your
    final report. Never run it yourself.
 
-8. **Verify before shipping:**
+9. **Verify before shipping:**
    ```bash
    npx tsc --noEmit
    rm -rf .next public/sw.js public/workbox-*.js public/worker-*.js
    NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder npm run build
    ```
 
-9. **Ship per this repo's branch workflow** (see root `CLAUDE.md`): new
+10. **Ship per this repo's branch workflow** (see root `CLAUDE.md`): new
    `claude/<slug>-theme` branch → commit → push → merge `--no-ff` into
    `staging` → push `staging` → report to the user and **stop before
    `master`** until they explicitly say "lên prod".
 
-10. **After pushing to staging, tell the user to actually click "✨ Áp dụng
+11. **After pushing to staging, tell the user to actually click "✨ Áp dụng
     theme"** in the admin panel for the room they want it on — adding the
     preset alone doesn't change any existing room until applied.
 
@@ -191,7 +208,10 @@ that way if the 46-icon total doesn't fit in one pass).
 - **No AI icon-generation API key in this environment**: the `design` skill's
   `scripts/icon/generate.py` needs `GEMINI_API_KEY`, which isn't set up here.
   Default to hand-drawing the SVGs directly (as done for every icon so far)
-  unless the user has explicitly provided a key for that session.
+  unless the user has explicitly provided a key for that session. This is
+  exactly why a mascot/companion character needs the user's explicit choice
+  (step 5) instead of silently defaulting to hand-drawn SVG — they may
+  prefer to run a Gemini prompt themselves and hand the art back to you.
 - **Icon sets go stale silently**: the `iconSet` lookup is generic, but the
   actual SVG *files* per theme are not — adding a new icon-using feature and
   drawing it for only one theme's folder doesn't error for the others, it
