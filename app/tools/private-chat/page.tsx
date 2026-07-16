@@ -238,12 +238,20 @@ function seededRandom(seed: string): number {
 function woodPlankStyle(seed: string): React.CSSProperties {
   const r1 = seededRandom(seed)
   const r2 = seededRandom(`${seed}-b`)
-  const angle = 88 + r1 * 4 // near-vertical grain, varies slightly per message
-  const stripe = 9 + r2 * 10
+  const r3 = seededRandom(`${seed}-c`)
+  const r4 = seededRandom(`${seed}-d`)
+  const angle = 88 + r1 * 4 // near-vertical main grain, varies slightly per message
+  const stripe = 16 + r2 * 18 // bigger, bolder streaks than before
+  // A second, gently slanted layer crossing the main grain at its own angle
+  // and spacing — real wood grain isn't perfectly parallel lines, so this
+  // breaks up the uniformity of the straight streaks above.
+  const tiltAngle = angle + (r3 < 0.5 ? -1 : 1) * (14 + r4 * 12)
+  const tiltStripe = 26 + r4 * 22
   return {
     backgroundImage: [
-      `repeating-linear-gradient(${angle}deg, rgba(122,75,38,0.32) 0px, rgba(122,75,38,0.32) 1.5px, transparent 1.5px, transparent ${stripe}px)`,
-      `repeating-linear-gradient(${angle}deg, rgba(74,46,24,0.22) 0px, transparent 2.5px, transparent ${stripe * 1.7}px)`,
+      `repeating-linear-gradient(${angle}deg, rgba(122,75,38,0.34) 0px, rgba(122,75,38,0.34) 3px, transparent 3px, transparent ${stripe}px)`,
+      `repeating-linear-gradient(${angle}deg, rgba(74,46,24,0.24) 0px, transparent 4px, transparent ${stripe * 1.7}px)`,
+      `repeating-linear-gradient(${tiltAngle}deg, rgba(74,46,24,0.16) 0px, transparent 3px, transparent ${tiltStripe}px)`,
       'linear-gradient(155deg, #CBA06B, #9C6B3E)',
     ].join(', '),
   }
