@@ -238,14 +238,21 @@ function seededRandom(seed: string): number {
 function woodPlankStyle(seed: string): React.CSSProperties {
   const r1 = seededRandom(seed)
   const r2 = seededRandom(`${seed}-b`)
-  const angle = 88 + r1 * 4 // near-vertical grain, varies slightly per message
-  const stripe = 9 + r2 * 10
+  const r3 = seededRandom(`${seed}-c`)
+  const plankHeight = 15 + r1 * 7 // 15-22px per plank board
+  const grainAngle = -1.5 + r2 * 3 // near-horizontal grain, like a real plank sign
+  const grainGap = 5 + r3 * 6
   return {
     backgroundImage: [
-      `repeating-linear-gradient(${angle}deg, rgba(122,75,38,0.32) 0px, rgba(122,75,38,0.32) 1.5px, transparent 1.5px, transparent ${stripe}px)`,
-      `repeating-linear-gradient(${angle}deg, rgba(74,46,24,0.22) 0px, transparent 2.5px, transparent ${stripe * 1.7}px)`,
-      'linear-gradient(155deg, #CBA06B, #9C6B3E)',
+      // dark groove between each stacked plank board
+      `repeating-linear-gradient(0deg, rgba(15,9,4,0.6) 0px, rgba(15,9,4,0.6) 1.5px, transparent 1.5px, transparent ${plankHeight}px)`,
+      // fine wood-grain streaks running along each board
+      `repeating-linear-gradient(${grainAngle}deg, rgba(0,0,0,0.22) 0px, transparent 1px, transparent ${grainGap}px)`,
+      `repeating-linear-gradient(${grainAngle}deg, rgba(90,58,32,0.3) 0px, transparent 2px, transparent ${grainGap * 1.8}px)`,
+      // deep weathered brown base, like a dark-stained sign
+      'linear-gradient(160deg, #5A3A20, #38230F)',
     ].join(', '),
+    backgroundColor: '#38230F',
   }
 }
 
@@ -785,9 +792,10 @@ function ChatScreen({
   const iconSet = ICON_SET_SLUGS.includes(roomInfo.wallpaperPreset ?? '') ? (roomInfo.wallpaperPreset as string) : null
   const hasStickerSet = iconSet !== null && ICON_SETS_WITH_STICKERS.has(iconSet)
   // Burrow's bubbles get a wood-plank look instead of the usual theme-color
-  // fill — always a warm cocoa ink for text so it reads over any wood tone.
+  // fill — a warm parchment cream for text, since the plank itself is now a
+  // deep weathered brown (too dark for the theme's usual cocoa ink to read).
   const isBurrow = roomInfo.wallpaperPreset === 'burrow'
-  const burrowInk = '#2B1F16'
+  const burrowInk = '#F3E3C5'
   const themeColor = roomInfo.primaryColor
   // Informational highlight color (pinned message, link previews, chosen
   // reactions) and a quieter secondary accent (outer aurora's extra blob) —
