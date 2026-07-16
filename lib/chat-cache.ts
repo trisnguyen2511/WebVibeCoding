@@ -4,7 +4,7 @@
 // — this is a fast-first-paint layer, not a replacement for sync.
 
 const CACHE_PREFIX = 'wv-chat-cache-'
-const CACHE_MAX_MESSAGES = 100
+export const CACHE_MAX_MESSAGES = 100
 
 type Cacheable = { id: string; created_at: string; pending?: boolean; failed?: boolean }
 
