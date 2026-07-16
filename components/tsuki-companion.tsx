@@ -13,9 +13,17 @@ const RABBIT_W = 46
 const RABBIT_H = 54
 
 type TState =
-  | 'idle' | 'climb' | 'fall' | 'run' | 'drag' | 'land' | 'happy' | 'wave' | 'carrot' | 'yawn' | 'sleep'
+  | 'idle' | 'climb' | 'fall' | 'run' | 'drag' | 'trip' | 'happy' | 'wave' | 'carrot' | 'yawn' | 'sleep'
+type Phase = 'settle' | 'fall' | 'trip' | 'walk' | 'climb'
 
-const ACTION_MS: Record<string, number> = { wave: 1500, carrot: 2600, yawn: 1400, happy: 900, land: 460 }
+const ACTION_MS: Record<string, number> = { wave: 1500, carrot: 2600, yawn: 1400, happy: 900 }
+// Movement tuning (px per frame @60fps)
+const GRAVITY = 0.9
+const MAX_VY = 22
+const WALK_SPEED = 2.4
+const CLIMB_SPEED = 2.6
+const TRIP_MS = 480
+const TARGET_MSG_INDEX = 2 // 3rd message from the top of the viewport
 
 export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement | null> }) {
   const overlayRef = useRef<HTMLDivElement>(null)
@@ -31,125 +39,133 @@ export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLD
     const scroller = scrollRef.current
     if (!overlay || !el) return
 
-    const pos = { x: 30, y: 30, init: false }
-    const scrollBias = { v: 0 }
+    const s = {
+      x: 30, y: 30, vy: 0, init: false,
+      phase: 'settle' as Phase,
+      jtx: 0, jty: 0, floor: 0, // journey target + floor (frame-local)
+      tripUntil: 0, settledAt: 0, nextAction: 0, actionEnds: 0,
+      pending: false, quietUntil: 0,
+    }
     const drag = { on: false, x: 0, y: 0, moved: 0, downAt: 0 }
-    const timing = { settledAt: 0, nextAction: 0, actionEnds: 0 }
     let curState: TState = 'idle'
     let raf = 0
-    let lastScrollTop = scroller?.scrollTop ?? 0
 
-    const setSt = (s: TState) => {
-      if (s === curState) return
-      curState = s
-      setState(s)
-    }
+    const setSt = (v: TState) => { if (v !== curState) { curState = v; setState(v) } }
 
-    const onScroll = () => {
-      if (!scroller) return
-      const d = scroller.scrollTop - lastScrollTop
-      lastScrollTop = scroller.scrollTop
-      // Scroll up (d<0) → bias upward so Tsuki climbs to keep up; scroll down
-      // (d>0) → bias down so it drops toward the newest message. Decays to 0.
-      scrollBias.v = Math.max(-70, Math.min(70, scrollBias.v + d * 0.7))
-      timing.settledAt = 0 // any scroll wakes it from sleep/idle antics
-    }
+    // Any scroll defers the next re-perch until scrolling pauses ~420ms.
+    const onScroll = () => { s.pending = true; s.quietUntil = performance.now() + 420; s.settledAt = 0 }
     scroller?.addEventListener('scroll', onScroll, { passive: true })
 
+    // Target = the 3rd message currently visible from the top of the frame
+    // (deliberately NOT the newest message). Also returns the floor line the
+    // rabbit walks along.
     const computeTarget = () => {
       const frame = overlay.getBoundingClientRect()
+      const floor = frame.height - RABBIT_H - 6
       let tx = frame.width / 2 - RABBIT_W / 2
-      let ty = frame.height - RABBIT_H - 12
+      let ty = floor
       if (scroller) {
-        const msgs = scroller.querySelectorAll('[data-message-id]')
-        const last = msgs[msgs.length - 1] as HTMLElement | undefined
-        if (last) {
-          const r = last.getBoundingClientRect()
+        const all = Array.from(scroller.querySelectorAll('[data-message-id]')) as HTMLElement[]
+        const visible = all.filter((n) => {
+          const r = n.getBoundingClientRect()
+          return r.bottom > frame.top + 6 && r.top < frame.bottom - 6
+        })
+        const pick = visible[Math.min(TARGET_MSG_INDEX, visible.length - 1)]
+        if (pick) {
+          const r = pick.getBoundingClientRect()
           tx = r.left - frame.left + 2
           ty = r.top - frame.top - RABBIT_H * 0.6
         }
       }
-      ty += scrollBias.v
       tx = Math.max(4, Math.min(frame.width - RABBIT_W - 4, tx))
-      ty = Math.max(4, Math.min(frame.height - RABBIT_H - 4, ty))
-      return { tx, ty }
+      ty = Math.max(4, Math.min(floor, ty))
+      return { tx, ty, floor }
+    }
+
+    const render = () => { el.style.transform = `translate(${s.x}px, ${s.y}px)` }
+
+    const runAntics = (now: number) => {
+      if (s.settledAt === 0) { s.settledAt = now; s.nextAction = now + 2200; setSt('idle') }
+      if (curState === 'wave' || curState === 'carrot' || curState === 'yawn') {
+        if (now >= s.actionEnds) setSt('idle')
+        return
+      }
+      if (curState === 'sleep') return
+      if (now - s.settledAt > 18000) { setSt('sleep'); return }
+      if (now >= s.nextAction) {
+        const acts: TState[] = ['wave', 'carrot', 'yawn']
+        const a = acts[Math.floor(Math.random() * acts.length)]
+        setSt(a)
+        s.actionEnds = now + ACTION_MS[a]
+        s.nextAction = now + ACTION_MS[a] + 2500 + Math.random() * 3500
+      }
     }
 
     const tick = () => {
       raf = requestAnimationFrame(tick)
       const now = performance.now()
-      scrollBias.v *= 0.9
-
-      if (drag.on) {
-        pos.x = drag.x
-        pos.y = drag.y
-        el.style.transform = `translate(${pos.x}px, ${pos.y}px)`
-        return
-      }
-
       const t = computeTarget()
-      if (!pos.init) {
-        pos.x = t.tx
-        pos.y = t.ty
-        pos.init = true
-        el.style.opacity = '1'
-      }
-      const dx = t.tx - pos.x
-      const dy = t.ty - pos.y
-      pos.x += dx * 0.14
-      pos.y += dy * 0.14
-      el.style.transform = `translate(${pos.x}px, ${pos.y}px)`
+      s.floor = t.floor
+      if (!s.init) { s.x = t.tx; s.y = t.ty; s.init = true; el.style.opacity = '1'; render() }
 
-      // Transient one-shot states play to completion before re-evaluating.
-      if ((curState === 'land' || curState === 'happy') && now < timing.actionEnds) return
+      if (drag.on) { s.x = drag.x; s.y = drag.y; render(); return }
+      if (curState === 'happy' && now < s.actionEnds) { render(); return }
 
       if (reduced) {
-        if (curState !== 'idle') setSt('idle')
-        return
+        // Minimal: just ease onto the target, no journeys/antics.
+        s.x += (t.tx - s.x) * 0.14
+        s.y += (t.ty - s.y) * 0.14
+        setSt('idle'); render(); return
       }
 
-      const dist = Math.abs(dx) + Math.abs(dy)
-      if (dist > 3) {
-        timing.settledAt = 0
-        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 1) {
-          setSt('run')
-          if (dx > 0.5) setFacingLeft(false)
-          else if (dx < -0.5) setFacingLeft(true)
-        } else if (dy < -1) {
-          setSt('climb')
-        } else if (dy > 1) {
-          setSt('fall')
+      if (s.phase === 'settle') {
+        const dist = Math.abs(t.tx - s.x) + Math.abs(t.ty - s.y)
+        // Kick off a relocate journey when scrolling paused, or the target
+        // jumped far (e.g. a new message shifted the layout).
+        if ((s.pending && now >= s.quietUntil) || (!s.pending && dist > 60)) {
+          s.jtx = t.tx; s.jty = t.ty; s.pending = false; s.vy = 0
+          s.phase = s.y < t.floor - 6 ? 'fall' : 'walk'
+        } else if (s.pending) {
+          // still scrolling — hold position
+          render(); return
+        } else {
+          // gentle drift to keep glued as the message nudges around
+          s.x += (t.tx - s.x) * 0.12
+          s.y += (t.ty - s.y) * 0.12
+          runAntics(now)
+          render(); return
         }
-        return
       }
 
-      // Settled on the target — run idle antics.
-      if (timing.settledAt === 0) {
-        timing.settledAt = now
-        timing.nextAction = now + 2200
-        if (curState !== 'idle') setSt('idle')
+      if (s.phase === 'fall') {
+        setSt('fall'); setFacingLeft(false)
+        s.vy = Math.min(MAX_VY, s.vy + GRAVITY)
+        s.y += s.vy // straight down — x is untouched
+        if (s.y >= s.floor) {
+          s.y = s.floor
+          if (s.vy > 6) { s.phase = 'trip'; s.tripUntil = now + TRIP_MS; setSt('trip') }
+          else s.phase = 'walk'
+          s.vy = 0
+        }
+      } else if (s.phase === 'trip') {
+        setSt('trip')
+        if (now >= s.tripUntil) s.phase = 'walk'
+      } else if (s.phase === 'walk') {
+        const dx = s.jtx - s.x
+        if (Math.abs(dx) < 3) { s.x = s.jtx; s.phase = 'climb' }
+        else { setSt('run'); setFacingLeft(dx < 0); s.x += Math.sign(dx) * WALK_SPEED; s.y = s.floor }
+      } else if (s.phase === 'climb') {
+        setSt('climb'); setFacingLeft(false)
+        s.x = s.jtx
+        if (s.y - s.jty <= 2) { s.y = s.jty; s.phase = 'settle'; s.settledAt = now; s.nextAction = now + 2000; setSt('idle') }
+        else s.y -= CLIMB_SPEED
       }
-      if (curState === 'wave' || curState === 'carrot' || curState === 'yawn') {
-        if (now >= timing.actionEnds) setSt('idle')
-        return
-      }
-      if (curState === 'sleep') return // stays asleep until scroll/movement resets settledAt
-      if (now - timing.settledAt > 18000) { setSt('sleep'); return }
-      if (now >= timing.nextAction) {
-        const acts: TState[] = ['wave', 'carrot', 'yawn']
-        const a = acts[Math.floor(Math.random() * acts.length)]
-        setSt(a)
-        timing.actionEnds = now + ACTION_MS[a]
-        timing.nextAction = now + ACTION_MS[a] + 2500 + Math.random() * 3500
-      }
+      render()
     }
     el.style.opacity = '0'
     raf = requestAnimationFrame(tick)
 
-    const onVis = () => {
-      cancelAnimationFrame(raf)
-      if (!document.hidden) raf = requestAnimationFrame(tick)
-    }
+    const onVis = () => { cancelAnimationFrame(raf); if (!document.hidden) raf = requestAnimationFrame(tick) }
     document.addEventListener('visibilitychange', onVis)
 
     const onDown = (e: PointerEvent) => {
@@ -176,20 +192,26 @@ export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLD
     const onUp = () => {
       if (!drag.on) return
       drag.on = false
+      s.x = drag.x
+      s.y = drag.y
       const quick = performance.now() - drag.downAt < 250
       if (drag.moved < 8 && quick) {
         // A tap (not a drag) → happy hop + a little burst of hearts.
         setSt('happy')
-        timing.actionEnds = performance.now() + ACTION_MS.happy
+        s.actionEnds = performance.now() + ACTION_MS.happy
+        s.phase = 'settle'
+        s.settledAt = 0
         const base = Date.now()
         const hs = [0, 1, 2].map((i) => ({ id: base + i, dx: -12 + i * 12 }))
         setHearts((prev) => [...prev, ...hs])
         setTimeout(() => setHearts((prev) => prev.filter((h) => !hs.some((x) => x.id === h.id))), 900)
       } else {
-        setSt('land')
-        timing.actionEnds = performance.now() + ACTION_MS.land
+        // Dropped: fall straight down (gravity), trip, walk over, climb the
+        // 3rd visible message.
+        s.phase = 'fall'
+        s.vy = 0
+        s.settledAt = 0
       }
-      timing.settledAt = 0
     }
     el.addEventListener('pointerdown', onDown)
     window.addEventListener('pointermove', onMove)
@@ -347,14 +369,21 @@ const TSUKI_CSS = `
 }
 .tsuki[data-state="happy"] .tsuki-bob { animation: tsuki-hop 0.9s cubic-bezier(0.3,1.4,0.5,1); }
 
-/* land squash after a drag */
-@keyframes tsuki-land {
-  0% { transform: translateY(-9px) scale(0.9,1.1); }
-  42% { transform: translateY(0) scale(1.18,0.82); }
-  72% { transform: scale(0.96,1.05); }
-  100% { transform: scale(1,1); }
+/* trip / tumble on landing after a fall — squashes on impact then tips over
+   one way and the other before righting itself */
+@keyframes tsuki-trip {
+  0% { transform: translateY(-6px) scale(0.88,1.12); }
+  22% { transform: translateY(0) scale(1.2,0.8) rotate(0deg); }
+  45% { transform: scale(1,1) rotate(-22deg); }
+  68% { transform: rotate(15deg); }
+  85% { transform: rotate(-6deg); }
+  100% { transform: rotate(0deg); }
 }
-.tsuki[data-state="land"] .tsuki-bob { animation: tsuki-land 0.46s ease-out; }
+.tsuki[data-state="trip"] .tsuki-bob { animation: tsuki-trip 0.48s ease-out; }
+.tsuki[data-state="trip"] .tsuki-ear-l { animation: tsuki-earflop 0.24s ease-in-out 2; }
+.tsuki[data-state="trip"] .tsuki-ear-r { animation: tsuki-earflop 0.24s ease-in-out 2 reverse; }
+/* little dizzy stars while tripped (reuse zzz group as sparks) */
+.tsuki[data-state="trip"] .tsuki-zzz { animation: tsuki-zzz 0.5s ease-in-out; }
 
 /* carrot nibble */
 @keyframes tsuki-chew { 0%,100% { transform: translateY(0); } 50% { transform: translateY(1.2px); } }
