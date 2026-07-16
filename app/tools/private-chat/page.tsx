@@ -236,23 +236,34 @@ function seededRandom(seed: string): number {
 // grain stretches correctly to fit each message's own width/height instead
 // of a fixed-size texture repeating oddly on short vs. long messages.
 function woodPlankStyle(seed: string): React.CSSProperties {
-  const r1 = seededRandom(seed)
-  const r2 = seededRandom(`${seed}-b`)
-  const r3 = seededRandom(`${seed}-c`)
-  const plankHeight = 15 + r1 * 7 // 15-22px per plank board
-  const grainAngle = -1.5 + r2 * 3 // near-horizontal grain, like a real plank sign
-  const grainGap = 5 + r3 * 6
+  const r = (i: number) => seededRandom(`${seed}-${i}`)
+  const plankHeight = 16 + r(1) * 7 // 16-23px per plank board
+
+  // Curved, almond-shaped grain "eyes" (elongated ellipses) instead of
+  // straight streaks — closer to the reference's swirling grain lines than
+  // plain repeating stripes can get with pure CSS.
+  const eyes = [0, 1, 2, 3].map((i) => {
+    const rx = 22 + r(10 + i) * 22
+    const ry = 3 + r(20 + i) * 3
+    const x = 10 + r(30 + i) * 80
+    const y = 10 + r(40 + i) * 80
+    return `radial-gradient(ellipse ${rx}px ${ry}px at ${x}% ${y}%, rgba(70,42,18,0.42) 0%, transparent 78%)`
+  })
+
   return {
     backgroundImage: [
-      // dark groove between each stacked plank board
-      `repeating-linear-gradient(0deg, rgba(15,9,4,0.6) 0px, rgba(15,9,4,0.6) 1.5px, transparent 1.5px, transparent ${plankHeight}px)`,
-      // fine wood-grain streaks running along each board
-      `repeating-linear-gradient(${grainAngle}deg, rgba(0,0,0,0.22) 0px, transparent 1px, transparent ${grainGap}px)`,
-      `repeating-linear-gradient(${grainAngle}deg, rgba(90,58,32,0.3) 0px, transparent 2px, transparent ${grainGap * 1.8}px)`,
-      // deep weathered brown base, like a dark-stained sign
-      'linear-gradient(160deg, #5A3A20, #38230F)',
+      ...eyes,
+      // beveled plank boards: a light highlight along each board's top edge,
+      // a dark groove along its bottom, like individual stacked planks
+      `repeating-linear-gradient(
+        0deg,
+        rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 1.5px,
+        transparent 1.5px, transparent ${plankHeight - 2}px,
+        rgba(20,12,5,0.5) ${plankHeight - 2}px, rgba(20,12,5,0.5) ${plankHeight}px
+      )`,
+      'linear-gradient(160deg, #B9814B, #8A5A2E)',
     ].join(', '),
-    backgroundColor: '#38230F',
+    backgroundColor: '#8A5A2E',
   }
 }
 
@@ -792,10 +803,9 @@ function ChatScreen({
   const iconSet = ICON_SET_SLUGS.includes(roomInfo.wallpaperPreset ?? '') ? (roomInfo.wallpaperPreset as string) : null
   const hasStickerSet = iconSet !== null && ICON_SETS_WITH_STICKERS.has(iconSet)
   // Burrow's bubbles get a wood-plank look instead of the usual theme-color
-  // fill — a warm parchment cream for text, since the plank itself is now a
-  // deep weathered brown (too dark for the theme's usual cocoa ink to read).
+  // fill — a dark cocoa ink for text, matching the medium-brown plank base.
   const isBurrow = roomInfo.wallpaperPreset === 'burrow'
-  const burrowInk = '#F3E3C5'
+  const burrowInk = '#2B1A0C'
   const themeColor = roomInfo.primaryColor
   // Informational highlight color (pinned message, link previews, chosen
   // reactions) and a quieter secondary accent (outer aurora's extra blob) —
