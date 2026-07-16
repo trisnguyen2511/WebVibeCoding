@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import Link from 'next/link'
 import { LogOut, Pin, Reply, SmilePlus, Clock, Image as ImageIcon, Type, Send, MessageCircle, BookOpen, X, Plus, Lock, Paperclip, FileIcon, Search, Images, ExternalLink, ArrowLeft } from 'lucide-react'
 import { ToolShell } from '@/components/tool-shell'
+import { TsukiCompanion } from '@/components/tsuki-companion'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { CHAT_MAX_FILE_SIZE_BYTES, CHAT_MAX_FILE_SIZE_MB, CHAT_OVERSIZE_DISMISS_DAYS } from '@/lib/chat-limits'
 import { loadCachedMessages, saveCachedMessages } from '@/lib/chat-cache'
@@ -2204,6 +2205,7 @@ function ChatScreen({
           ↓ {newMessageCount} tin nhắn mới
         </button>
       )}
+      {isBurrow && <TsukiCompanion scrollRef={scrollRef} />}
       </div>
 
       {/* ── Reply bar ───────────────────────────────────────────── */}
