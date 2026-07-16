@@ -252,31 +252,9 @@ function woodPlankStyle(seed: string): React.CSSProperties {
 // A few light, randomly-placed leaf sprigs decorating each burrow-theme
 // bubble — position/rotation seeded per message so it's stable, not
 // re-randomized on every render.
-// Fixed, well-spread anchor slots (corners + mid-edges) — picking distinct
-// slots out of this fixed set guarantees leaves never land too close to
-// each other, regardless of how the seeded shuffle picks them.
-const LEAF_ANCHORS: React.CSSProperties[] = [
-  { top: 3, left: 4 },
-  { top: 3, right: 4 },
-  { bottom: 3, left: 4 },
-  { bottom: 3, right: 4 },
-  { top: '45%', left: 2 },
-  { top: '45%', right: 2 },
-]
-
-// Seeded Fisher-Yates pick of `count` distinct anchors — stable per message
-// (same shuffle every render), not just per-bubble-random each time.
-function pickLeafAnchors(seed: string, count: number): React.CSSProperties[] {
-  const indices = LEAF_ANCHORS.map((_, i) => i)
-  for (let i = indices.length - 1; i > 0; i--) {
-    const j = Math.floor(seededRandom(`${seed}-shuffle-${i}`) * (i + 1))
-    ;[indices[i], indices[j]] = [indices[j], indices[i]]
-  }
-  return indices.slice(0, count).map((idx) => LEAF_ANCHORS[idx])
-}
-
-function LeafSprig({ seed, anchor }: { seed: string; anchor: React.CSSProperties }) {
+function LeafSprig({ seed }: { seed: string }) {
   const r = seededRandom(`${seed}-leaf`)
+  const corner: React.CSSProperties = r < 0.5 ? { top: 3, right: 4 } : { bottom: 3, left: 4 }
   const rotate = -20 + r * 40
   return (
     <svg
@@ -284,7 +262,7 @@ function LeafSprig({ seed, anchor }: { seed: string; anchor: React.CSSProperties
       width={15}
       height={15}
       className="pointer-events-none absolute opacity-70"
-      style={{ ...anchor, transform: `rotate(${rotate}deg)` }}
+      style={{ ...corner, transform: `rotate(${rotate}deg)` }}
       aria-hidden="true"
     >
       <path d="M12 3c4 2 6 6 5 11-4 1-8-1-9-5-1-3 .5-5 4-6Z" fill="#3E5C3A" stroke="#2B1F16" strokeWidth="1" />
@@ -2050,10 +2028,7 @@ function ChatScreen({
                             ...(journalColor && !hasWallpaper && !isBurrow ? { backgroundColor: `${journalColor}22` } : undefined),
                           }}
                         >
-                          {isBurrow &&
-                            pickLeafAnchors(m.id, 3).map((anchor, i) => (
-                              <LeafSprig key={i} seed={`${m.id}-${i}`} anchor={anchor} />
-                            ))}
+                          {isBurrow && <LeafSprig seed={m.id} />}
                           <LinkPreviewCard message={m} opaque={hasWallpaper} accentColor={tertiaryColor} />
                           <FileAttachment message={m} />
                           {m.content && (
@@ -2105,10 +2080,7 @@ function ChatScreen({
                                 fontStyle: m.italic ? 'italic' : undefined,
                               }}
                             >
-                              {isBurrow &&
-                            pickLeafAnchors(m.id, 3).map((anchor, i) => (
-                              <LeafSprig key={i} seed={`${m.id}-${i}`} anchor={anchor} />
-                            ))}
+                              {isBurrow && <LeafSprig seed={m.id} />}
                               {renderMessageContent(m.content, iconSet)}
                             </div>
                           )}
