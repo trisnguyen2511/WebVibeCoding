@@ -229,7 +229,7 @@ export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLD
 
   // Expression is a whole-head swap now (the sprite sheet gives 3 full heads).
   const headSrc =
-    state === 'yawn' ? '/tsuki/head-closed.png'
+    state === 'yawn' || state === 'sleep' ? '/tsuki/head-closed.png'
       : state === 'trip' ? '/tsuki/head-ouch.png'
         : '/tsuki/head-neutral.png'
 
@@ -253,38 +253,36 @@ export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLD
             {hearts.map((h) => (
               <span key={h.id} className="tsuki-heart" style={{ left: RABBIT_W / 2 + h.dx }}>♥</span>
             ))}
-            {state === 'sleep' ? (
-              <>
-                <img className="tsuki-sleeping" src="/tsuki/pose-sleeping.png" {...imgProps}
-                  style={{ position: 'absolute', left: -6, top: 36, width: 49, height: 30 }} />
-                <img className="tsuki-zzz" src="/tsuki/zzz.png" {...imgProps}
-                  style={{ position: 'absolute', left: 25, top: 8, width: 11, height: 15 }} />
-              </>
-            ) : (
-              <>
-                {/* comic impact burst (trip only) — behind everything */}
-                <svg className="tsuki-pow" viewBox="0 0 48 48" width={56} height={56}
-                  style={{ position: 'absolute', left: -9.5, top: 18, overflow: 'visible' }} aria-hidden="true">
-                  <g transform="translate(24 24)">
-                    <polygon
-                      points="0,-19 2.4,-8.2 10.3,-16 6.4,-5.6 17.3,-7.9 8.4,-1.2 18.8,2.7 7.7,3.5 14.4,12.4 4.6,7.2 5.4,18.2 0,8.5 -5.4,18.2 -4.6,7.2 -14.4,12.4 -7.7,3.5 -18.8,2.7 -8.4,-1.2 -17.3,-7.9 -6.4,-5.6 -10.3,-16 -2.4,-8.2"
-                      fill="#F5A623" stroke="#2B1F16" strokeWidth="1.6" strokeLinejoin="round" transform="translate(1 1)" />
-                    <polygon
-                      points="0,-19 2.4,-8.2 10.3,-16 6.4,-5.6 17.3,-7.9 8.4,-1.2 18.8,2.7 7.7,3.5 14.4,12.4 4.6,7.2 5.4,18.2 0,8.5 -5.4,18.2 -4.6,7.2 -14.4,12.4 -7.7,3.5 -18.8,2.7 -8.4,-1.2 -17.3,-7.9 -6.4,-5.6 -10.3,-16 -2.4,-8.2"
-                      fill="#FFD21E" stroke="#2B1F16" strokeWidth="1.6" strokeLinejoin="round" />
-                  </g>
-                </svg>
-                <img className="tsuki-part tsuki-feet" src="/tsuki/feet.png" {...imgProps} style={partStyle(PARTS.feet)} />
-                <img className="tsuki-part tsuki-arm tsuki-arm-back" src="/tsuki/arm-left.png" {...imgProps} style={partStyle(PARTS.armBack)} />
-                <img className="tsuki-part tsuki-body" src="/tsuki/body.png" {...imgProps} style={partStyle(PARTS.body)} />
-                <img className="tsuki-part tsuki-arm tsuki-arm-front" src="/tsuki/arm.png" {...imgProps} style={partStyle(PARTS.armFront)} />
-                <img className="tsuki-part tsuki-head" src={headSrc} {...imgProps} style={partStyle(PARTS.head)} />
-                <img className="tsuki-part tsuki-carrot" src="/tsuki/carrot.png" {...imgProps}
-                  style={{ position: 'absolute', left: 15, top: 34, width: 14, height: 14.4 }} />
-              </>
-            )}
+            {/* comic impact burst (trip only) — behind everything */}
+            <svg className="tsuki-pow" viewBox="0 0 48 48" width={56} height={56}
+              style={{ position: 'absolute', left: -9.5, top: 18, overflow: 'visible' }} aria-hidden="true">
+              <g transform="translate(24 24)">
+                <polygon
+                  points="0,-19 2.4,-8.2 10.3,-16 6.4,-5.6 17.3,-7.9 8.4,-1.2 18.8,2.7 7.7,3.5 14.4,12.4 4.6,7.2 5.4,18.2 0,8.5 -5.4,18.2 -4.6,7.2 -14.4,12.4 -7.7,3.5 -18.8,2.7 -8.4,-1.2 -17.3,-7.9 -6.4,-5.6 -10.3,-16 -2.4,-8.2"
+                  fill="#F5A623" stroke="#2B1F16" strokeWidth="1.6" strokeLinejoin="round" transform="translate(1 1)" />
+                <polygon
+                  points="0,-19 2.4,-8.2 10.3,-16 6.4,-5.6 17.3,-7.9 8.4,-1.2 18.8,2.7 7.7,3.5 14.4,12.4 4.6,7.2 5.4,18.2 0,8.5 -5.4,18.2 -4.6,7.2 -14.4,12.4 -7.7,3.5 -18.8,2.7 -8.4,-1.2 -17.3,-7.9 -6.4,-5.6 -10.3,-16 -2.4,-8.2"
+                  fill="#FFD21E" stroke="#2B1F16" strokeWidth="1.6" strokeLinejoin="round" />
+              </g>
+            </svg>
+            <img className="tsuki-part tsuki-feet" src="/tsuki/feet.png" {...imgProps} style={partStyle(PARTS.feet)} />
+            <img className="tsuki-part tsuki-arm tsuki-arm-back" src="/tsuki/arm-left.png" {...imgProps} style={partStyle(PARTS.armBack)} />
+            <img className="tsuki-part tsuki-body" src="/tsuki/body.png" {...imgProps} style={partStyle(PARTS.body)} />
+            <img className="tsuki-part tsuki-arm tsuki-arm-front" src="/tsuki/arm.png" {...imgProps} style={partStyle(PARTS.armFront)} />
+            <img className="tsuki-part tsuki-head" src={headSrc} {...imgProps} style={partStyle(PARTS.head)} />
+            <img className="tsuki-part tsuki-carrot" src="/tsuki/carrot.png" {...imgProps}
+              style={{ position: 'absolute', left: 15, top: 34, width: 14, height: 14.4 }} />
           </div>
         </div>
+        {/* Rendered outside the tilt/flip wrappers so it always floats
+            upright above the head, regardless of the sleep lean. */}
+        {state === 'sleep' && (
+          <svg className="tsuki-zzz" viewBox="0 0 30 34" width={22} height={25}
+            style={{ position: 'absolute', left: 24, top: -6 }} aria-hidden="true">
+            <text x="0" y="14" fontSize="9" fontWeight="700" fontFamily="sans-serif" fill="#6FC6E8">z</text>
+            <text x="9" y="8" fontSize="13" fontWeight="700" fontFamily="sans-serif" fill="#6FC6E8">Z</text>
+          </svg>
+        )}
       </div>
     </div>
   )
@@ -315,9 +313,10 @@ const TSUKI_CSS = `
 @keyframes tsuki-breathe { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.04); } }
 .tsuki[data-state="idle"] .tsuki-body { animation: tsuki-breathe 2.6s ease-in-out infinite; }
 
-/* wave */
-@keyframes tsuki-wave { 0%,100% { transform: rotate(6deg); } 50% { transform: rotate(-46deg); } }
-.tsuki[data-state="wave"] .tsuki-arm-back { animation: tsuki-wave 0.42s ease-in-out 3; }
+/* wave — animates the visible front arm (the back arm is mostly tucked
+   behind the body and wouldn't read as a wave) */
+@keyframes tsuki-wave { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(46deg); } }
+.tsuki[data-state="wave"] .tsuki-arm-front { animation: tsuki-wave 0.42s ease-in-out 3; }
 .tsuki[data-state="wave"] .tsuki-body { animation: tsuki-breathe 2.6s ease-in-out infinite; }
 
 /* arm swing (shared by walk) */
@@ -383,9 +382,10 @@ const TSUKI_CSS = `
 @keyframes tsuki-yawn-head { 0%,100% { transform: rotate(0); } 35%,70% { transform: rotate(-5deg); } }
 .tsuki[data-state="yawn"] .tsuki-head { animation: tsuki-yawn-head 1.4s ease-in-out; }
 
-/* sleep (lying pose) */
-@keyframes tsuki-sleepbob { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-1px) rotate(1.2deg); } }
-.tsuki[data-state="sleep"] .tsuki-sleeping { transform-box: fill-box; transform-origin: 50% 100%; animation: tsuki-sleepbob 4s ease-in-out infinite; }
+/* sleep — leans the whole body over to one side and closes the eyes
+   (head swap to head-closed.png happens in headSrc) */
+@keyframes tsuki-sleepbob { 0%,100% { transform: rotate(13deg); } 50% { transform: rotate(15deg); } }
+.tsuki[data-state="sleep"] .tsuki-bob { animation: tsuki-sleepbob 4s ease-in-out infinite; }
 @keyframes tsuki-zzz { 0% { opacity: 0; transform: translateY(2px) scale(0.6); } 30% { opacity: 0.9; } 100% { opacity: 0; transform: translateY(-12px) scale(1.1); } }
 .tsuki-zzz { animation: tsuki-zzz 2.6s ease-in-out infinite; }
 
