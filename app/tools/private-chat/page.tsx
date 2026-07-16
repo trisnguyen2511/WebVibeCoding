@@ -207,7 +207,22 @@ const ICON_TOKEN_RE = new RegExp(`(${ICON_TOKEN_OPTIONS.map((o) => `:${o.id}:`).
 // they just fall back to the plain emoji for sticker-* until drawn.
 const ICON_SETS_WITH_STICKERS = new Set(['mosaic', 'burrow'])
 
+// Pure function of (content, iconSet) — cached so re-rendering the message
+// list for an unrelated state change (typing indicator, popover toggles,
+// mood updates, ...) doesn't re-run the regex split/token lookup for every
+// message that hasn't actually changed. Capped so a very long-lived room
+// session can't grow this unboundedly.
+const messageContentCache = new Map<string, React.ReactNode>()
 function renderMessageContent(content: string, iconSet: string | null): React.ReactNode {
+  const cacheKey = `${iconSet ?? ''}|${content}`
+  const cached = messageContentCache.get(cacheKey)
+  if (cached !== undefined) return cached
+  if (messageContentCache.size > 2000) messageContentCache.clear()
+  const result = renderMessageContentUncached(content, iconSet)
+  messageContentCache.set(cacheKey, result)
+  return result
+}
+function renderMessageContentUncached(content: string, iconSet: string | null): React.ReactNode {
   const parts = content.split(ICON_TOKEN_RE)
   if (parts.length === 1) return content
   return parts.map((part, i) => {
@@ -236,7 +251,18 @@ function seededRandom(seed: string): number {
 // plank — built from layered CSS gradients (not an SVG/image asset) so the
 // grain stretches correctly to fit each message's own width/height instead
 // of a fixed-size texture repeating oddly on short vs. long messages.
+// Cached by seed (message id) — the output never changes for a given
+// message, so there's no reason to recompute it on every re-render.
+const woodPlankStyleCache = new Map<string, React.CSSProperties>()
 function woodPlankStyle(seed: string): React.CSSProperties {
+  const cached = woodPlankStyleCache.get(seed)
+  if (cached) return cached
+  if (woodPlankStyleCache.size > 2000) woodPlankStyleCache.clear()
+  const style = woodPlankStyleUncached(seed)
+  woodPlankStyleCache.set(seed, style)
+  return style
+}
+function woodPlankStyleUncached(seed: string): React.CSSProperties {
   const r1 = seededRandom(seed)
   const r2 = seededRandom(`${seed}-b`)
   const angle = 88 + r1 * 4 // near-vertical grain, varies slightly per message
@@ -809,6 +835,14 @@ function ChatScreen({
   useEffect(() => { roomTypeRef.current = roomType }, [roomType])
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  // Tracks which message ids have already played their "slide in" entrance
+  // animation, so an unrelated re-render of ChatScreen (typing indicator,
+  // popover toggles, mood updates, ...) doesn't replay animate-msg-in across
+  // the entire list — only a genuinely new message gets it.
+  const seenMsgIdsRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    messages.forEach((m) => seenMsgIdsRef.current.add(m.id))
+  }, [messages])
   const [input, setInput] = useState('')
   const hasText = Boolean(input.trim())
   const [hasMore, setHasMore] = useState(false)
@@ -1925,7 +1959,7 @@ function ChatScreen({
                         <span className="h-px flex-1 bg-overlay/[0.06]" />
                       </div>
                     )}
-                    <div className="flex justify-center animate-msg-in">
+                    <div className={`flex justify-center ${seenMsgIdsRef.current.has(m.id) ? '' : 'animate-msg-in'}`}>
                       <span className="rounded-full border border-amber-500/20 bg-amber-500/[0.08] px-3.5 py-1 text-center text-xs text-amber-400">
                         {m.content}
                       </span>
@@ -1962,7 +1996,7 @@ function ChatScreen({
                     </div>
                   )}
                   <div
-                    className={`group flex animate-msg-in flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'} ${
+                    className={`group flex ${seenMsgIdsRef.current.has(m.id) ? '' : 'animate-msg-in'} flex-col ${isJournal ? 'w-full items-start' : mine ? 'items-end' : 'items-start'} ${
                       m.reply_to_id ? (mine ? 'mr-3' : 'ml-3') : ''
                     }`}
                   >
