@@ -365,11 +365,10 @@ const TSUKI_CSS = `
 .tsuki[data-state="fall"] .tsuki-ear-r { animation: tsuki-earflop 0.3s ease-in-out infinite reverse; }
 
 /* run */
-/* walk: lean forward into the stride + a gentle hop (leans in the travel
-   direction because the whole rig is scaleX-flipped when facing left) */
+/* walk: upright gentle hop (no body lean) */
 @keyframes tsuki-run {
-  0%,100% { transform: translateY(0) rotate(-5deg); }
-  50% { transform: translateY(-2.5px) rotate(-8deg); }
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-2.5px); }
 }
 .tsuki[data-state="run"] .tsuki-bob { animation: tsuki-run 0.42s ease-in-out infinite; }
 .tsuki[data-state="run"] .tsuki-arm-l { animation: tsuki-climb-arm-l 0.42s ease-in-out infinite; }
