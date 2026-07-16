@@ -26,22 +26,46 @@ const PARTS = {
 } as const
 
 type TState =
-  | 'idle' | 'fall' | 'run' | 'drag' | 'trip' | 'happy' | 'wave' | 'carrot' | 'yawn' | 'sleep'
+  | 'idle' | 'fall' | 'run' | 'drag' | 'trip' | 'happy' | 'wave' | 'carrot' | 'yawn' | 'sleep' | 'typing' | 'send'
 type Phase = 'walk' | 'rest' | 'fall' | 'trip'
 
-const ACTION_MS: Record<string, number> = { wave: 1500, carrot: 2600, yawn: 1400, happy: 900 }
+const ACTION_MS: Record<string, number> = { wave: 1500, carrot: 2600, yawn: 1400, happy: 900, send: 900 }
 // Movement tuning (px per frame @60fps)
 const GRAVITY = 0.9
 const MAX_VY = 22
 const WALK_SPEED = 1.25
 const TRIP_MS = 480
+// How many typed characters count as "fully raised" arm — beyond this the
+// arm just stays at its max angle instead of continuing to rotate.
+const TYPING_MAX_CHARS = 40
+const TYPING_MAX_ANGLE = 130
 
-export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLDivElement | null> }) {
+export function TsukiCompanion({
+  scrollRef,
+  typingLength = 0,
+  sendSignal = 0,
+}: {
+  scrollRef: React.RefObject<HTMLDivElement | null>
+  typingLength?: number
+  sendSignal?: number
+}) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const rabbitRef = useRef<HTMLDivElement>(null)
   const [state, setState] = useState<TState>('idle')
   const [facingLeft, setFacingLeft] = useState(false)
   const [hearts, setHearts] = useState<{ id: number; dx: number }[]>([])
+  // Read by the rAF loop below without needing to restart it — updated from
+  // plain prop-watching effects so typing/sending stay responsive without
+  // re-creating the whole animation setup on every keystroke.
+  const interactionRef = useRef({ typingLen: 0, celebrateQueued: false })
+  useEffect(() => { interactionRef.current.typingLen = typingLength }, [typingLength])
+  const prevSendSignal = useRef(sendSignal)
+  useEffect(() => {
+    if (sendSignal !== prevSendSignal.current) {
+      prevSendSignal.current = sendSignal
+      interactionRef.current.celebrateQueued = true
+    }
+  }, [sendSignal])
 
   useEffect(() => {
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
@@ -137,6 +161,32 @@ export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLD
 
       if (drag.on) { s.x = drag.x; s.y = drag.y; render(); return }
       if (curState === 'happy' && now < s.actionEnds) { render(); return }
+
+      // Sending a message always takes priority — jump up and cheer,
+      // interrupting whatever else was happening.
+      if (interactionRef.current.celebrateQueued) {
+        interactionRef.current.celebrateQueued = false
+        s.y = floor
+        setSt('send')
+        s.napping = false
+        s.actionEnds = now + (ACTION_MS.send ?? 900)
+        s.phase = 'rest'
+        s.restUntil = s.actionEnds + 700
+        render()
+        return
+      }
+      if (curState === 'send' && now < s.actionEnds) { s.y = floor; render(); return }
+
+      // While the user is typing, stop and point at the input — the arm
+      // angle grows with how much has been typed so far.
+      if (interactionRef.current.typingLen > 0 && s.phase !== 'fall' && s.phase !== 'trip' && curState !== 'drag') {
+        setSt('typing')
+        s.y = floor
+        const angle = Math.min(1, interactionRef.current.typingLen / TYPING_MAX_CHARS) * TYPING_MAX_ANGLE
+        el.style.setProperty('--arm-point', `${angle}deg`)
+        render()
+        return
+      }
 
       if (reduced) { s.y = floor; setSt('idle'); render(); return }
 
@@ -365,6 +415,20 @@ const TSUKI_CSS = `
   100% { transform: translateY(0) scale(1,1); }
 }
 .tsuki[data-state="happy"] .tsuki-bob { animation: tsuki-hop 0.9s cubic-bezier(0.3,1.4,0.5,1); }
+
+/* typing — holds still and points the front arm up at an angle set live
+   from JS via --arm-point, growing with how much has been typed so far */
+.tsuki[data-state="typing"] .tsuki-arm-front { transform: rotate(var(--arm-point, 0deg)); }
+.tsuki[data-state="typing"] .tsuki-body { animation: tsuki-breathe 2.6s ease-in-out infinite; }
+
+/* send — jumps up and throws the front arm up in a cheer */
+@keyframes tsuki-send-arm {
+  0% { transform: rotate(0deg); }
+  30% { transform: rotate(150deg); }
+  100% { transform: rotate(150deg); }
+}
+.tsuki[data-state="send"] .tsuki-bob { animation: tsuki-hop 0.9s cubic-bezier(0.3,1.4,0.5,1); }
+.tsuki[data-state="send"] .tsuki-arm-front { animation: tsuki-send-arm 0.9s ease-out; }
 
 /* trip / tumble on landing after a fall — squashes on impact then tips over
    one way and the other before righting itself (head shows the >< ouch face) */
