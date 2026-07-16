@@ -64,6 +64,20 @@ export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLD
     const setSt = (v: TState) => { if (v !== curState) { curState = v; setState(v) } }
     const render = () => { el.style.transform = `translate(${s.x}px, ${s.y}px)` }
 
+    // Cache the overlay's size instead of forcing a layout read
+    // (getBoundingClientRect) on every animation frame — only recompute it
+    // when the container actually resizes.
+    let frameW = 0
+    let frameH = 0
+    const readFrame = () => {
+      const r = overlay.getBoundingClientRect()
+      frameW = r.width
+      frameH = r.height
+    }
+    readFrame()
+    const ro = new ResizeObserver(readFrame)
+    ro.observe(overlay)
+
     // Pick a fresh random spot to stroll to (meaningfully far from the current
     // one so it actually paces back and forth), then start walking.
     const startWander = (now: number, minX: number, maxX: number) => {
@@ -104,14 +118,13 @@ export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLD
     const tick = () => {
       raf = requestAnimationFrame(tick)
       const now = performance.now()
-      const frame = overlay.getBoundingClientRect()
-      const floor = frame.height - RABBIT_H - 6
+      const floor = frameH - RABBIT_H - 6
       const minX = 6
-      const maxX = Math.max(minX, frame.width - RABBIT_W - 6)
+      const maxX = Math.max(minX, frameW - RABBIT_W - 6)
       s.floor = floor
 
       if (!s.init) {
-        s.x = frame.width / 2 - RABBIT_W / 2
+        s.x = frameW / 2 - RABBIT_W / 2
         s.y = floor
         s.init = true
         el.style.opacity = '1'
@@ -219,6 +232,7 @@ export function TsukiCompanion({ scrollRef }: { scrollRef: React.RefObject<HTMLD
 
     return () => {
       cancelAnimationFrame(raf)
+      ro.disconnect()
       scroller?.removeEventListener('scroll', onScroll)
       document.removeEventListener('visibilitychange', onVis)
       el.removeEventListener('pointerdown', onDown)
