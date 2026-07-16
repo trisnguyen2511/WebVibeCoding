@@ -315,7 +315,7 @@ const TSUKI_CSS = `
 
 /* wave — animates the visible front arm (the back arm is mostly tucked
    behind the body and wouldn't read as a wave) */
-@keyframes tsuki-wave { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(46deg); } }
+@keyframes tsuki-wave { 0%,100% { transform: rotate(6deg); } 50% { transform: rotate(-46deg); } }
 .tsuki[data-state="wave"] .tsuki-arm-front { animation: tsuki-wave 0.42s ease-in-out 3; }
 .tsuki[data-state="wave"] .tsuki-body { animation: tsuki-breathe 2.6s ease-in-out infinite; }
 
