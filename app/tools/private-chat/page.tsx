@@ -222,6 +222,55 @@ function renderMessageContent(content: string, iconSet: string | null): React.Re
   })
 }
 
+// Deterministic 0-1 pseudo-random value from a string seed (e.g. a message
+// id) — same message always gets the same "random" look on every render,
+// instead of the grain/leaf jittering around every time React re-renders.
+function seededRandom(seed: string): number {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0
+  return (h % 1000) / 1000
+}
+
+// The burrow theme's message bubbles look like text sitting on a wood
+// plank — built from layered CSS gradients (not an SVG/image asset) so the
+// grain stretches correctly to fit each message's own width/height instead
+// of a fixed-size texture repeating oddly on short vs. long messages.
+function woodPlankStyle(seed: string): React.CSSProperties {
+  const r1 = seededRandom(seed)
+  const r2 = seededRandom(`${seed}-b`)
+  const angle = 88 + r1 * 4 // near-vertical grain, varies slightly per message
+  const stripe = 9 + r2 * 10
+  return {
+    backgroundImage: [
+      `repeating-linear-gradient(${angle}deg, rgba(122,75,38,0.32) 0px, rgba(122,75,38,0.32) 1.5px, transparent 1.5px, transparent ${stripe}px)`,
+      `repeating-linear-gradient(${angle}deg, rgba(74,46,24,0.22) 0px, transparent 2.5px, transparent ${stripe * 1.7}px)`,
+      'linear-gradient(155deg, #CBA06B, #9C6B3E)',
+    ].join(', '),
+  }
+}
+
+// A few light, randomly-placed leaf sprigs decorating each burrow-theme
+// bubble — position/rotation seeded per message so it's stable, not
+// re-randomized on every render.
+function LeafSprig({ seed }: { seed: string }) {
+  const r = seededRandom(`${seed}-leaf`)
+  const corner: React.CSSProperties = r < 0.5 ? { top: 3, right: 4 } : { bottom: 3, left: 4 }
+  const rotate = -20 + r * 40
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={15}
+      height={15}
+      className="pointer-events-none absolute opacity-70"
+      style={{ ...corner, transform: `rotate(${rotate}deg)` }}
+      aria-hidden="true"
+    >
+      <path d="M12 3c4 2 6 6 5 11-4 1-8-1-9-5-1-3 .5-5 4-6Z" fill="#3E5C3A" stroke="#2B1F16" strokeWidth="1" />
+      <path d="M12 4c1 3 1.5 6 .5 9" stroke="#2B1F16" strokeWidth="0.7" fill="none" />
+    </svg>
+  )
+}
+
 function hexAlpha(hex: string, alphaHex: string): string {
   return /^#[0-9a-fA-F]{6}$/.test(hex) ? `${hex}${alphaHex}` : hex
 }
@@ -735,6 +784,10 @@ function ChatScreen({
   const ICON_SET_SLUGS = ['mosaic', 'burrow']
   const iconSet = ICON_SET_SLUGS.includes(roomInfo.wallpaperPreset ?? '') ? (roomInfo.wallpaperPreset as string) : null
   const hasStickerSet = iconSet !== null && ICON_SETS_WITH_STICKERS.has(iconSet)
+  // Burrow's bubbles get a wood-plank look instead of the usual theme-color
+  // fill — always a warm cocoa ink for text so it reads over any wood tone.
+  const isBurrow = roomInfo.wallpaperPreset === 'burrow'
+  const burrowInk = '#2B1F16'
   const themeColor = roomInfo.primaryColor
   // Informational highlight color (pinned message, link previews, chosen
   // reactions) and a quieter secondary accent (outer aurora's extra blob) —
@@ -1949,24 +2002,33 @@ function ChatScreen({
                         </span>
                       ) : isJournal ? (
                         <div
-                          className={`w-full overflow-x-auto border-l-2 ${journalColor ? '' : 'border-accent/40'} ${
-                            hasWallpaper
-                              ? 'rounded-r-xl bg-background/60 py-2 pl-4 pr-3 backdrop-blur-md'
-                              : journalColor
-                                ? 'rounded-r-xl py-2 pl-4 pr-3'
-                                : 'py-1 pl-4'
+                          className={`relative w-full overflow-x-auto border-l-2 ${
+                            isBurrow ? '' : journalColor ? '' : 'border-accent/40'
+                          } ${
+                            isBurrow
+                              ? 'rounded-r-xl py-2 pl-4 pr-3 shadow-inner'
+                              : hasWallpaper
+                                ? 'rounded-r-xl bg-background/60 py-2 pl-4 pr-3 backdrop-blur-md'
+                                : journalColor
+                                  ? 'rounded-r-xl py-2 pl-4 pr-3'
+                                  : 'py-1 pl-4'
                           }`}
                           style={{
                             touchAction: 'pan-y',
-                            ...(journalColor ? { borderColor: journalColor } : undefined),
+                            ...(isBurrow
+                              ? { borderColor: '#7A4B26', ...woodPlankStyle(m.id) }
+                              : journalColor
+                                ? { borderColor: journalColor }
+                                : undefined),
                             // Tint each entry's own fill (not just the border) with
                             // its sender's theme color, so already-sent messages
                             // read as themed blocks — skipped over a wallpaper,
                             // where the translucent backing above already exists
                             // purely for text legibility and shouldn't be recolored.
-                            ...(journalColor && !hasWallpaper ? { backgroundColor: `${journalColor}22` } : undefined),
+                            ...(journalColor && !hasWallpaper && !isBurrow ? { backgroundColor: `${journalColor}22` } : undefined),
                           }}
                         >
+                          {isBurrow && <LeafSprig seed={m.id} />}
                           <LinkPreviewCard message={m} opaque={hasWallpaper} accentColor={tertiaryColor} />
                           <FileAttachment message={m} />
                           {m.content && (
@@ -1974,7 +2036,7 @@ function ChatScreen({
                               className="text-[15px] leading-relaxed text-fg"
                               style={{
                                 ...fontStyleFor(m.font_family),
-                                color: m.text_color ?? undefined,
+                                color: m.text_color ?? (isBurrow ? burrowInk : undefined),
                                 fontWeight: m.bold ? 700 : undefined,
                                 fontStyle: m.italic ? 'italic' : undefined,
                               }}
@@ -1997,22 +2059,28 @@ function ChatScreen({
                           <FileAttachment message={m} />
                           {m.content && (
                             <div
-                              className={`max-w-[75%] overflow-x-auto rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${tailClass} ${
-                                mine
-                                  ? `text-white shadow-[0_2px_16px_rgba(124,58,237,0.35)] ${roomInfo.primaryColor ? '' : 'bg-gradient-to-br from-accent to-[#5b21b6]'}`
-                                  : `text-fg backdrop-blur-sm ${roomInfo.secondaryColor ? 'border' : 'border border-overlay/[0.08] bg-overlay/[0.1]'}`
+                              className={`relative max-w-[75%] overflow-x-auto rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${tailClass} ${
+                                isBurrow
+                                  ? 'border shadow-inner'
+                                  : mine
+                                    ? `text-white shadow-[0_2px_16px_rgba(124,58,237,0.35)] ${roomInfo.primaryColor ? '' : 'bg-gradient-to-br from-accent to-[#5b21b6]'}`
+                                    : `text-fg backdrop-blur-sm ${roomInfo.secondaryColor ? 'border' : 'border border-overlay/[0.08] bg-overlay/[0.1]'}`
                               }`}
                               style={{
                                 ...fontStyleFor(m.font_family),
-                                ...(mine && roomInfo.primaryColor ? { backgroundColor: roomInfo.primaryColor } : undefined),
-                                ...(!mine && roomInfo.secondaryColor
-                                  ? { backgroundColor: `${roomInfo.secondaryColor}30`, borderColor: `${roomInfo.secondaryColor}55` }
-                                  : undefined),
-                                color: m.text_color ?? undefined,
+                                ...(isBurrow
+                                  ? { borderColor: '#7A4B26', ...woodPlankStyle(m.id) }
+                                  : mine && roomInfo.primaryColor
+                                    ? { backgroundColor: roomInfo.primaryColor }
+                                    : !mine && roomInfo.secondaryColor
+                                      ? { backgroundColor: `${roomInfo.secondaryColor}30`, borderColor: `${roomInfo.secondaryColor}55` }
+                                      : undefined),
+                                color: m.text_color ?? (isBurrow ? burrowInk : undefined),
                                 fontWeight: m.bold ? 700 : undefined,
                                 fontStyle: m.italic ? 'italic' : undefined,
                               }}
                             >
+                              {isBurrow && <LeafSprig seed={m.id} />}
                               {renderMessageContent(m.content, iconSet)}
                             </div>
                           )}
