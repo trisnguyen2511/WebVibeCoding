@@ -15,23 +15,28 @@ export function describeEvent(event: GameEvent, players: Player[], roles: RoleDe
       return `Đêm ${event.payload.night} — ${role?.name ?? '?'} (${name(event.payload.actorPlayerId)}) chọn ${targets}`
     }
     case 'night_resolved': {
-      const { night, deaths, saved } = event.payload
+      const { night, deaths, saved, blocked, conversions } = event.payload
       const deathText = deaths.length ? deaths.map(name).join(', ') : 'không ai chết'
       const savedText = saved.length ? ` — được cứu: ${saved.map(name).join(', ')}` : ''
-      return `Đêm ${night} kết thúc — ${deathText}${savedText}`
+      const blockedText = blocked.length ? ` — bị khóa: ${blocked.map(name).join(', ')}` : ''
+      const convertText = conversions.length
+        ? ` — biến thành Sói: ${conversions.map((c) => name(c.playerId)).join(', ')}`
+        : ''
+      return `Đêm ${night} kết thúc — ${deathText}${savedText}${blockedText}${convertText}`
     }
-    case 'day_vote':
-      return `Ngày ${event.payload.day} — ${name(event.payload.voterPlayerId)} bỏ phiếu cho ${name(event.payload.targetPlayerId)}`
     case 'day_resolved': {
-      const { day, eliminatedPlayerId } = event.payload
-      return eliminatedPlayerId
-        ? `Ngày ${day} kết thúc — ${name(eliminatedPlayerId)} bị loại`
-        : `Ngày ${day} kết thúc — không ai bị loại`
+      const { day, eliminatedPlayerId, foolWinnerId } = event.payload
+      if (!eliminatedPlayerId) return `Ngày ${day} kết thúc — không ai bị loại`
+      return foolWinnerId
+        ? `Ngày ${day} kết thúc — ${name(eliminatedPlayerId)} bị loại nhưng là Thằng Đần, thắng cả ván!`
+        : `Ngày ${day} kết thúc — ${name(eliminatedPlayerId)} bị loại`
     }
     case 'death_trigger_resolved': {
       const role = roleById.get(event.payload.roleId)
       const targets = event.payload.targetPlayerIds.map(name).join(', ') || 'không ai'
       return `${role?.name ?? '?'} (${name(event.payload.playerId)}) kích hoạt khi chết → ${targets}`
     }
+    case 'manual_override':
+      return `MC sửa tay — ${name(event.payload.playerId)} → ${event.payload.isAlive ? 'sống lại' : 'cho chết'}`
   }
 }

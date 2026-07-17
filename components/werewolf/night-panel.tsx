@@ -1,23 +1,12 @@
 'use client'
 import { useMemo, useState } from 'react'
-import type { EffectType, GameEvent, Player, RoleDef } from '@/lib/werewolf/types'
-import { getNightQueue, usesRemaining } from '@/lib/werewolf/night-queue'
+import type { GameEvent, Player, RoleDef } from '@/lib/werewolf/types'
+import { getBlockedActorIds, getNightQueue, usesRemaining } from '@/lib/werewolf/night-queue'
 import { getActiveNightActions } from '@/lib/werewolf/selectors'
 import { factionOf } from '@/lib/werewolf/faction'
+import { EFFECT_COLOR } from '@/lib/werewolf/effect-color'
 import { TargetGraph } from './target-graph'
 import { ListTargetPicker } from './list-target-picker'
-
-const EFFECT_COLOR: Record<EffectType, string> = {
-  kill: '#DC2626',
-  poison: '#EA580C',
-  protect: '#A78BFA',
-  inspect: '#2563EB',
-  revive: '#16A34A',
-  link: '#DB2777',
-  swap: '#0891B2',
-  silence: '#52525B',
-  custom: '#9333EA',
-}
 
 const LIST_FALLBACK_THRESHOLD = 10
 
@@ -33,9 +22,11 @@ interface NightPanelProps {
 export function NightPanel({ roles, players, night, events, onCommitAction, onEndNight }: NightPanelProps) {
   const [selected, setSelected] = useState<string[]>([])
   const [useList, setUseList] = useState(players.length > LIST_FALLBACK_THRESHOLD)
-  const [reveal, setReveal] = useState<{ targetName: string; isWolf: boolean } | null>(null)
+  const [reveal, setReveal] = useState<{ targetName: string; isWolf: boolean | null } | null>(null)
 
+  const roleById = new Map(roles.map((r) => [r.id, r]))
   const queue = useMemo(() => getNightQueue(roles, players, night, events), [roles, players, night, events])
+  const blockedIds = useMemo(() => getBlockedActorIds(roles, players, events, night), [roles, players, events, night])
   const doneActions = getActiveNightActions(events, night)
   const isDone = (roleId: string, actorPlayerId: string) =>
     doneActions.some((a) => a.roleId === roleId && a.actorPlayerId === actorPlayerId)
@@ -49,7 +40,8 @@ export function NightPanel({ roles, players, night, events, onCommitAction, onEn
     if (role.effect === 'inspect' && !reveal) {
       const target = players.find((p) => p.id === selected[0])
       if (!target) return
-      setReveal({ targetName: target.name, isWolf: factionOf(target, roles) === 'wolf' })
+      const isBlocked = blockedIds.has(actorPlayerId)
+      setReveal(isBlocked ? { targetName: target.name, isWolf: null } : { targetName: target.name, isWolf: factionOf(target, roles) === 'wolf' })
       return
     }
     onCommitAction(role.id, actorPlayerId, selected, false)
@@ -88,19 +80,33 @@ export function NightPanel({ roles, players, night, events, onCommitAction, onEn
 
   const { role, actorPlayerId } = currentSlot
   const actor = players.find((p) => p.id === actorPlayerId)
+  const actorRoles = actor?.roleIds.map((id) => roleById.get(id)).filter((r): r is RoleDef => !!r) ?? []
   const edgeColor = EFFECT_COLOR[role.effect]
   const canConfirm = role.targetCount === 0 || selected.length === role.targetCount
   const remaining = usesRemaining(role, actorPlayerId, events)
+  const isBlocked = blockedIds.has(actorPlayerId)
 
   if (reveal) {
     return (
       <div className="space-y-4">
-        <div className="rounded-2xl border border-blue-500/40 bg-blue-500/10 px-5 py-8 text-center">
-          <p className="text-3xl">{reveal.isWolf ? '🐺' : '🕊️'}</p>
+        <div
+          className={`rounded-2xl border px-5 py-8 text-center ${
+            reveal.isWolf === null ? 'border-amber-500/40 bg-amber-500/10' : 'border-blue-500/40 bg-blue-500/10'
+          }`}
+        >
+          <p className="text-3xl">{reveal.isWolf === null ? '🔒' : reveal.isWolf ? '🐺' : '🕊️'}</p>
           <p className="mt-3 text-sm text-muted">Kết quả soi (chỉ MC thấy)</p>
-          <p className="mt-1 font-display text-lg font-semibold text-fg">
-            {reveal.targetName} {reveal.isWolf ? 'LÀ phe Sói' : 'KHÔNG PHẢI phe Sói'}
-          </p>
+          {reveal.isWolf === null ? (
+            <p className="mt-1 font-display text-base font-semibold text-fg">
+              Tiên tri bị Nguyệt Nữ khóa đêm nay — không có kết quả thật.
+              <br />
+              <span className="text-xs font-normal text-muted">MC tự quyết định: không trả lời hoặc chỉ ngược kết quả.</span>
+            </p>
+          ) : (
+            <p className="mt-1 font-display text-lg font-semibold text-fg">
+              {reveal.targetName} {reveal.isWolf ? 'LÀ phe Sói' : 'KHÔNG PHẢI phe Sói'}
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -135,6 +141,12 @@ export function NightPanel({ roles, players, night, events, onCommitAction, onEn
         <p className="text-sm text-muted">
           Người thao tác: <span className="text-fg">{actor?.name ?? '?'}</span>
         </p>
+        {actorRoles.length > 0 && (
+          <p className="mt-1 text-xs text-muted">
+            Vai trò của {actor?.name}: {actorRoles.map((r) => `${r.icon} ${r.name}`).join(', ')}
+            {actor && actor.linkedWith.length > 0 && <span className="text-pink-400"> · 💘 Cặp đôi</span>}
+          </p>
+        )}
         <p className="mx-auto mt-2 max-w-xs text-xs leading-relaxed text-muted">{role.description}</p>
         {remaining !== null && (
           <p className="mt-2 inline-block rounded-full border border-border px-2.5 py-0.5 font-mono text-[11px] text-accent-soft">
@@ -143,47 +155,65 @@ export function NightPanel({ roles, players, night, events, onCommitAction, onEn
         )}
       </div>
 
-      {role.targetCount > 0 &&
-        (useList ? (
-          <ListTargetPicker
-            players={players}
-            actorId={actorPlayerId}
-            targetCount={role.targetCount}
-            selected={selected}
-            onChange={setSelected}
-            canTargetSelf={role.canTargetSelf}
-          />
-        ) : (
-          <TargetGraph
-            players={players}
-            actorId={actorPlayerId}
-            targetCount={role.targetCount}
-            selected={selected}
-            onChange={setSelected}
-            edgeColor={edgeColor}
-            canTargetSelf={role.canTargetSelf}
-          />
-        ))}
-
-      <div className="flex gap-2">
-        {role.skippable && (
+      {isBlocked ? (
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-6 text-center">
+            <p className="text-2xl">🔒</p>
+            <p className="mt-2 text-sm text-fg">Bị Nguyệt Nữ khóa đêm nay — hành động sẽ không có hiệu lực.</p>
+          </div>
           <button
             type="button"
             onClick={skip}
-            className="rounded-xl border border-border px-4 py-3 text-sm text-muted transition-colors hover:border-accent/40 hover:text-fg"
+            className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg shadow-lg shadow-accent/20 transition-transform active:scale-[0.98]"
           >
-            Bỏ qua lượt
+            Xác nhận (bị khóa, bỏ qua)
           </button>
-        )}
-        <button
-          type="button"
-          onClick={confirm}
-          disabled={!canConfirm}
-          className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg shadow-lg shadow-accent/20 transition-transform active:scale-[0.98] disabled:opacity-40 disabled:shadow-none"
-        >
-          Xác nhận vai này
-        </button>
-      </div>
+        </div>
+      ) : (
+        <>
+          {role.targetCount > 0 &&
+            (useList ? (
+              <ListTargetPicker
+                players={players}
+                actorId={actorPlayerId}
+                targetCount={role.targetCount}
+                selected={selected}
+                onChange={setSelected}
+                canTargetSelf={role.canTargetSelf}
+              />
+            ) : (
+              <TargetGraph
+                players={players}
+                actorId={actorPlayerId}
+                targetCount={role.targetCount}
+                selected={selected}
+                onChange={setSelected}
+                edgeColor={edgeColor}
+                canTargetSelf={role.canTargetSelf}
+              />
+            ))}
+
+          <div className="flex gap-2">
+            {role.skippable && (
+              <button
+                type="button"
+                onClick={skip}
+                className="rounded-xl border border-border px-4 py-3 text-sm text-muted transition-colors hover:border-accent/40 hover:text-fg"
+              >
+                Bỏ qua lượt
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={confirm}
+              disabled={!canConfirm}
+              className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg shadow-lg shadow-accent/20 transition-transform active:scale-[0.98] disabled:opacity-40 disabled:shadow-none"
+            >
+              Xác nhận vai này
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

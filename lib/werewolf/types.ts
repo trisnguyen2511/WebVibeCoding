@@ -9,6 +9,7 @@ export type EffectType =
   | 'link'
   | 'swap'
   | 'silence'
+  | 'block'
   | 'custom'
 
 export interface RoleDef {
@@ -33,6 +34,12 @@ export interface RoleDef {
   usesPerGame?: number
   /** MC có thể bỏ qua lượt này mà không tốn 1 lần dùng (không bắt buộc hành động). */
   skippable: boolean
+  /** Đây là "vết cắn" của Sói — dùng để kích hoạt Bán Sói (turnsWolfOnBite). */
+  isWolfBite?: boolean
+  /** Nếu bị "cắn" (isWolfBite) mà không chết thì biến thành Sói từ đêm sau, thay vì chết (VD Bán Sói). */
+  turnsWolfOnBite?: boolean
+  /** Nếu bị dân làng vote loại thì thắng cả ván ngay lập tức (VD Thằng Đần). */
+  winsIfVotedOut?: boolean
 }
 
 export interface Player {
@@ -59,17 +66,11 @@ export interface NightAction {
   createdAt: number
 }
 
-export interface DayVote {
-  id: string
-  day: number
-  voterPlayerId: string
-  targetPlayerId: string
-  createdAt: number
-}
-
 export interface DayResolution {
   day: number
   eliminatedPlayerId: string | null
+  /** Người bị loại giữ vai winsIfVotedOut — thắng solo ngay (VD Thằng Đần). */
+  foolWinnerId: string | null
   notes: string[]
 }
 
@@ -78,21 +79,26 @@ export interface NightResolution {
   deaths: string[]
   saved: string[]
   linked: [string, string][]
+  /** Người bị Nguyệt Nữ khóa đêm nay — hành động của họ không có hiệu lực. */
+  blocked: string[]
+  /** Vai được cộng thêm cho 1 người ngay trong đêm (VD Bán Sói biến thành Sói). */
+  conversions: { playerId: string; addRoleId: string }[]
   notes: string[]
 }
 
 // Append-only log; undo/redo works by splicing entries out of/into this
 // array (see lib/werewolf/game-actions.ts) rather than by marker events —
 // derivePlayers() only reacts to the *resolved types, so removing a raw
-// night_action/day_vote entry is enough to make it disappear everywhere.
+// night_action entry is enough to make it disappear everywhere.
 export type GameEvent =
   | { id: string; type: 'night_action'; payload: NightAction }
   | { id: string; type: 'night_resolved'; payload: NightResolution }
-  | { id: string; type: 'day_vote'; payload: DayVote }
   | { id: string; type: 'day_resolved'; payload: DayResolution }
   | { id: string; type: 'death_trigger_resolved'; payload: { playerId: string; targetPlayerIds: string[]; roleId: string } }
+  /** MC tự sửa tay trạng thái sống/chết khi phát hiện hệ thống tính nhầm. */
+  | { id: string; type: 'manual_override'; payload: { playerId: string; isAlive: boolean } }
 
-export type GamePhase = 'setup' | 'night' | 'day' | 'ended'
+export type GamePhase = 'setup' | 'night' | 'recap' | 'day' | 'ended'
 
 export interface PlayerSetup {
   id: string

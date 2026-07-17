@@ -1,4 +1,5 @@
 import type { GameEvent, Player, RoleDef } from './types'
+import { getActiveNightActions } from './selectors'
 
 export interface NightSlot {
   role: RoleDef
@@ -16,6 +17,31 @@ export function usesRemaining(role: RoleDef, actorPlayerId: string, events: Game
       !e.payload.skipped
   ).length
   return role.usesPerGame - used
+}
+
+/**
+ * Người bị Nguyệt Nữ khóa đêm nay (VD: nếu ngủ với 1 Sói duy nhất thì Sói đó
+ * bị khóa; nếu bầy Sói còn nhiều người thì bầy vẫn cắn bình thường).
+ */
+export function getBlockedActorIds(roles: RoleDef[], players: Player[], events: GameEvent[], night: number): Set<string> {
+  const actions = getActiveNightActions(events, night)
+  const roleById = new Map(roles.map((r) => [r.id, r]))
+  const blocked = new Set<string>()
+
+  for (const action of actions) {
+    const role = roleById.get(action.roleId)
+    if (role?.effect !== 'block' || action.skipped) continue
+    for (const targetId of action.targetPlayerIds) {
+      const target = players.find((p) => p.id === targetId)
+      if (!target) continue
+      const targetRoles = target.roleIds.map((id) => roleById.get(id)).filter((r): r is RoleDef => !!r)
+      const isSoloWolfPack = targetRoles.some((r) => r.isCouncil) &&
+        players.filter((p) => p.isAlive && p.roleIds.some((rid) => targetRoles.some((r) => r.isCouncil && r.id === rid))).length <= 1
+      const blocksNormalRole = targetRoles.some((r) => !r.isCouncil)
+      if (blocksNormalRole || isSoloWolfPack) blocked.add(targetId)
+    }
+  }
+  return blocked
 }
 
 /** Thứ tự vai trò cần thức dậy đêm nay, mỗi vai gắn với 1 người chơi đại diện thao tác. */

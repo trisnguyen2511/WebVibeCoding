@@ -9,15 +9,19 @@ const FACTION_LABEL: Record<Faction, string> = {
 
 interface WinBannerProps {
   winner: Faction
+  /** Nếu có, ghi đè thông báo phe thắng bằng chiến thắng solo (VD Thằng Đần bị vote loại). */
+  soloWinnerName?: string
   onPlayAgain: () => void
   onResetAll: () => void
 }
 
-export function WinBanner({ winner, onPlayAgain, onResetAll }: WinBannerProps) {
+export function WinBanner({ winner, soloWinnerName, onPlayAgain, onResetAll }: WinBannerProps) {
   return (
     <div className="space-y-4 rounded-2xl border border-accent/40 bg-surface px-6 py-8 text-center">
-      <p className="text-4xl">🏆</p>
-      <p className="font-display text-xl font-semibold text-fg">{FACTION_LABEL[winner]} chiến thắng!</p>
+      <p className="text-4xl">{soloWinnerName ? '🃏' : '🏆'}</p>
+      <p className="font-display text-xl font-semibold text-fg">
+        {soloWinnerName ? `${soloWinnerName} (Thằng Đần) thắng cả ván!` : `${FACTION_LABEL[winner]} chiến thắng!`}
+      </p>
       <div className="space-y-2">
         <button
           type="button"

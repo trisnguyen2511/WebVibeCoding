@@ -8,7 +8,7 @@ import { phaseAfterTruncate, phaseAfterUndo, popLastEvent } from '@/lib/werewolf
 import { findDeathTrigger } from '@/lib/werewolf/night-queue'
 import { resolveDay } from '@/lib/werewolf/resolve-day'
 import { resolveNight } from '@/lib/werewolf/resolve-night'
-import { getActiveDayVotes, getActiveNightActions } from '@/lib/werewolf/selectors'
+import { getActiveNightActions } from '@/lib/werewolf/selectors'
 import { clearGameState, loadGameState, saveGameState } from '@/lib/werewolf/storage'
 import type { GameEvent, GameState, RoleDef } from '@/lib/werewolf/types'
 
@@ -17,9 +17,11 @@ import { SetupRoles } from '@/components/werewolf/setup-roles'
 import { SetupAssign } from '@/components/werewolf/setup-assign'
 import { SetupOrder } from '@/components/werewolf/setup-order'
 import { NightPanel } from '@/components/werewolf/night-panel'
+import { NightRecap } from '@/components/werewolf/night-recap'
 import { DayPanel } from '@/components/werewolf/day-panel'
 import { DeathTriggerPanel } from '@/components/werewolf/death-trigger-panel'
 import { TimelineView } from '@/components/werewolf/timeline-view'
+import { RosterView } from '@/components/werewolf/roster-view'
 import { WinBanner } from '@/components/werewolf/win-banner'
 
 function initialState(): GameState {
@@ -40,6 +42,7 @@ export default function WerewolfGmPage() {
   const [state, setState] = useState<GameState>(initialState)
   const [setupStep, setSetupStep] = useState<SetupStep>('players')
   const [showTimeline, setShowTimeline] = useState(false)
+  const [showRoster, setShowRoster] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
@@ -75,20 +78,6 @@ export default function WerewolfGmPage() {
     setState((s) => ({ ...s, events: [...s.events, event] }))
   }
 
-  function afterResolution(nextEvents: GameEvent[], night: number, day: number, advance: 'to-day' | 'to-next-night') {
-    const nextPlayers = derivePlayers(state.setupPlayers, state.roles, nextEvents)
-    const winner = checkWinCondition(nextPlayers, state.roles)
-    if (winner) {
-      setState((s) => ({ ...s, events: nextEvents, currentPhase: 'ended' }))
-      return
-    }
-    if (advance === 'to-day') {
-      setState((s) => ({ ...s, events: nextEvents, currentPhase: 'day', currentDay: night }))
-    } else {
-      setState((s) => ({ ...s, events: nextEvents, currentPhase: 'night', currentNight: day + 1, currentDay: day + 1 }))
-    }
-  }
-
   function handleCommitNightAction(roleId: string, actorPlayerId: string, targetPlayerIds: string[], skipped: boolean) {
     pushEvent({
       id: crypto.randomUUID(),
@@ -100,24 +89,45 @@ export default function WerewolfGmPage() {
   function handleEndNight() {
     const actions = getActiveNightActions(state.events, state.currentNight)
     const resolution = resolveNight(state.roles, players, actions, state.currentNight)
-    const nextEvents: GameEvent[] = [...state.events, { id: crypto.randomUUID(), type: 'night_resolved', payload: resolution }]
-    afterResolution(nextEvents, state.currentNight, state.currentDay, 'to-day')
+    pushEvent({ id: crypto.randomUUID(), type: 'night_resolved', payload: resolution })
+    setState((s) => ({ ...s, currentPhase: 'recap' }))
   }
 
-  function handleVote(voterPlayerId: string, targetPlayerId: string) {
-    pushEvent({
-      id: crypto.randomUUID(),
-      type: 'day_vote',
-      payload: { id: crypto.randomUUID(), day: state.currentDay, voterPlayerId, targetPlayerId, createdAt: Date.now() },
-    })
+  function handleManualOverride(playerId: string, isAlive: boolean) {
+    pushEvent({ id: crypto.randomUUID(), type: 'manual_override', payload: { playerId, isAlive } })
   }
 
-  function handleResolveDay() {
-    const votes = getActiveDayVotes(state.events, state.currentDay)
-    const resolution = resolveDay(votes, players, state.currentDay)
+  function handleConfirmRecap() {
+    const winner = checkWinCondition(players, state.roles)
+    setState((s) => ({ ...s, currentPhase: winner ? 'ended' : 'day', currentDay: s.currentNight }))
+  }
+
+  function handleEliminate(playerId: string) {
+    const resolution = resolveDay(playerId, players, state.roles, state.currentDay)
     const nextEvents: GameEvent[] = [...state.events, { id: crypto.randomUUID(), type: 'day_resolved', payload: resolution }]
-    afterResolution(nextEvents, state.currentNight, state.currentDay, 'to-next-night')
+    const nextPlayers = derivePlayers(state.setupPlayers, state.roles, nextEvents)
+    const winner = resolution.foolWinnerId ? null : checkWinCondition(nextPlayers, state.roles)
+    setState((s) => ({
+      ...s,
+      events: nextEvents,
+      currentPhase: winner || resolution.foolWinnerId ? 'ended' : 'night',
+      currentNight: winner || resolution.foolWinnerId ? s.currentNight : s.currentDay + 1,
+      currentDay: winner || resolution.foolWinnerId ? s.currentDay : s.currentDay + 1,
+    }))
   }
+
+  function handleSkipDay() {
+    const resolution = resolveDay(null, players, state.roles, state.currentDay)
+    pushEvent({ id: crypto.randomUUID(), type: 'day_resolved', payload: resolution })
+    setState((s) => ({ ...s, currentPhase: 'night', currentNight: s.currentDay + 1, currentDay: s.currentDay + 1 }))
+  }
+
+  const lastNightResolution = [...state.events].reverse().find(
+    (e): e is Extract<GameEvent, { type: 'night_resolved' }> => e.type === 'night_resolved' && e.payload.night === state.currentNight
+  )
+  const foolWinEvent = [...state.events].reverse().find(
+    (e): e is Extract<GameEvent, { type: 'day_resolved' }> => e.type === 'day_resolved' && !!e.payload.foolWinnerId
+  )
 
   function handleDeathTriggerCommit(targetPlayerIds: string[]) {
     if (!pendingTrigger) return
@@ -205,14 +215,29 @@ export default function WerewolfGmPage() {
     <ToolShell name="Werewolf GM" icon="🐺" description="Quản trò Ma Sói — chia vai, điều hành đêm, undo, lịch sử ván">
       <div className="space-y-4">
         {state.currentPhase !== 'setup' && (
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setShowTimeline((v) => !v)}
-              className="rounded-lg px-2 py-1.5 text-xs text-muted underline underline-offset-2 transition-colors hover:text-fg"
-            >
-              {showTimeline ? '✕ Đóng lịch sử' : '📜 Xem lịch sử'}
-            </button>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTimeline((v) => !v)
+                  setShowRoster(false)
+                }}
+                className="rounded-lg px-1 py-1.5 text-xs text-muted underline underline-offset-2 transition-colors hover:text-fg"
+              >
+                {showTimeline ? '✕ Đóng lịch sử' : '📜 Lịch sử'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRoster((v) => !v)
+                  setShowTimeline(false)
+                }}
+                className="rounded-lg px-1 py-1.5 text-xs text-muted underline underline-offset-2 transition-colors hover:text-fg"
+              >
+                {showRoster ? '✕ Đóng vai trò' : '👥 Vai trò'}
+              </button>
+            </div>
             {state.events.length > 0 && (
               <button
                 type="button"
@@ -227,6 +252,10 @@ export default function WerewolfGmPage() {
 
         {showTimeline && state.currentPhase !== 'setup' && (
           <TimelineView events={state.events} players={players} roles={state.roles} onUndoTo={handleUndoTo} />
+        )}
+
+        {showRoster && !showTimeline && state.currentPhase !== 'setup' && (
+          <RosterView players={players} roles={state.roles} />
         )}
 
         {!showTimeline && state.currentPhase === 'setup' && (
@@ -356,24 +385,41 @@ export default function WerewolfGmPage() {
           </div>
         )}
 
-        {!showTimeline && state.currentPhase === 'ended' && (
+        {!showTimeline && !showRoster && state.currentPhase === 'ended' && (
           <WinBanner
             winner={checkWinCondition(players, state.roles) ?? 'village'}
+            soloWinnerName={foolWinEvent ? players.find((p) => p.id === foolWinEvent.payload.foolWinnerId)?.name : undefined}
             onPlayAgain={handlePlayAgain}
             onResetAll={handleResetEverything}
           />
         )}
 
-        {!showTimeline && state.currentPhase !== 'setup' && state.currentPhase !== 'ended' && pendingTrigger && (
-          <DeathTriggerPanel
-            role={state.roles.find((r) => r.id === pendingTrigger.roleId)!}
-            actorPlayerId={pendingTrigger.playerId}
+        {!showTimeline && !showRoster && state.currentPhase === 'recap' && lastNightResolution && (
+          <NightRecap
             players={players}
-            onCommit={handleDeathTriggerCommit}
+            roles={state.roles}
+            night={state.currentNight}
+            deaths={lastNightResolution.payload.deaths}
+            onToggleAlive={handleManualOverride}
+            onConfirm={handleConfirmRecap}
           />
         )}
 
-        {!showTimeline && state.currentPhase === 'night' && !pendingTrigger && (
+        {!showTimeline &&
+          !showRoster &&
+          state.currentPhase !== 'setup' &&
+          state.currentPhase !== 'ended' &&
+          state.currentPhase !== 'recap' &&
+          pendingTrigger && (
+            <DeathTriggerPanel
+              role={state.roles.find((r) => r.id === pendingTrigger.roleId)!}
+              actorPlayerId={pendingTrigger.playerId}
+              players={players}
+              onCommit={handleDeathTriggerCommit}
+            />
+          )}
+
+        {!showTimeline && !showRoster && state.currentPhase === 'night' && !pendingTrigger && (
           <NightPanel
             roles={state.roles}
             players={players}
@@ -384,14 +430,8 @@ export default function WerewolfGmPage() {
           />
         )}
 
-        {!showTimeline && state.currentPhase === 'day' && !pendingTrigger && (
-          <DayPanel
-            players={players}
-            day={state.currentDay}
-            events={state.events}
-            onVote={handleVote}
-            onResolveDay={handleResolveDay}
-          />
+        {!showTimeline && !showRoster && state.currentPhase === 'day' && !pendingTrigger && (
+          <DayPanel players={players} day={state.currentDay} onEliminate={handleEliminate} onSkip={handleSkipDay} />
         )}
       </div>
     </ToolShell>

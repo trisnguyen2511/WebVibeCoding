@@ -53,7 +53,7 @@ export function derivePlayers(setupPlayers: PlayerSetup[], roles: RoleDef[], eve
 
   for (const event of events) {
     if (event.type === 'night_resolved') {
-      const { night, deaths, linked } = event.payload
+      const { night, deaths, linked, conversions } = event.payload
       for (const [a, b] of linked) {
         const pa = players.get(a)
         const pb = players.get(b)
@@ -64,15 +64,27 @@ export function derivePlayers(setupPlayers: PlayerSetup[], roles: RoleDef[], eve
         killPlayer(players, playerId, 'night', night, null)
       }
       applyLinkChains(players, night, 'link')
+      for (const { playerId, addRoleId } of conversions) {
+        const player = players.get(playerId)
+        if (player && !player.roleIds.includes(addRoleId)) player.roleIds.push(addRoleId)
+      }
     } else if (event.type === 'day_resolved') {
-      const { day, eliminatedPlayerId } = event.payload
-      if (eliminatedPlayerId) {
+      const { day, eliminatedPlayerId, foolWinnerId } = event.payload
+      if (eliminatedPlayerId && eliminatedPlayerId !== foolWinnerId) {
         killPlayer(players, eliminatedPlayerId, 'vote', null, day)
         applyLinkChains(players, day, 'link')
       }
     } else if (event.type === 'death_trigger_resolved') {
       for (const targetId of event.payload.targetPlayerIds) {
         killPlayer(players, targetId, event.payload.roleId, null, null)
+      }
+    } else if (event.type === 'manual_override') {
+      const player = players.get(event.payload.playerId)
+      if (player) {
+        player.isAlive = event.payload.isAlive
+        player.deathCause = event.payload.isAlive ? null : 'mc_override'
+        player.deathNight = event.payload.isAlive ? null : player.deathNight
+        player.deathDay = event.payload.isAlive ? null : player.deathDay
       }
     }
   }

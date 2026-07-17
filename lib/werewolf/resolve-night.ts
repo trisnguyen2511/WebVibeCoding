@@ -11,14 +11,33 @@ export function resolveNight(
   const sorted = actions
     .filter((a) => !a.skipped)
     .sort((a, b) => {
-    const pa = roleById.get(a.roleId)?.priority ?? 999
-    const pb = roleById.get(b.roleId)?.priority ?? 999
-    return pa - pb
-  })
+      const pa = roleById.get(a.roleId)?.priority ?? 999
+      const pb = roleById.get(b.roleId)?.priority ?? 999
+      return pa - pb
+    })
+
+  // Nguyệt Nữ khóa ai đêm nay — tính trước để các vai xử lý sau (priority lớn hơn) bị vô hiệu hoá.
+  const blocked = new Set<string>()
+  for (const action of sorted) {
+    const role = roleById.get(action.roleId)
+    if (role?.effect !== 'block') continue
+    for (const targetId of action.targetPlayerIds) {
+      const target = players.find((p) => p.id === targetId)
+      if (!target) continue
+      const targetRoles = target.roleIds.map((id) => roleById.get(id)).filter((r): r is RoleDef => !!r)
+      const inSoloWolfPack =
+        targetRoles.some((r) => r.isCouncil) &&
+        players.filter((p) => p.isAlive && p.roleIds.some((rid) => targetRoles.some((r) => r.isCouncil && r.id === rid)))
+          .length <= 1
+      const blocksNormalRole = targetRoles.some((r) => !r.isCouncil)
+      if (blocksNormalRole || inSoloWolfPack) blocked.add(targetId)
+    }
+  }
 
   const protectedIds = new Set<string>()
   const pendingDeath = new Map<string, string>() // playerId -> roleId gây chết
   const linked: [string, string][] = []
+  const conversions: { playerId: string; addRoleId: string }[] = []
   const notes: string[] = []
 
   for (const action of sorted) {
@@ -27,7 +46,15 @@ export function resolveNight(
     const actorName = nameById.get(action.actorPlayerId) ?? '?'
     const targetNames = action.targetPlayerIds.map((id) => nameById.get(id) ?? '?')
 
+    if (role.effect !== 'block' && blocked.has(action.actorPlayerId)) {
+      notes.push(`${role.name} (${actorName}) bị Nguyệt Nữ khóa — hành động không có hiệu lực đêm nay`)
+      continue
+    }
+
     switch (role.effect) {
+      case 'block':
+        notes.push(`${role.name} (${actorName}) ngủ với ${targetNames.join(', ') || 'không ai'}`)
+        break
       case 'protect':
         for (const id of action.targetPlayerIds) protectedIds.add(id)
         notes.push(`${role.name} (${actorName}) bảo vệ ${targetNames.join(', ')}`)
@@ -68,13 +95,23 @@ export function resolveNight(
   const saved: string[] = []
   const deaths: string[] = []
   for (const [playerId, causeRoleId] of Array.from(pendingDeath.entries())) {
-    const role = roleById.get(causeRoleId)
-    if (role?.effect === 'kill' && protectedIds.has(playerId)) {
+    const causeRole = roleById.get(causeRoleId)
+    if (causeRole?.effect === 'kill' && protectedIds.has(playerId)) {
       saved.push(playerId)
       continue
+    }
+    if (causeRole?.isWolfBite) {
+      const target = players.find((p) => p.id === playerId)
+      const holdsHalfWolf = target?.roleIds.some((rid) => roleById.get(rid)?.turnsWolfOnBite)
+      const wolfRole = roles.find((r) => r.isWolfBite)
+      if (holdsHalfWolf && wolfRole && !target?.roleIds.includes(wolfRole.id)) {
+        conversions.push({ playerId, addRoleId: wolfRole.id })
+        notes.push(`${nameById.get(playerId) ?? '?'} bị Sói cắn nhưng biến thành Sói từ đêm sau!`)
+        continue
+      }
     }
     deaths.push(playerId)
   }
 
-  return { night, deaths, saved, linked, notes }
+  return { night, deaths, saved, linked, blocked: Array.from(blocked), conversions, notes }
 }

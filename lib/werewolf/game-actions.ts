@@ -12,6 +12,8 @@ export function phaseAfterUndo(popped: GameEvent): { phase: GamePhase; night?: n
       return { phase: 'night', night: popped.payload.night }
     case 'day_resolved':
       return { phase: 'day', day: popped.payload.day }
+    case 'manual_override':
+      return { phase: 'recap' }
     default:
       return null
   }
@@ -41,7 +43,7 @@ export function phaseAfterTruncate(events: GameEvent[]): { phase: GamePhase; nig
     return { phase: 'night', night: lastDay + 1, day: lastDay + 1 }
   }
   if (lastNight !== null) {
-    return { phase: 'day', night: lastNight, day: lastNight }
+    return { phase: 'recap', night: lastNight, day: lastNight }
   }
   return { phase: 'night', night: 1, day: 1 }
 }
