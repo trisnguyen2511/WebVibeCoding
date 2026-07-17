@@ -34,6 +34,9 @@ export function RoleEditorDialog({ onCreate, onCancel }: RoleEditorDialogProps) 
   const [targetCount, setTargetCount] = useState<0 | 1 | 2>(1)
   const [priority, setPriority] = useState(50)
   const [description, setDescription] = useState('')
+  const [skippable, setSkippable] = useState(true)
+  const [limitedUses, setLimitedUses] = useState(false)
+  const [usesPerGame, setUsesPerGame] = useState(1)
 
   function submit() {
     const trimmed = name.trim()
@@ -53,6 +56,8 @@ export function RoleEditorDialog({ onCreate, onCancel }: RoleEditorDialogProps) 
       firstNightOnly: false,
       extraLives: 0,
       isCouncil: false,
+      skippable,
+      usesPerGame: limitedUses ? usesPerGame : undefined,
       description: description.trim() || 'Vai trò tùy chỉnh.',
     })
   }
@@ -130,6 +135,26 @@ export function RoleEditorDialog({ onCreate, onCancel }: RoleEditorDialogProps) 
         rows={2}
         className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg outline-none focus:border-accent"
       />
+
+      <div className="flex flex-wrap items-center gap-4 text-xs text-muted">
+        <label className="flex items-center gap-1.5">
+          <input type="checkbox" checked={skippable} onChange={(e) => setSkippable(e.target.checked)} />
+          Có thể bỏ qua lượt
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input type="checkbox" checked={limitedUses} onChange={(e) => setLimitedUses(e.target.checked)} />
+          Giới hạn số lần dùng cả ván
+        </label>
+        {limitedUses && (
+          <input
+            type="number"
+            min={1}
+            value={usesPerGame}
+            onChange={(e) => setUsesPerGame(Math.max(1, Number(e.target.value)))}
+            className="w-16 rounded-lg border border-border bg-background px-2 py-1 text-fg"
+          />
+        )}
+      </div>
 
       <div className="flex justify-end gap-2">
         <button

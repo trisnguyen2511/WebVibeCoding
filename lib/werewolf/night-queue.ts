@@ -1,12 +1,25 @@
-import type { Player, RoleDef } from './types'
+import type { GameEvent, Player, RoleDef } from './types'
 
 export interface NightSlot {
   role: RoleDef
   actorPlayerId: string
 }
 
+/** Số lần vai này (gắn với 1 actor cụ thể) còn được dùng trong cả ván. null = không giới hạn. */
+export function usesRemaining(role: RoleDef, actorPlayerId: string, events: GameEvent[]): number | null {
+  if (role.usesPerGame === undefined) return null
+  const used = events.filter(
+    (e): e is Extract<GameEvent, { type: 'night_action' }> =>
+      e.type === 'night_action' &&
+      e.payload.roleId === role.id &&
+      e.payload.actorPlayerId === actorPlayerId &&
+      !e.payload.skipped
+  ).length
+  return role.usesPerGame - used
+}
+
 /** Thứ tự vai trò cần thức dậy đêm nay, mỗi vai gắn với 1 người chơi đại diện thao tác. */
-export function getNightQueue(roles: RoleDef[], players: Player[], night: number): NightSlot[] {
+export function getNightQueue(roles: RoleDef[], players: Player[], night: number, events: GameEvent[]): NightSlot[] {
   const eligibleRoles = roles
     .filter((r) => r.actsAtNight && (!r.firstNightOnly || night === 1))
     .sort((a, b) => a.priority - b.priority)
@@ -17,8 +30,12 @@ export function getNightQueue(roles: RoleDef[], players: Player[], night: number
     if (holders.length === 0) continue
     if (role.isCouncil) {
       slots.push({ role, actorPlayerId: holders[0].id })
-    } else {
-      for (const holder of holders) slots.push({ role, actorPlayerId: holder.id })
+      continue
+    }
+    for (const holder of holders) {
+      const remaining = usesRemaining(role, holder.id, events)
+      if (remaining !== null && remaining <= 0) continue
+      slots.push({ role, actorPlayerId: holder.id })
     }
   }
   return slots

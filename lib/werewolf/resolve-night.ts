@@ -8,7 +8,9 @@ export function resolveNight(
 ): NightResolution {
   const roleById = new Map(roles.map((r) => [r.id, r]))
   const nameById = new Map(players.map((p) => [p.id, p.name]))
-  const sorted = [...actions].sort((a, b) => {
+  const sorted = actions
+    .filter((a) => !a.skipped)
+    .sort((a, b) => {
     const pa = roleById.get(a.roleId)?.priority ?? 999
     const pb = roleById.get(b.roleId)?.priority ?? 999
     return pa - pb

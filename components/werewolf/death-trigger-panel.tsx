@@ -55,14 +55,25 @@ export function DeathTriggerPanel({ role, actorPlayerId, players, onCommit }: De
         {useList ? 'Dùng graph kéo thả' : 'Dùng danh sách'}
       </button>
 
-      <button
-        type="button"
-        onClick={() => onCommit(selected)}
-        disabled={!canConfirm}
-        className="w-full rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-fg disabled:opacity-40"
-      >
-        Xác nhận
-      </button>
+      <div className="flex gap-2">
+        {role.skippable && (
+          <button
+            type="button"
+            onClick={() => onCommit([])}
+            className="rounded-xl border border-border px-4 py-3 text-sm text-muted transition-colors hover:border-accent/40 hover:text-fg"
+          >
+            Bỏ qua
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => onCommit(selected)}
+          disabled={!canConfirm}
+          className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-fg transition-transform active:scale-[0.98] disabled:opacity-40"
+        >
+          Xác nhận
+        </button>
+      </div>
     </div>
   )
 }

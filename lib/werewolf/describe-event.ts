@@ -8,6 +8,9 @@ export function describeEvent(event: GameEvent, players: Player[], roles: RoleDe
   switch (event.type) {
     case 'night_action': {
       const role = roleById.get(event.payload.roleId)
+      if (event.payload.skipped) {
+        return `Đêm ${event.payload.night} — ${role?.name ?? '?'} (${name(event.payload.actorPlayerId)}) bỏ qua lượt`
+      }
       const targets = event.payload.targetPlayerIds.map(name).join(', ') || 'không ai'
       return `Đêm ${event.payload.night} — ${role?.name ?? '?'} (${name(event.payload.actorPlayerId)}) chọn ${targets}`
     }

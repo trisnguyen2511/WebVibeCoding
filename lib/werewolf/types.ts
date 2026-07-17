@@ -29,6 +29,10 @@ export interface RoleDef {
   extraLives: number
   /** Nhiều actor cùng giữ vai này chỉ tạo chung 1 NightAction (VD Sói cả bầy). */
   isCouncil: boolean
+  /** Tổng số lần được dùng trong cả ván (VD mỗi bình thuốc Phù thủy dùng 1 lần). undefined = không giới hạn, dùng mọi đêm. */
+  usesPerGame?: number
+  /** MC có thể bỏ qua lượt này mà không tốn 1 lần dùng (không bắt buộc hành động). */
+  skippable: boolean
 }
 
 export interface Player {
@@ -50,6 +54,8 @@ export interface NightAction {
   roleId: string
   actorPlayerId: string
   targetPlayerIds: string[]
+  /** MC chọn "Bỏ qua lượt" — hành động không có hiệu lực và không tính vào usesPerGame. */
+  skipped: boolean
   createdAt: number
 }
 

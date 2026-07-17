@@ -15,6 +15,7 @@ import type { GameEvent, GameState, RoleDef } from '@/lib/werewolf/types'
 import { SetupPlayers } from '@/components/werewolf/setup-players'
 import { SetupRoles } from '@/components/werewolf/setup-roles'
 import { SetupAssign } from '@/components/werewolf/setup-assign'
+import { SetupOrder } from '@/components/werewolf/setup-order'
 import { NightPanel } from '@/components/werewolf/night-panel'
 import { DayPanel } from '@/components/werewolf/day-panel'
 import { DeathTriggerPanel } from '@/components/werewolf/death-trigger-panel'
@@ -33,7 +34,7 @@ function initialState(): GameState {
   }
 }
 
-type SetupStep = 'players' | 'roles' | 'assign'
+type SetupStep = 'players' | 'roles' | 'assign' | 'order'
 
 export default function WerewolfGmPage() {
   const [state, setState] = useState<GameState>(initialState)
@@ -88,11 +89,11 @@ export default function WerewolfGmPage() {
     }
   }
 
-  function handleCommitNightAction(roleId: string, actorPlayerId: string, targetPlayerIds: string[]) {
+  function handleCommitNightAction(roleId: string, actorPlayerId: string, targetPlayerIds: string[], skipped: boolean) {
     pushEvent({
       id: crypto.randomUUID(),
       type: 'night_action',
-      payload: { id: crypto.randomUUID(), night: state.currentNight, roleId, actorPlayerId, targetPlayerIds, createdAt: Date.now() },
+      payload: { id: crypto.randomUUID(), night: state.currentNight, roleId, actorPlayerId, targetPlayerIds, skipped, createdAt: Date.now() },
     })
   }
 
@@ -162,7 +163,22 @@ export default function WerewolfGmPage() {
     }))
   }
 
-  function handleNewGame() {
+  /** Chơi ván mới nhưng giữ nguyên danh sách người chơi (và các vai trò tùy chỉnh đã tạo) để MC không phải nhập lại từ đầu. */
+  function handlePlayAgain() {
+    setState((s) => ({
+      ...s,
+      setupPlayers: s.setupPlayers.map((p) => ({ ...p, roleIds: [] })),
+      setupRoleCounts: {},
+      events: [],
+      currentNight: 1,
+      currentDay: 1,
+      currentPhase: 'setup',
+    }))
+    setSetupStep('players')
+    setShowTimeline(false)
+  }
+
+  function handleResetEverything() {
     clearGameState()
     setState(initialState())
     setSetupStep('players')
@@ -177,6 +193,14 @@ export default function WerewolfGmPage() {
   const everyoneHasRole = state.setupPlayers.every((p) => p.roleIds.length > 0)
   const canStart = state.setupPlayers.length >= 4 && totalAssigned === state.setupPlayers.length && everyoneHasRole
 
+  const SETUP_STEPS: { key: SetupStep; label: string }[] = [
+    { key: 'players', label: 'Người chơi' },
+    { key: 'roles', label: 'Vai trò' },
+    { key: 'assign', label: 'Gán vai' },
+    { key: 'order', label: 'Sắp xếp' },
+  ]
+  const stepIndex = SETUP_STEPS.findIndex((s) => s.key === setupStep)
+
   return (
     <ToolShell name="Werewolf GM" icon="🐺" description="Quản trò Ma Sói — chia vai, điều hành đêm, undo, lịch sử ván">
       <div className="space-y-4">
@@ -185,15 +209,15 @@ export default function WerewolfGmPage() {
             <button
               type="button"
               onClick={() => setShowTimeline((v) => !v)}
-              className="text-xs text-muted underline"
+              className="rounded-lg px-2 py-1.5 text-xs text-muted underline underline-offset-2 transition-colors hover:text-fg"
             >
-              {showTimeline ? 'Đóng lịch sử' : '📜 Xem lịch sử'}
+              {showTimeline ? '✕ Đóng lịch sử' : '📜 Xem lịch sử'}
             </button>
             {state.events.length > 0 && (
               <button
                 type="button"
                 onClick={handleUndo}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted hover:text-fg"
+                className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-accent/40 hover:text-fg"
               >
                 ↩ Hoàn tác
               </button>
@@ -207,12 +231,26 @@ export default function WerewolfGmPage() {
 
         {!showTimeline && state.currentPhase === 'setup' && (
           <div className="space-y-4">
-            <div className="flex gap-1.5 font-mono text-xs text-muted">
-              <span className={setupStep === 'players' ? 'text-accent-soft' : ''}>1. Người chơi</span>
-              <span>→</span>
-              <span className={setupStep === 'roles' ? 'text-accent-soft' : ''}>2. Vai trò</span>
-              <span>→</span>
-              <span className={setupStep === 'assign' ? 'text-accent-soft' : ''}>3. Gán vai</span>
+            <div className="flex items-center gap-1.5">
+              {SETUP_STEPS.map((step, i) => (
+                <div key={step.key} className="flex flex-1 items-center gap-1.5">
+                  <div className="flex flex-1 flex-col items-center gap-1">
+                    <span
+                      className={`flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px] transition-colors ${
+                        i <= stepIndex ? 'bg-accent text-fg' : 'border border-border text-muted'
+                      }`}
+                    >
+                      {i + 1}
+                    </span>
+                    <span className={`text-[10px] ${i === stepIndex ? 'text-accent-soft' : 'text-muted'}`}>
+                      {step.label}
+                    </span>
+                  </div>
+                  {i < SETUP_STEPS.length - 1 && (
+                    <div className={`mb-4 h-px flex-1 ${i < stepIndex ? 'bg-accent' : 'bg-border'}`} />
+                  )}
+                </div>
+              ))}
             </div>
 
             {setupStep === 'players' && (
@@ -225,7 +263,7 @@ export default function WerewolfGmPage() {
                   type="button"
                   disabled={state.setupPlayers.length < 4}
                   onClick={() => setSetupStep('roles')}
-                  className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-fg disabled:opacity-40"
+                  className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg transition-transform active:scale-[0.98] disabled:opacity-40"
                 >
                   Tiếp: chọn vai trò
                 </button>
@@ -245,7 +283,7 @@ export default function WerewolfGmPage() {
                   <button
                     type="button"
                     onClick={() => setSetupStep('players')}
-                    className="rounded-lg border border-border px-4 py-2 text-sm text-muted"
+                    className="rounded-xl border border-border px-4 py-3 text-sm text-muted transition-colors hover:text-fg"
                   >
                     Quay lại
                   </button>
@@ -253,7 +291,7 @@ export default function WerewolfGmPage() {
                     type="button"
                     disabled={totalAssigned !== state.setupPlayers.length}
                     onClick={() => setSetupStep('assign')}
-                    className="flex-1 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-fg disabled:opacity-40"
+                    className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg transition-transform active:scale-[0.98] disabled:opacity-40"
                   >
                     Tiếp: gán vai
                   </button>
@@ -273,7 +311,34 @@ export default function WerewolfGmPage() {
                   <button
                     type="button"
                     onClick={() => setSetupStep('roles')}
-                    className="rounded-lg border border-border px-4 py-2 text-sm text-muted"
+                    className="rounded-xl border border-border px-4 py-3 text-sm text-muted transition-colors hover:text-fg"
+                  >
+                    Quay lại
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canStart}
+                    onClick={() => setSetupStep('order')}
+                    className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg transition-transform active:scale-[0.98] disabled:opacity-40"
+                  >
+                    Tiếp: sắp xếp vị trí
+                  </button>
+                </div>
+              </>
+            )}
+
+            {setupStep === 'order' && (
+              <>
+                <SetupOrder
+                  players={state.setupPlayers}
+                  allRoles={state.roles}
+                  onChange={(setupPlayers) => setState((s) => ({ ...s, setupPlayers }))}
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSetupStep('assign')}
+                    className="rounded-xl border border-border px-4 py-3 text-sm text-muted transition-colors hover:text-fg"
                   >
                     Quay lại
                   </button>
@@ -281,7 +346,7 @@ export default function WerewolfGmPage() {
                     type="button"
                     disabled={!canStart}
                     onClick={() => setState((s) => ({ ...s, currentPhase: 'night', currentNight: 1, currentDay: 1 }))}
-                    className="flex-1 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-fg disabled:opacity-40"
+                    className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg shadow-lg shadow-accent/20 transition-transform active:scale-[0.98] disabled:opacity-40 disabled:shadow-none"
                   >
                     🌙 Bắt đầu ván
                   </button>
@@ -292,7 +357,11 @@ export default function WerewolfGmPage() {
         )}
 
         {!showTimeline && state.currentPhase === 'ended' && (
-          <WinBanner winner={checkWinCondition(players, state.roles) ?? 'village'} onNewGame={handleNewGame} />
+          <WinBanner
+            winner={checkWinCondition(players, state.roles) ?? 'village'}
+            onPlayAgain={handlePlayAgain}
+            onResetAll={handleResetEverything}
+          />
         )}
 
         {!showTimeline && state.currentPhase !== 'setup' && state.currentPhase !== 'ended' && pendingTrigger && (
