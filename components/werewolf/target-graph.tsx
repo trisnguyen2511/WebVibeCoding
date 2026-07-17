@@ -1,0 +1,184 @@
+'use client'
+import { useRef, useState } from 'react'
+import type { Player } from '@/lib/werewolf/types'
+
+interface TargetGraphProps {
+  players: Player[]
+  actorId: string
+  targetCount: 0 | 1 | 2
+  selected: string[]
+  onChange?: (ids: string[]) => void
+  edgeColor: string
+  canTargetSelf: boolean
+  readOnly?: boolean
+}
+
+const SIZE = 300
+const CENTER = SIZE / 2
+const RADIUS = 112
+const NODE_R = 22
+
+function nodePosition(index: number, total: number) {
+  const angle = (index / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2
+  return {
+    x: CENTER + RADIUS * Math.cos(angle),
+    y: CENTER + RADIUS * Math.sin(angle),
+  }
+}
+
+function initials(name: string) {
+  return name.trim().slice(0, 2).toUpperCase()
+}
+
+export function TargetGraph({
+  players,
+  actorId,
+  targetCount,
+  selected,
+  onChange,
+  edgeColor,
+  canTargetSelf,
+  readOnly = false,
+}: TargetGraphProps) {
+  const svgRef = useRef<SVGSVGElement>(null)
+  const draggingRef = useRef(false)
+  const [dragPoint, setDragPoint] = useState<{ x: number; y: number } | null>(null)
+
+  const eligible = players.filter((p) => p.isAlive || p.id === actorId)
+  const positions = new Map(eligible.map((p, i) => [p.id, nodePosition(i, eligible.length)]))
+  const actorPos = positions.get(actorId)
+
+  function toSvgPoint(clientX: number, clientY: number) {
+    const svg = svgRef.current
+    if (!svg) return { x: 0, y: 0 }
+    const rect = svg.getBoundingClientRect()
+    return {
+      x: ((clientX - rect.left) / rect.width) * SIZE,
+      y: ((clientY - rect.top) / rect.height) * SIZE,
+    }
+  }
+
+  function handleActorPointerDown(e: React.PointerEvent<SVGCircleElement>) {
+    if (readOnly || !onChange || targetCount === 0 || selected.length >= targetCount) return
+    draggingRef.current = true
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setDragPoint(toSvgPoint(e.clientX, e.clientY))
+  }
+
+  function handlePointerMove(e: React.PointerEvent<SVGCircleElement>) {
+    if (!draggingRef.current) return
+    setDragPoint(toSvgPoint(e.clientX, e.clientY))
+  }
+
+  function handlePointerUp(e: React.PointerEvent<SVGCircleElement>) {
+    if (!draggingRef.current || !onChange) return
+    draggingRef.current = false
+    setDragPoint(null)
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    const targetId = el?.closest('[data-player-id]')?.getAttribute('data-player-id')
+    if (!targetId) return
+    if (targetId === actorId && !canTargetSelf) return
+    if (selected.includes(targetId) || selected.length >= targetCount) return
+    onChange([...selected, targetId])
+  }
+
+  function handleNodeTap(playerId: string) {
+    if (readOnly || !onChange) return
+    if (selected.includes(playerId)) onChange(selected.filter((id) => id !== playerId))
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        className="h-[280px] w-[280px] max-w-full touch-none select-none"
+      >
+        {selected.map((targetId) => {
+          const pos = positions.get(targetId)
+          if (!pos || !actorPos) return null
+          return (
+            <line
+              key={targetId}
+              x1={actorPos.x}
+              y1={actorPos.y}
+              x2={pos.x}
+              y2={pos.y}
+              stroke={edgeColor}
+              strokeWidth={2.5}
+              markerEnd="url(#arrow)"
+            />
+          )
+        })}
+        {dragPoint && actorPos && (
+          <line
+            x1={actorPos.x}
+            y1={actorPos.y}
+            x2={dragPoint.x}
+            y2={dragPoint.y}
+            stroke={edgeColor}
+            strokeWidth={2}
+            strokeDasharray="4 4"
+          />
+        )}
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill={edgeColor} />
+          </marker>
+        </defs>
+
+        {eligible.map((player) => {
+          const pos = positions.get(player.id)
+          if (!pos) return null
+          const isActor = player.id === actorId
+          const isSelected = selected.includes(player.id)
+          return (
+            <g
+              key={player.id}
+              data-player-id={player.id}
+              opacity={player.isAlive ? 1 : 0.35}
+              onClick={() => handleNodeTap(player.id)}
+            >
+              <circle
+                cx={pos.x}
+                cy={pos.y}
+                r={NODE_R}
+                fill={isSelected ? edgeColor : 'rgb(var(--color-surface))'}
+                fillOpacity={isSelected ? 0.25 : 1}
+                stroke={isActor ? '#7C3AED' : isSelected ? edgeColor : 'rgb(var(--color-border))'}
+                strokeWidth={isActor ? 3 : 1.5}
+                onPointerDown={isActor ? handleActorPointerDown : undefined}
+                onPointerMove={isActor ? handlePointerMove : undefined}
+                onPointerUp={isActor ? handlePointerUp : undefined}
+                className={isActor && !readOnly ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
+              />
+              <text
+                x={pos.x}
+                y={pos.y}
+                textAnchor="middle"
+                dominantBaseline="central"
+                className="pointer-events-none select-none font-mono text-[10px] fill-fg"
+              >
+                {initials(player.name)}
+              </text>
+              <text
+                x={pos.x}
+                y={pos.y + NODE_R + 11}
+                textAnchor="middle"
+                className="pointer-events-none select-none text-[9px] fill-muted"
+              >
+                {player.name.length > 8 ? `${player.name.slice(0, 7)}…` : player.name}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+      {!readOnly && (
+        <p className="text-center text-xs text-muted">
+          Kéo từ người viền tím (đang thao tác) tới {targetCount === 2 ? '2 mục tiêu' : 'mục tiêu'} — tap lại vào mục
+          tiêu đã chọn để bỏ chọn.
+        </p>
+      )}
+    </div>
+  )
+}

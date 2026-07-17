@@ -107,4 +107,11 @@ export const tools: Tool[] = [
     description: 'PIN-based private chat with push notifications',
     category: 'social',
   },
+  {
+    name: 'Werewolf GM',
+    slug: 'werewolf-gm',
+    icon: '🐺',
+    description: 'Công cụ quản trò Ma Sói — chia vai, điều hành đêm, kéo thả chọn mục tiêu, undo, lịch sử ván',
+    category: 'game',
+  },
 ]
