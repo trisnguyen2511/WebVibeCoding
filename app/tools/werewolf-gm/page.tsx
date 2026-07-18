@@ -10,7 +10,6 @@ import { resolveDay } from '@/lib/werewolf/resolve-day'
 import { resolveNight } from '@/lib/werewolf/resolve-night'
 import { getActiveNightActions } from '@/lib/werewolf/selectors'
 import { totalRoleSlots } from '@/lib/werewolf/role-bundles'
-import { assignLeftoverRoles } from '@/lib/werewolf/randomize-assignment'
 import { clearGameState, loadGameState, saveGameState } from '@/lib/werewolf/storage'
 import type { GameEvent, GameState, RoleDef } from '@/lib/werewolf/types'
 
@@ -95,20 +94,6 @@ export default function WerewolfGmPage() {
     setState((s) => ({
       ...s,
       setupPlayers: s.setupPlayers.map((p) => (p.id === playerId ? { ...p, roleIds: [...p.roleIds, ...roleIds] } : p)),
-    }))
-  }
-
-  /** Xong hết chức năng đêm 1 — random ngầm các vai không có hành động đêm cho người còn lại rồi kết thúc đêm như bình thường. */
-  function handleFinishLiveAssign() {
-    const nextSetupPlayers = assignLeftoverRoles(state.setupPlayers, state.roles, state.setupRoleCounts)
-    const nextPlayers = derivePlayers(nextSetupPlayers, state.roles, state.events)
-    const actions = getActiveNightActions(state.events, state.currentNight)
-    const resolution = resolveNight(state.roles, nextPlayers, actions, state.currentNight)
-    setState((s) => ({
-      ...s,
-      setupPlayers: nextSetupPlayers,
-      events: [...s.events, { id: crypto.randomUUID(), type: 'night_resolved', payload: resolution }],
-      currentPhase: 'recap',
     }))
   }
 
@@ -488,7 +473,7 @@ export default function WerewolfGmPage() {
               events={state.events}
               onCommitAction={handleCommitNightAction}
               onAssignRole={handleAssignRole}
-              onFinishLiveAssign={handleFinishLiveAssign}
+              onEndNight={handleEndNight}
             />
           ) : (
             <NightPanel

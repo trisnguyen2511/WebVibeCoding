@@ -15,16 +15,16 @@ interface NightLiveAssignProps {
   events: GameEvent[]
   onCommitAction: (roleId: string, actorPlayerId: string, targetPlayerIds: string[], skipped: boolean) => void
   onAssignRole: (playerId: string, roleIds: string[]) => void
-  onFinishLiveAssign: () => void
+  onEndNight: () => void
 }
 
 /**
- * Đêm 1 ở chế độ "gán vai ngay trong đêm" — đi theo THỨ TỰ CHỨC NĂNG như
- * đêm bình thường (Sói trước, Bảo vệ sau...). Mỗi chức năng: MC chọn ai
- * đang giữ vai đó ngay lúc gọi (MC tự biết mặt nhờ đã sắp xếp ngoài đời),
- * gán vai cho người đó, rồi thao tác luôn (kéo mũi tên) nếu vai có hành
- * động đêm. Người không có chức năng (Dân thường...) được random ngầm ở
- * bước cuối, không cần gọi riêng.
+ * Đêm 1 ở chế độ "gán vai ngay trong đêm" — đi theo THỨ TỰ VAI TRÒ như đêm
+ * bình thường (Sói trước, Bảo vệ sau...), gọi TẤT CẢ vai đã chọn kể cả vai
+ * không có hành động đêm (Dân thường...) để không ai bị lộ qua việc "vai
+ * nào được gọi". Mỗi vai: MC chọn đủ số người đang giữ vai đó ngay lúc gọi
+ * (MC tự biết mặt nhờ đã sắp xếp ngoài đời), rồi thao tác luôn (kéo mũi
+ * tên) nếu vai có hành động đêm.
  */
 export function NightLiveAssign({
   roles,
@@ -34,7 +34,7 @@ export function NightLiveAssign({
   events,
   onCommitAction,
   onAssignRole,
-  onFinishLiveAssign,
+  onEndNight,
 }: NightLiveAssignProps) {
   const [selected, setSelected] = useState<string[]>([])
   const [useList, setUseList] = useState(false)
@@ -52,17 +52,14 @@ export function NightLiveAssign({
       <div className="space-y-4 text-center">
         <div className="rounded-2xl border border-accent/30 bg-surface px-5 py-8">
           <p className="text-3xl">🌘</p>
-          <p className="mt-3 text-sm text-muted">
-            Đã gọi và thao tác xong tất cả chức năng đêm 1. {unassigned.length} người còn lại sẽ được random ngầm
-            (Dân thường và các vai không có hành động đêm).
-          </p>
+          <p className="mt-3 text-sm text-muted">Đã gọi và gán vai xong cho tất cả mọi người.</p>
         </div>
         <button
           type="button"
-          onClick={onFinishLiveAssign}
+          onClick={onEndNight}
           className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg shadow-lg shadow-accent/20 transition-transform active:scale-[0.98]"
         >
-          🌙 Random vai còn lại & kết thúc đêm 1
+          🌙 Kết thúc đêm {night}
         </button>
       </div>
     )
@@ -85,6 +82,9 @@ export function NightLiveAssign({
             Gọi &ldquo;{group.name} dậy đi&rdquo; — chọn {needed - assignedPlayers.length} người còn lại đang giữ vai này
             {assignedPlayers.length > 0 && ` (đã chọn ${assignedPlayers.map((p) => p.name).join(', ')})`}.
           </p>
+          {!group.roles.some((r) => r.actsAtNight && (!r.firstNightOnly || night === 1)) && (
+            <p className="mt-1 text-[11px] text-muted">Vai này không có hành động đêm — chỉ cần gọi và gán tên.</p>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {unassigned.map((player) => (
@@ -221,7 +221,7 @@ function ProgressHeader({ done, total }: { done: number; total: number }) {
   return (
     <div>
       <p className="font-mono text-xs text-muted">
-        Gán vai đêm 1 · {done}/{total} chức năng đã xong
+        Gán vai đêm 1 · {done}/{total} vai đã xong
       </p>
       <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-border">
         <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} />

@@ -28,11 +28,11 @@ export function getLiveAssignQueue(
   const doneActions = getActiveNightActions(events, night)
   const isRoleDone = (roleId: string) => doneActions.some((a) => a.roleId === roleId)
 
+  // Gọi TẤT CẢ vai đã chọn theo thứ tự — kể cả vai không có hành động đêm
+  // (VD Dân thường) — để không ai bị bỏ qua, tránh lộ thông tin qua việc
+  // "vai nào được gọi, vai nào không".
   const groups = groupRoles(roles)
-    .filter(
-      (g) =>
-        (counts[g.roleIds[0]] ?? 0) > 0 && g.roles.some((r) => r.actsAtNight && (!r.firstNightOnly || night === 1))
-    )
+    .filter((g) => (counts[g.roleIds[0]] ?? 0) > 0)
     .sort((a, b) => Math.min(...a.roles.map((r) => r.priority)) - Math.min(...b.roles.map((r) => r.priority)))
 
   return groups.map((group) => {
