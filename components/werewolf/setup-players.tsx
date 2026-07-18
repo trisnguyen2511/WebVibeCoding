@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import type { PlayerSetup } from '@/lib/werewolf/types'
 
 interface SetupPlayersProps {
@@ -7,10 +8,19 @@ interface SetupPlayersProps {
   onChange: (players: PlayerSetup[]) => void
 }
 
+interface PlayerGroup {
+  id: string
+  name: string
+  playerNames: string[]
+}
+
 export function SetupPlayers({ players, onChange }: SetupPlayersProps) {
   const [name, setName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
+  const [showGroups, setShowGroups] = useState(false)
+  const [groups, setGroups] = useState<PlayerGroup[] | null>(null)
+  const [loadingGroups, setLoadingGroups] = useState(false)
 
   function addPlayer() {
     const trimmed = name.trim()
@@ -37,6 +47,28 @@ export function SetupPlayers({ players, onChange }: SetupPlayersProps) {
     setEditingName('')
   }
 
+  async function toggleGroups() {
+    const next = !showGroups
+    setShowGroups(next)
+    if (next && groups === null) {
+      setLoadingGroups(true)
+      try {
+        const res = await fetch('/api/werewolf/groups')
+        const data = await res.json()
+        setGroups(data.groups ?? [])
+      } catch {
+        setGroups([])
+      } finally {
+        setLoadingGroups(false)
+      }
+    }
+  }
+
+  function applyGroup(group: PlayerGroup) {
+    onChange([...players, ...group.playerNames.map((n) => ({ id: crypto.randomUUID(), name: n, roleIds: [] }))])
+    setShowGroups(false)
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex gap-2">
@@ -58,6 +90,43 @@ export function SetupPlayers({ players, onChange }: SetupPlayersProps) {
           Thêm
         </button>
       </div>
+
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <button
+          type="button"
+          onClick={toggleGroups}
+          className="text-muted underline underline-offset-2 hover:text-fg"
+        >
+          {showGroups ? '✕ Đóng danh sách nhóm' : '📋 Chọn nhóm có sẵn'}
+        </button>
+        <Link href="/tools/werewolf-gm/admin" className="text-muted underline underline-offset-2 hover:text-fg">
+          ⚙️ Quản lý nhóm
+        </Link>
+      </div>
+
+      {showGroups && (
+        <div className="space-y-1.5 rounded-xl border border-border bg-surface p-2.5">
+          {loadingGroups ? (
+            <p className="px-1 py-2 text-xs text-muted">Đang tải...</p>
+          ) : !groups || groups.length === 0 ? (
+            <p className="px-1 py-2 text-xs text-muted">Chưa có nhóm nào được lưu — tạo ở trang Quản lý nhóm.</p>
+          ) : (
+            groups.map((group) => (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => applyGroup(group)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-left text-xs transition-colors hover:border-accent/50"
+              >
+                <span className="block font-medium text-fg">{group.name}</span>
+                <span className="block truncate text-muted">
+                  {group.playerNames.length} người · {group.playerNames.join(', ')}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
 
       {players.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
