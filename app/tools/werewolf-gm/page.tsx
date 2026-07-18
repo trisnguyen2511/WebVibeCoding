@@ -49,8 +49,19 @@ export default function WerewolfGmPage() {
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    const saved = loadGameState()
-    if (saved) setState({ ...saved, roles: syncBuiltInRoles(saved.roles) })
+    try {
+      const saved = loadGameState()
+      if (saved) {
+        const roles = syncBuiltInRoles(saved.roles)
+        // Replay thử ngay tại đây để phát hiện ván cũ không còn tương thích
+        // với schema hiện tại (VD event thiếu field mới) trước khi nó lọt vào
+        // useMemo của render và làm crash cả trang.
+        derivePlayers(saved.setupPlayers, roles, saved.events)
+        setState({ ...saved, roles })
+      }
+    } catch {
+      clearGameState()
+    }
     setLoaded(true)
   }, [])
 
