@@ -89,11 +89,15 @@ export function findDeathTrigger(
   const roleById = new Map(roles.map((r) => [r.id, r]))
   for (const player of players) {
     if (player.isAlive || resolvedPlayerIds.has(player.id)) continue
+    const diedAtNight = player.deathNight !== null
+    const diedByVote = player.deathDay !== null
     for (const roleId of player.roleIds) {
       const role = roleById.get(roleId)
-      if (role?.effect === 'kill' && role.canTargetDead) {
-        return { playerId: player.id, roleId }
-      }
+      if (role?.effect !== 'kill' || !role.canTargetDead) continue
+      const condition = role.deathTriggerCondition ?? 'both'
+      if (condition === 'night' && !diedAtNight) continue
+      if (condition === 'day' && !diedByVote) continue
+      return { playerId: player.id, roleId }
     }
   }
   return null

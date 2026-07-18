@@ -42,6 +42,12 @@ export interface RoleDef {
   winsIfVotedOut?: boolean
   /** Các vai cùng bundleId luôn được đếm số lượng và gán chung 1 người (VD 2 bình Phù thủy). */
   bundleId?: string
+  /**
+   * Với vai kích hoạt khi chết (canTargetDead + effect kill) — chỉ kích hoạt
+   * khi chết đúng kiểu này. 'night' = chỉ khi bị giết ban đêm, 'day' = chỉ
+   * khi bị treo cổ ban ngày, 'both' = cả hai (mặc định nếu bỏ trống).
+   */
+  deathTriggerCondition?: 'night' | 'day' | 'both'
 }
 
 export interface Player {

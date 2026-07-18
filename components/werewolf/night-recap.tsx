@@ -1,5 +1,5 @@
 'use client'
-import type { Player, RoleDef } from '@/lib/werewolf/types'
+import type { NightAction, Player, RoleDef } from '@/lib/werewolf/types'
 import { EFFECT_COLOR } from '@/lib/werewolf/effect-color'
 import { primaryRole } from '@/lib/werewolf/primary-role'
 
@@ -7,9 +7,14 @@ interface NightRecapProps {
   players: Player[]
   roles: RoleDef[]
   night: number
+  actions: NightAction[]
   deaths: string[]
   onToggleAlive: (playerId: string, isAlive: boolean) => void
   onConfirm: () => void
+}
+
+function markerId(color: string) {
+  return `recap-arrow-${color.replace('#', '')}`
 }
 
 const SIZE = 300
@@ -22,10 +27,27 @@ function nodePosition(index: number, total: number) {
   return { x: CENTER + RADIUS * Math.cos(angle), y: CENTER + RADIUS * Math.sin(angle) }
 }
 
-export function NightRecap({ players, roles, night, deaths, onToggleAlive, onConfirm }: NightRecapProps) {
+export function NightRecap({ players, roles, night, actions, deaths, onToggleAlive, onConfirm }: NightRecapProps) {
   const roleById = new Map(roles.map((r) => [r.id, r]))
   const positions = new Map(players.map((p, i) => [p.id, nodePosition(i, players.length)]))
   const deathSet = new Set(deaths)
+
+  const arrows = actions
+    .filter((a) => !a.skipped && a.targetPlayerIds.length > 0)
+    .flatMap((a) => {
+      const role = roleById.get(a.roleId)
+      if (!role) return []
+      const from = positions.get(a.actorPlayerId)
+      const color = EFFECT_COLOR[role.effect]
+      return a.targetPlayerIds
+        .map((targetId) => {
+          const to = positions.get(targetId)
+          if (!from || !to) return null
+          return { key: `${a.id}-${targetId}`, from, to, color }
+        })
+        .filter((x): x is { key: string; from: { x: number; y: number }; to: { x: number; y: number }; color: string } => !!x)
+    })
+  const arrowColors = Array.from(new Set(arrows.map((a) => a.color)))
 
   return (
     <div className="space-y-4">
@@ -38,6 +60,26 @@ export function NightRecap({ players, roles, night, deaths, onToggleAlive, onCon
       </div>
 
       <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="mx-auto h-[280px] w-[280px] max-w-full select-none">
+        <defs>
+          {arrowColors.map((color) => (
+            <marker key={color} id={markerId(color)} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill={color} />
+            </marker>
+          ))}
+        </defs>
+        {arrows.map((arrow) => (
+          <line
+            key={arrow.key}
+            x1={arrow.from.x}
+            y1={arrow.from.y}
+            x2={arrow.to.x}
+            y2={arrow.to.y}
+            stroke={arrow.color}
+            strokeWidth={2}
+            opacity={0.85}
+            markerEnd={`url(#${markerId(arrow.color)})`}
+          />
+        ))}
         {players.map((player) => {
           const pos = positions.get(player.id)
           if (!pos) return null

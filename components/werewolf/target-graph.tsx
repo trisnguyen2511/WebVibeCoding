@@ -15,10 +15,10 @@ interface TargetGraphProps {
   readOnly?: boolean
 }
 
-const SIZE = 300
+const SIZE = 380
 const CENTER = SIZE / 2
-const RADIUS = 112
-const NODE_R = 22
+const RADIUS = 148
+const NODE_R = 28
 
 function nodePosition(index: number, total: number) {
   const angle = (index / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2
@@ -92,7 +92,7 @@ export function TargetGraph({
       <svg
         ref={svgRef}
         viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className="h-[280px] w-[280px] max-w-full touch-none select-none"
+        className="mx-auto h-auto w-full max-w-[400px] touch-none select-none"
       >
         {selected.map((targetId) => {
           const pos = positions.get(targetId)
@@ -159,7 +159,7 @@ export function TargetGraph({
                 y={pos.y}
                 textAnchor="middle"
                 dominantBaseline="central"
-                className="pointer-events-none select-none text-[16px]"
+                className="pointer-events-none select-none text-[20px]"
               >
                 {role?.icon ?? '❓'}
               </text>
@@ -169,7 +169,7 @@ export function TargetGraph({
                   y={pos.y - NODE_R + 4}
                   textAnchor="middle"
                   dominantBaseline="central"
-                  className="pointer-events-none select-none text-[11px]"
+                  className="pointer-events-none select-none text-[13px]"
                 >
                   💘
                 </text>
@@ -178,7 +178,7 @@ export function TargetGraph({
                 x={pos.x}
                 y={pos.y + NODE_R + 11}
                 textAnchor="middle"
-                className="pointer-events-none select-none text-[9px] fill-muted"
+                className="pointer-events-none select-none text-[11px] fill-muted"
               >
                 {player.name.length > 8 ? `${player.name.slice(0, 7)}…` : player.name}
               </text>
