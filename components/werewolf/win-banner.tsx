@@ -11,16 +11,22 @@ interface WinBannerProps {
   winner: Faction
   /** Nếu có, ghi đè thông báo phe thắng bằng chiến thắng solo (VD Thằng Đần bị vote loại). */
   soloWinnerName?: string
+  /** Nếu có, ghi đè thông báo phe thắng bằng chiến thắng riêng của cặp đôi Cupid. */
+  loverNames?: [string, string]
   onPlayAgain: () => void
   onResetAll: () => void
 }
 
-export function WinBanner({ winner, soloWinnerName, onPlayAgain, onResetAll }: WinBannerProps) {
+export function WinBanner({ winner, soloWinnerName, loverNames, onPlayAgain, onResetAll }: WinBannerProps) {
   return (
     <div className="space-y-4 rounded-2xl border border-accent/40 bg-surface px-6 py-8 text-center">
-      <p className="text-4xl">{soloWinnerName ? '🃏' : '🏆'}</p>
+      <p className="text-4xl">{soloWinnerName ? '🃏' : loverNames ? '💘' : '🏆'}</p>
       <p className="font-display text-xl font-semibold text-fg">
-        {soloWinnerName ? `${soloWinnerName} (Thằng Đần) thắng cả ván!` : `${FACTION_LABEL[winner]} chiến thắng!`}
+        {soloWinnerName
+          ? `${soloWinnerName} (Thằng Đần) thắng cả ván!`
+          : loverNames
+            ? `${loverNames[0]} và ${loverNames[1]} (Cặp đôi) thắng cả ván!`
+            : `${FACTION_LABEL[winner]} chiến thắng!`}
       </p>
       <div className="space-y-2">
         <button

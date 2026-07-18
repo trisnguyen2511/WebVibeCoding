@@ -18,11 +18,18 @@ function initialPlayers(setupPlayers: PlayerSetup[], roles: RoleDef[]): Player[]
   })
 }
 
+/**
+ * Mạng phụ (VD Già làng) chỉ đỡ được 1 lần bị vote treo cổ ban ngày — bị Sói
+ * cắn, thuốc độc, bắn dây chuyền hay chết theo cặp đôi thì vẫn chết ngay,
+ * bỏ qua mạng phụ hoàn toàn.
+ */
 function killPlayer(players: Map<string, Player>, playerId: string, cause: string, night: number | null, day: number | null) {
   const player = players.get(playerId)
   if (!player || !player.isAlive) return
-  player.livesLeft -= 1
-  if (player.livesLeft > 0) return
+  if (cause === 'vote') {
+    player.livesLeft -= 1
+    if (player.livesLeft > 0) return
+  }
   player.isAlive = false
   player.deathNight = night
   player.deathDay = day

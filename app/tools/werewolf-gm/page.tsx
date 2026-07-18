@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ToolShell } from '@/components/tool-shell'
 import { cloneBuiltInRoles, syncBuiltInRoles } from '@/lib/werewolf/built-in-roles'
 import { derivePlayers } from '@/lib/werewolf/derive-game-state'
-import { checkWinCondition } from '@/lib/werewolf/check-win-condition'
+import { checkWinCondition, checkLoversWin } from '@/lib/werewolf/check-win-condition'
 import { phaseAfterTruncate, phaseAfterUndo, popLastEvent } from '@/lib/werewolf/game-actions'
 import { findDeathTrigger } from '@/lib/werewolf/night-queue'
 import { resolveDay } from '@/lib/werewolf/resolve-day'
@@ -109,21 +109,21 @@ export default function WerewolfGmPage() {
   }
 
   function handleConfirmRecap() {
-    const winner = checkWinCondition(players, state.roles)
-    setState((s) => ({ ...s, currentPhase: winner ? 'ended' : 'day', currentDay: s.currentNight }))
+    const ended = !!checkWinCondition(players, state.roles) || !!checkLoversWin(players)
+    setState((s) => ({ ...s, currentPhase: ended ? 'ended' : 'day', currentDay: s.currentNight }))
   }
 
   function handleEliminate(playerId: string) {
     const resolution = resolveDay(playerId, players, state.roles, state.currentDay)
     const nextEvents: GameEvent[] = [...state.events, { id: crypto.randomUUID(), type: 'day_resolved', payload: resolution }]
     const nextPlayers = derivePlayers(state.setupPlayers, state.roles, nextEvents)
-    const winner = resolution.foolWinnerId ? null : checkWinCondition(nextPlayers, state.roles)
+    const ended = !!resolution.foolWinnerId || !!checkWinCondition(nextPlayers, state.roles) || !!checkLoversWin(nextPlayers)
     setState((s) => ({
       ...s,
       events: nextEvents,
-      currentPhase: winner || resolution.foolWinnerId ? 'ended' : 'night',
-      currentNight: winner || resolution.foolWinnerId ? s.currentNight : s.currentDay + 1,
-      currentDay: winner || resolution.foolWinnerId ? s.currentDay : s.currentDay + 1,
+      currentPhase: ended ? 'ended' : 'night',
+      currentNight: ended ? s.currentNight : s.currentDay + 1,
+      currentDay: ended ? s.currentDay : s.currentDay + 1,
     }))
   }
 
@@ -153,8 +153,8 @@ export default function WerewolfGmPage() {
     // Không tự chuyển phase — chỉ ghi nhận rồi ở nguyên đêm/ngày hiện tại để MC tiếp tục;
     // chỉ kết thúc ván sớm nếu phát bắn này vừa phân định thắng thua.
     const nextPlayers = derivePlayers(state.setupPlayers, state.roles, nextEvents)
-    const winner = checkWinCondition(nextPlayers, state.roles)
-    setState((s) => ({ ...s, events: nextEvents, currentPhase: winner ? 'ended' : s.currentPhase }))
+    const ended = !!checkWinCondition(nextPlayers, state.roles) || !!checkLoversWin(nextPlayers)
+    setState((s) => ({ ...s, events: nextEvents, currentPhase: ended ? 'ended' : s.currentPhase }))
   }
 
   function handleUndo() {
@@ -174,11 +174,11 @@ export default function WerewolfGmPage() {
     const nextEvents = state.events.slice(0, index)
     const transition = phaseAfterTruncate(nextEvents)
     const nextPlayers = derivePlayers(state.setupPlayers, state.roles, nextEvents)
-    const winner = checkWinCondition(nextPlayers, state.roles)
+    const ended = !!checkWinCondition(nextPlayers, state.roles) || !!checkLoversWin(nextPlayers)
     setState((s) => ({
       ...s,
       events: nextEvents,
-      currentPhase: winner ? 'ended' : transition.phase,
+      currentPhase: ended ? 'ended' : transition.phase,
       currentNight: transition.night,
       currentDay: transition.day,
     }))
@@ -428,6 +428,14 @@ export default function WerewolfGmPage() {
           <WinBanner
             winner={checkWinCondition(players, state.roles) ?? 'village'}
             soloWinnerName={foolWinEvent ? players.find((p) => p.id === foolWinEvent.payload.foolWinnerId)?.name : undefined}
+            loverNames={(() => {
+              const lovers = checkLoversWin(players)
+              if (!lovers) return undefined
+              const [a, b] = lovers
+              const nameA = players.find((p) => p.id === a)?.name
+              const nameB = players.find((p) => p.id === b)?.name
+              return nameA && nameB ? ([nameA, nameB] as [string, string]) : undefined
+            })()}
             onPlayAgain={handlePlayAgain}
             onResetAll={handleResetEverything}
           />

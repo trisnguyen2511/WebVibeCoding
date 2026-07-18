@@ -141,7 +141,7 @@ export function NightRecap({ players, roles, night, actions, deaths, healed, onT
               <text x={pos.x} y={pos.y + NODE_R + 11} textAnchor="middle" className="pointer-events-none select-none text-[9px] fill-muted">
                 {player.name.length > 8 ? `${player.name.slice(0, 7)}…` : player.name}
               </text>
-              {deathSet.has(player.id) && (
+              {deathSet.has(player.id) && !player.isAlive && (
                 <text x={pos.x} y={pos.y - NODE_R - 6} textAnchor="middle" className="pointer-events-none select-none text-[11px]">
                   💀
                 </text>
@@ -156,7 +156,7 @@ export function NightRecap({ players, roles, night, actions, deaths, healed, onT
         <ul className="space-y-1.5">
           {players.map((player) => {
             const role = primaryRole(player, roleById)
-            const diedTonight = deathSet.has(player.id)
+            const diedTonight = deathSet.has(player.id) && !player.isAlive
             return (
               <li
                 key={player.id}
