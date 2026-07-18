@@ -7,8 +7,6 @@ import { EFFECT_COLOR } from '@/lib/werewolf/effect-color'
 import { TargetGraph } from './target-graph'
 import { ListTargetPicker } from './list-target-picker'
 
-const LIST_FALLBACK_THRESHOLD = 10
-
 interface NightLiveAssignProps {
   roles: RoleDef[]
   players: Player[]
@@ -39,7 +37,7 @@ export function NightLiveAssign({
   onFinishLiveAssign,
 }: NightLiveAssignProps) {
   const [selected, setSelected] = useState<string[]>([])
-  const [useList, setUseList] = useState(players.length > LIST_FALLBACK_THRESHOLD)
+  const [useList, setUseList] = useState(false)
   const [reveal, setReveal] = useState<{ targetName: string; isWolf: boolean } | null>(null)
 
   const queue = getLiveAssignQueue(roles, players, setupRoleCounts, night, events)

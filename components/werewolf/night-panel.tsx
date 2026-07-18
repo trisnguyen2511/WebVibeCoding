@@ -8,8 +8,6 @@ import { EFFECT_COLOR } from '@/lib/werewolf/effect-color'
 import { TargetGraph } from './target-graph'
 import { ListTargetPicker } from './list-target-picker'
 
-const LIST_FALLBACK_THRESHOLD = 10
-
 interface NightPanelProps {
   roles: RoleDef[]
   players: Player[]
@@ -21,7 +19,7 @@ interface NightPanelProps {
 
 export function NightPanel({ roles, players, night, events, onCommitAction, onEndNight }: NightPanelProps) {
   const [selected, setSelected] = useState<string[]>([])
-  const [useList, setUseList] = useState(players.length > LIST_FALLBACK_THRESHOLD)
+  const [useList, setUseList] = useState(false)
   const [reveal, setReveal] = useState<{ targetName: string; isWolf: boolean; blocked: boolean } | null>(null)
 
   const roleById = new Map(roles.map((r) => [r.id, r]))
