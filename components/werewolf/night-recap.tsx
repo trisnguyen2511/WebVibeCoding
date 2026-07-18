@@ -9,6 +9,8 @@ interface NightRecapProps {
   night: number
   actions: NightAction[]
   deaths: string[]
+  /** Người được cứu bằng thuốc giải/hồi sinh không chỉ định target — vẽ mũi tên actor -> người được cứu. */
+  healed: { actorPlayerId: string; playerId: string }[]
   onToggleAlive: (playerId: string, isAlive: boolean) => void
   onConfirm: () => void
 }
@@ -27,12 +29,12 @@ function nodePosition(index: number, total: number) {
   return { x: CENTER + RADIUS * Math.cos(angle), y: CENTER + RADIUS * Math.sin(angle) }
 }
 
-export function NightRecap({ players, roles, night, actions, deaths, onToggleAlive, onConfirm }: NightRecapProps) {
+export function NightRecap({ players, roles, night, actions, deaths, healed, onToggleAlive, onConfirm }: NightRecapProps) {
   const roleById = new Map(roles.map((r) => [r.id, r]))
   const positions = new Map(players.map((p, i) => [p.id, nodePosition(i, players.length)]))
   const deathSet = new Set(deaths)
 
-  const arrows = actions
+  const actionArrows = actions
     .filter((a) => !a.skipped && a.targetPlayerIds.length > 0)
     .flatMap((a) => {
       const role = roleById.get(a.roleId)
@@ -47,6 +49,19 @@ export function NightRecap({ players, roles, night, actions, deaths, onToggleAli
         })
         .filter((x): x is { key: string; from: { x: number; y: number }; to: { x: number; y: number }; color: string } => !!x)
     })
+
+  // Bình thuốc giải kiểu Phù thủy không chỉ định target lúc thao tác (tự cứu
+  // người đang sắp chết) — vẫn cần vẽ mũi tên actor -> người được cứu ở đây.
+  const healArrows = healed
+    .map((h) => {
+      const from = positions.get(h.actorPlayerId)
+      const to = positions.get(h.playerId)
+      if (!from || !to) return null
+      return { key: `heal-${h.actorPlayerId}-${h.playerId}`, from, to, color: EFFECT_COLOR.revive }
+    })
+    .filter((x): x is { key: string; from: { x: number; y: number }; to: { x: number; y: number }; color: string } => !!x)
+
+  const arrows = [...actionArrows, ...healArrows]
   const arrowColors = Array.from(new Set(arrows.map((a) => a.color)))
 
   return (

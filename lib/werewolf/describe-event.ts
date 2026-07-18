@@ -15,14 +15,15 @@ export function describeEvent(event: GameEvent, players: Player[], roles: RoleDe
       return `Đêm ${event.payload.night} — ${role?.name ?? '?'} (${name(event.payload.actorPlayerId)}) chọn ${targets}`
     }
     case 'night_resolved': {
-      const { night, deaths, saved, blocked, conversions } = event.payload
+      const { night, deaths, saved, blocked, conversions, healed } = event.payload
       const deathText = deaths.length ? deaths.map(name).join(', ') : 'không ai chết'
-      const savedText = saved.length ? ` — được cứu: ${saved.map(name).join(', ')}` : ''
+      const savedText = saved.length ? ` — được bảo vệ: ${saved.map(name).join(', ')}` : ''
+      const healedText = healed.length ? ` — được cứu: ${healed.map((h) => name(h.playerId)).join(', ')}` : ''
       const blockedText = blocked.length ? ` — bị khóa: ${blocked.map(name).join(', ')}` : ''
       const convertText = conversions.length
         ? ` — biến thành Sói: ${conversions.map((c) => name(c.playerId)).join(', ')}`
         : ''
-      return `Đêm ${night} kết thúc — ${deathText}${savedText}${blockedText}${convertText}`
+      return `Đêm ${night} kết thúc — ${deathText}${savedText}${healedText}${blockedText}${convertText}`
     }
     case 'day_resolved': {
       const { day, eliminatedPlayerId, foolWinnerId } = event.payload

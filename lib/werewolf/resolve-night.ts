@@ -38,6 +38,7 @@ export function resolveNight(
   const pendingDeath = new Map<string, string>() // playerId -> roleId gây chết
   const linked: [string, string][] = []
   const conversions: { playerId: string; addRoleId: string }[] = []
+  const healed: { actorPlayerId: string; playerId: string }[] = []
   const notes: string[] = []
 
   for (const action of sorted) {
@@ -81,8 +82,10 @@ export function resolveNight(
       case 'revive':
         if (action.targetPlayerIds.length === 0) {
           // Bình thuốc giải kiểu Phù thủy — cứu bất kỳ ai đang sắp chết đêm nay, không cần chỉ định.
-          const savedNames = Array.from(pendingDeath.keys()).map((id) => nameById.get(id) ?? '?')
+          const savedIds = Array.from(pendingDeath.keys())
           pendingDeath.clear()
+          for (const id of savedIds) healed.push({ actorPlayerId: action.actorPlayerId, playerId: id })
+          const savedNames = savedIds.map((id) => nameById.get(id) ?? '?')
           notes.push(
             savedNames.length
               ? `${role.name} (${actorName}) dùng thuốc giải — cứu ${savedNames.join(', ')}`
@@ -91,6 +94,7 @@ export function resolveNight(
         } else {
           for (const id of action.targetPlayerIds) {
             pendingDeath.delete(id)
+            healed.push({ actorPlayerId: action.actorPlayerId, playerId: id })
             notes.push(`${role.name} (${actorName}) hồi sinh/cứu ${nameById.get(id) ?? '?'}`)
           }
         }
@@ -124,5 +128,5 @@ export function resolveNight(
     deaths.push(playerId)
   }
 
-  return { night, deaths, saved, linked, blocked: Array.from(blocked), conversions, notes }
+  return { night, deaths, saved, linked, blocked: Array.from(blocked), conversions, healed, notes }
 }

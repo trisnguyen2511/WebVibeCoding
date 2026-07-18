@@ -440,6 +440,7 @@ export default function WerewolfGmPage() {
             night={state.currentNight}
             actions={getActiveNightActions(state.events, state.currentNight)}
             deaths={lastNightResolution.payload.deaths}
+            healed={lastNightResolution.payload.healed}
             onToggleAlive={handleManualOverride}
             onConfirm={handleConfirmRecap}
           />

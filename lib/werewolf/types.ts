@@ -91,6 +91,8 @@ export interface NightResolution {
   blocked: string[]
   /** Vai được cộng thêm cho 1 người ngay trong đêm (VD Bán Sói biến thành Sói). */
   conversions: { playerId: string; addRoleId: string }[]
+  /** Người được cứu bằng thuốc giải/hồi sinh (không cần chỉ định target) — để vẽ mũi tên actor -> người được cứu ở recap. */
+  healed: { actorPlayerId: string; playerId: string }[]
   notes: string[]
 }
 
