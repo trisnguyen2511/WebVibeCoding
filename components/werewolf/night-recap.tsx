@@ -19,10 +19,10 @@ function markerId(color: string) {
   return `recap-arrow-${color.replace('#', '')}`
 }
 
-const SIZE = 300
+const SIZE = 380
 const CENTER = SIZE / 2
-const RADIUS = 112
-const NODE_R = 22
+const RADIUS = 148
+const NODE_R = 26
 
 function nodePosition(index: number, total: number) {
   const angle = (index / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2
@@ -74,7 +74,7 @@ export function NightRecap({ players, roles, night, actions, deaths, healed, onT
         </p>
       </div>
 
-      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="mx-auto h-[280px] w-[280px] max-w-full select-none">
+      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="mx-auto h-auto w-full max-w-[400px] select-none">
         <defs>
           {arrowColors.map((color) => (
             <marker key={color} id={markerId(color)} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">

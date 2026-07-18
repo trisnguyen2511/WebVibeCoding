@@ -154,6 +154,16 @@ export function TargetGraph({
                 onPointerUp={isActor ? handlePointerUp : undefined}
                 className={isActor && !readOnly ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
               />
+              {role && (
+                <text
+                  x={pos.x}
+                  y={pos.y - NODE_R - 8}
+                  textAnchor="middle"
+                  className="pointer-events-none select-none text-[10px] fill-muted"
+                >
+                  {role.name}
+                </text>
+              )}
               <text
                 x={pos.x}
                 y={pos.y}
