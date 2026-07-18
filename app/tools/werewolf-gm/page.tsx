@@ -10,7 +10,7 @@ import { resolveDay } from '@/lib/werewolf/resolve-day'
 import { resolveNight } from '@/lib/werewolf/resolve-night'
 import { getActiveNightActions } from '@/lib/werewolf/selectors'
 import { totalRoleSlots } from '@/lib/werewolf/role-bundles'
-import { randomizeAssignment } from '@/lib/werewolf/randomize-assignment'
+import { assignLeftoverRoles } from '@/lib/werewolf/randomize-assignment'
 import { clearGameState, loadGameState, saveGameState } from '@/lib/werewolf/storage'
 import type { GameEvent, GameState, RoleDef } from '@/lib/werewolf/types'
 
@@ -90,8 +90,26 @@ export default function WerewolfGmPage() {
     })
   }
 
-  function handleSeatCalled(playerId: string) {
-    pushEvent({ id: crypto.randomUUID(), type: 'seat_called', payload: { night: state.currentNight, playerId } })
+  /** Gán tay 1 vai (hoặc cả bó, VD 2 bình Phù thủy) cho 1 người ngay lúc MC gọi chức năng đó trong đêm 1. */
+  function handleAssignRole(playerId: string, roleIds: string[]) {
+    setState((s) => ({
+      ...s,
+      setupPlayers: s.setupPlayers.map((p) => (p.id === playerId ? { ...p, roleIds: [...p.roleIds, ...roleIds] } : p)),
+    }))
+  }
+
+  /** Xong hết chức năng đêm 1 — random ngầm các vai không có hành động đêm cho người còn lại rồi kết thúc đêm như bình thường. */
+  function handleFinishLiveAssign() {
+    const nextSetupPlayers = assignLeftoverRoles(state.setupPlayers, state.roles, state.setupRoleCounts)
+    const nextPlayers = derivePlayers(nextSetupPlayers, state.roles, state.events)
+    const actions = getActiveNightActions(state.events, state.currentNight)
+    const resolution = resolveNight(state.roles, nextPlayers, actions, state.currentNight)
+    setState((s) => ({
+      ...s,
+      setupPlayers: nextSetupPlayers,
+      events: [...s.events, { id: crypto.randomUUID(), type: 'night_resolved', payload: resolution }],
+      currentPhase: 'recap',
+    }))
   }
 
   function handleEndNight() {
@@ -223,13 +241,9 @@ export default function WerewolfGmPage() {
     state.setupPlayers.length >= 4 && rolesFullyChosen && (state.assignMode === 'live' || everyoneHasRole)
 
   function handleStartGame() {
-    setState((s) => ({
-      ...s,
-      setupPlayers: s.assignMode === 'live' ? randomizeAssignment(s.setupPlayers, s.roles, s.setupRoleCounts) : s.setupPlayers,
-      currentPhase: 'night',
-      currentNight: 1,
-      currentDay: 1,
-    }))
+    // Chế độ 'live' cố tình KHÔNG random trước — vai được MC gán tay ngay lúc
+    // gọi từng chức năng trong đêm 1 (xem NightLiveAssign).
+    setState((s) => ({ ...s, currentPhase: 'night', currentNight: 1, currentDay: 1 }))
   }
 
   const SETUP_STEPS: { key: SetupStep; label: string }[] = [
@@ -469,11 +483,12 @@ export default function WerewolfGmPage() {
             <NightLiveAssign
               roles={state.roles}
               players={players}
+              setupRoleCounts={state.setupRoleCounts}
               night={state.currentNight}
               events={state.events}
               onCommitAction={handleCommitNightAction}
-              onSeatCalled={handleSeatCalled}
-              onEndNight={handleEndNight}
+              onAssignRole={handleAssignRole}
+              onFinishLiveAssign={handleFinishLiveAssign}
             />
           ) : (
             <NightPanel

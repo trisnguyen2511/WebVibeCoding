@@ -105,8 +105,6 @@ export type GameEvent =
   | { id: string; type: 'death_trigger_resolved'; payload: { playerId: string; targetPlayerIds: string[]; roleId: string } }
   /** MC tự sửa tay trạng thái sống/chết khi phát hiện hệ thống tính nhầm. */
   | { id: string; type: 'manual_override'; payload: { playerId: string; isAlive: boolean } }
-  /** MC đã gọi xong 1 người trong chế độ gán vai trực tiếp đêm 1 (kể cả người không có hành động). */
-  | { id: string; type: 'seat_called'; payload: { night: number; playerId: string } }
 
 export type GamePhase = 'setup' | 'night' | 'recap' | 'day' | 'ended'
 

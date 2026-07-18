@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import type { GameEvent, Player, RoleDef } from '@/lib/werewolf/types'
-import { getActiveNightActions } from '@/lib/werewolf/selectors'
+import { getLiveAssignQueue } from '@/lib/werewolf/live-assign-queue'
 import { factionOf } from '@/lib/werewolf/faction'
 import { EFFECT_COLOR } from '@/lib/werewolf/effect-color'
 import { TargetGraph } from './target-graph'
@@ -12,101 +12,103 @@ const LIST_FALLBACK_THRESHOLD = 10
 interface NightLiveAssignProps {
   roles: RoleDef[]
   players: Player[]
+  setupRoleCounts: Record<string, number>
   night: number
   events: GameEvent[]
   onCommitAction: (roleId: string, actorPlayerId: string, targetPlayerIds: string[], skipped: boolean) => void
-  onSeatCalled: (playerId: string) => void
-  onEndNight: () => void
+  onAssignRole: (playerId: string, roleIds: string[]) => void
+  onFinishLiveAssign: () => void
 }
 
 /**
- * Đêm 1 ở chế độ "gán vai ngay trong đêm" — MC đi lần lượt theo thứ tự chỗ
- * ngồi (players đã được sắp ở bước setup), báo vai cho từng người và để họ
- * hành động ngay lúc đó nếu vai có chức năng đêm. Người không có chức năng
- * (hoặc vai đã được quyết định bởi người khác, VD Sói thứ 2) chỉ cần xác
- * nhận đã gọi rồi qua người tiếp theo.
+ * Đêm 1 ở chế độ "gán vai ngay trong đêm" — đi theo THỨ TỰ CHỨC NĂNG như
+ * đêm bình thường (Sói trước, Bảo vệ sau...). Mỗi chức năng: MC chọn ai
+ * đang giữ vai đó ngay lúc gọi (MC tự biết mặt nhờ đã sắp xếp ngoài đời),
+ * gán vai cho người đó, rồi thao tác luôn (kéo mũi tên) nếu vai có hành
+ * động đêm. Người không có chức năng (Dân thường...) được random ngầm ở
+ * bước cuối, không cần gọi riêng.
  */
-export function NightLiveAssign({ roles, players, night, events, onCommitAction, onSeatCalled, onEndNight }: NightLiveAssignProps) {
+export function NightLiveAssign({
+  roles,
+  players,
+  setupRoleCounts,
+  night,
+  events,
+  onCommitAction,
+  onAssignRole,
+  onFinishLiveAssign,
+}: NightLiveAssignProps) {
   const [selected, setSelected] = useState<string[]>([])
   const [useList, setUseList] = useState(players.length > LIST_FALLBACK_THRESHOLD)
   const [reveal, setReveal] = useState<{ targetName: string; isWolf: boolean } | null>(null)
 
-  const roleById = new Map(roles.map((r) => [r.id, r]))
-  const doneActions = getActiveNightActions(events, night)
-  const calledIds = new Set(
-    events
-      .filter((e): e is Extract<GameEvent, { type: 'seat_called' }> => e.type === 'seat_called' && e.payload.night === night)
-      .map((e) => e.payload.playerId)
-  )
+  const queue = getLiveAssignQueue(roles, players, setupRoleCounts, night, events)
+  const totalSteps = queue.length
+  const doneSteps = queue.filter((s) => s.assignedPlayers.length >= s.needed && !s.pendingRole).length
+  const currentStep = queue.find((s) => s.assignedPlayers.length < s.needed || s.pendingRole)
 
-  const seatIndex = players.findIndex((p) => !calledIds.has(p.id))
-  const calledCount = seatIndex === -1 ? players.length : seatIndex
+  const unassigned = players.filter((p) => p.roleIds.length === 0)
 
-  if (seatIndex === -1) {
+  if (!currentStep) {
     return (
       <div className="space-y-4 text-center">
         <div className="rounded-2xl border border-accent/30 bg-surface px-5 py-8">
           <p className="text-3xl">🌘</p>
-          <p className="mt-3 text-sm text-muted">Đã gọi và gán vai xong cho tất cả mọi người.</p>
+          <p className="mt-3 text-sm text-muted">
+            Đã gọi và thao tác xong tất cả chức năng đêm 1. {unassigned.length} người còn lại sẽ được random ngầm
+            (Dân thường và các vai không có hành động đêm).
+          </p>
         </div>
         <button
           type="button"
-          onClick={onEndNight}
+          onClick={onFinishLiveAssign}
           className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg shadow-lg shadow-accent/20 transition-transform active:scale-[0.98]"
         >
-          🌙 Kết thúc đêm {night}
+          🌙 Random vai còn lại & kết thúc đêm 1
         </button>
       </div>
     )
   }
 
-  const player = players[seatIndex]
-  const actionableRoles = player.roleIds
-    .map((id) => roleById.get(id))
-    .filter((r): r is RoleDef => !!r && r.actsAtNight && (!r.firstNightOnly || night === 1))
-    .filter((r) => !doneActions.some((a) => a.roleId === r.id))
-    .sort((a, b) => a.priority - b.priority)
+  const { group, needed, assignedPlayers, pendingRole, actorPlayer } = currentStep
 
-  const allPlayerRoles = player.roleIds.map((id) => roleById.get(id)).filter((r): r is RoleDef => !!r)
-  const progressPct = Math.round((calledCount / players.length) * 100)
-
-  function confirmSeat() {
-    onSeatCalled(player.id)
-    setSelected([])
-    setReveal(null)
+  function confirmAssign(playerId: string) {
+    onAssignRole(playerId, group.roleIds)
   }
 
-  if (actionableRoles.length === 0) {
+  if (assignedPlayers.length < needed) {
     return (
       <div className="space-y-4">
-        <ProgressHeader calledCount={calledCount} total={players.length} pct={progressPct} />
-        <div className="rounded-2xl border border-accent/40 bg-surface px-4 py-6 text-center">
-          <p className="text-xs text-muted">
-            Chỗ {seatIndex + 1} —{' '}
-            <span className="font-mono text-fg">{player.name}</span>
+        <ProgressHeader done={doneSteps} total={totalSteps} />
+        <div className="rounded-2xl border border-accent/40 bg-surface px-4 py-4 text-center">
+          <p className="text-2xl leading-none">{group.icon}</p>
+          <p className="mt-2 font-display text-base font-semibold text-fg">{group.name}</p>
+          <p className="mt-1 text-xs text-muted">
+            Gọi &ldquo;{group.name} dậy đi&rdquo; — chọn {needed - assignedPlayers.length} người còn lại đang giữ vai này
+            {assignedPlayers.length > 0 && ` (đã chọn ${assignedPlayers.map((p) => p.name).join(', ')})`}.
           </p>
-          <p className="mt-2 font-display text-base font-semibold text-fg">
-            {allPlayerRoles.length > 0 ? allPlayerRoles.map((r) => `${r.icon} ${r.name}`).join(', ') : 'Không có vai (lỗi gán)'}
-          </p>
-          {allPlayerRoles.some((r) => r.isCouncil) && (
-            <p className="mt-2 text-xs text-muted">Bầy Sói đã quyết định trước đó — chỉ cần báo vai, không cần hành động thêm.</p>
-          )}
-          {allPlayerRoles.every((r) => !r.actsAtNight) && (
-            <p className="mt-2 text-xs text-muted">Không có chức năng đêm nay.</p>
-          )}
         </div>
-        <button
-          type="button"
-          onClick={confirmSeat}
-          className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg shadow-lg shadow-accent/20 transition-transform active:scale-[0.98]"
-        >
-          Đã báo vai — gọi người tiếp theo
-        </button>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {unassigned.map((player) => (
+            <button
+              key={player.id}
+              type="button"
+              onClick={() => confirmAssign(player.id)}
+              className="rounded-lg border border-border bg-surface px-3 py-2 text-left text-sm text-fg transition-colors hover:border-accent/40"
+            >
+              {player.name}
+            </button>
+          ))}
+        </div>
+        {unassigned.length === 0 && (
+          <p className="text-center text-xs text-amber-400">Không còn ai chưa được gán vai — kiểm tra lại số lượng vai đã chọn.</p>
+        )}
       </div>
     )
   }
 
-  const role = actionableRoles[0]
+  const role = pendingRole!
+  const actor = actorPlayer!
   const edgeColor = EFFECT_COLOR[role.effect]
   const canConfirm = role.targetCount === 0 || selected.length === role.targetCount
 
@@ -117,13 +119,13 @@ export function NightLiveAssign({ roles, players, night, events, onCommitAction,
       setReveal({ targetName: target.name, isWolf: factionOf(target, roles) === 'wolf' })
       return
     }
-    onCommitAction(role.id, player.id, selected, false)
+    onCommitAction(role.id, actor.id, selected, false)
     setSelected([])
     setReveal(null)
   }
 
   function skipAction() {
-    onCommitAction(role.id, player.id, [], true)
+    onCommitAction(role.id, actor.id, [], true)
     setSelected([])
     setReveal(null)
   }
@@ -131,7 +133,7 @@ export function NightLiveAssign({ roles, players, night, events, onCommitAction,
   if (reveal) {
     return (
       <div className="space-y-4">
-        <ProgressHeader calledCount={calledCount} total={players.length} pct={progressPct} />
+        <ProgressHeader done={doneSteps} total={totalSteps} />
         <div className="rounded-2xl border border-blue-500/40 bg-blue-500/10 px-5 py-8 text-center">
           <p className="text-3xl">{reveal.isWolf ? '🐺' : '🕊️'}</p>
           <p className="mt-3 text-sm text-muted">Kết quả soi (chỉ MC thấy)</p>
@@ -152,14 +154,14 @@ export function NightLiveAssign({ roles, players, night, events, onCommitAction,
 
   return (
     <div className="space-y-4">
-      <ProgressHeader calledCount={calledCount} total={players.length} pct={progressPct} />
+      <ProgressHeader done={doneSteps} total={totalSteps} />
 
       <div className="rounded-2xl border border-accent/40 bg-surface px-4 py-4 text-center">
-        <p className="text-xs text-muted">
-          Chỗ {seatIndex + 1} — <span className="font-mono text-fg">{player.name}</span>
-        </p>
         <p className="text-2xl leading-none">{role.icon}</p>
         <p className="mt-2 font-display text-base font-semibold text-fg">{role.name}</p>
+        <p className="text-sm text-muted">
+          Người thao tác: <span className="text-fg">{actor.name}</span>
+        </p>
         <p className="mx-auto mt-2 max-w-xs text-xs leading-relaxed text-muted">{role.description}</p>
         <button
           type="button"
@@ -174,7 +176,7 @@ export function NightLiveAssign({ roles, players, night, events, onCommitAction,
         (useList ? (
           <ListTargetPicker
             players={players}
-            actorId={player.id}
+            actorId={actor.id}
             targetCount={role.targetCount}
             selected={selected}
             onChange={setSelected}
@@ -184,7 +186,7 @@ export function NightLiveAssign({ roles, players, night, events, onCommitAction,
           <TargetGraph
             players={players}
             roles={roles}
-            actorId={player.id}
+            actorId={actor.id}
             targetCount={role.targetCount}
             selected={selected}
             onChange={setSelected}
@@ -216,11 +218,12 @@ export function NightLiveAssign({ roles, players, night, events, onCommitAction,
   )
 }
 
-function ProgressHeader({ calledCount, total, pct }: { calledCount: number; total: number; pct: number }) {
+function ProgressHeader({ done, total }: { done: number; total: number }) {
+  const pct = total === 0 ? 100 : Math.round((done / total) * 100)
   return (
     <div>
       <p className="font-mono text-xs text-muted">
-        Gán vai đêm 1 · {calledCount}/{total} người đã được gọi
+        Gán vai đêm 1 · {done}/{total} chức năng đã xong
       </p>
       <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-border">
         <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} />
