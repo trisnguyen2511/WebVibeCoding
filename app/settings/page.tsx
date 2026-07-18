@@ -2,7 +2,8 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useTheme } from 'next-themes'
-import { Settings as SettingsIcon, Moon, Sun } from 'lucide-react'
+import { Settings as SettingsIcon, Moon, Sun, Trash2 } from 'lucide-react'
+import { CLEARABLE_CACHES, clearToolCache } from '@/lib/clear-cache-registry'
 
 // App-wide settings — deliberately its own page (not a tool, doesn't use
 // ToolShell) so it isn't tracked as "last tool visited" and so more setting
@@ -10,7 +11,15 @@ import { Settings as SettingsIcon, Moon, Sun } from 'lucide-react'
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const [clearedSlug, setClearedSlug] = useState<string | null>(null)
   useEffect(() => setMounted(true), [])
+
+  function handleClearCache(slug: string, label: string) {
+    if (!window.confirm(`Xoá dữ liệu local của "${label}"? Không thể hoàn tác.`)) return
+    clearToolCache(slug)
+    setClearedSlug(slug)
+    setTimeout(() => setClearedSlug((s) => (s === slug ? null : s)), 2000)
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -64,6 +73,35 @@ export default function SettingsPage() {
               <Sun size={16} /> Sáng
             </button>
           </div>
+        </section>
+
+        <section className="rounded-2xl border border-border bg-surface p-5">
+          <h2 className="font-display text-sm font-semibold text-fg">Xoá cache</h2>
+          <p className="mt-0.5 text-xs text-muted">
+            Xoá dữ liệu lưu cục bộ (localStorage) của 1 tool — dùng khi tool gặp lỗi do dữ liệu cũ không tương thích.
+          </p>
+          <ul className="mt-4 space-y-2">
+            {CLEARABLE_CACHES.map((entry) => (
+              <li
+                key={entry.slug}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-3.5 py-2.5"
+              >
+                <span className="text-xs text-muted">{entry.label}</span>
+                <button
+                  type="button"
+                  onClick={() => handleClearCache(entry.slug, entry.label)}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                    clearedSlug === entry.slug
+                      ? 'border-emerald-500/40 text-emerald-400'
+                      : 'border-border text-muted hover:border-red-500/40 hover:text-red-400'
+                  }`}
+                >
+                  <Trash2 size={13} />
+                  {clearedSlug === entry.slug ? 'Đã xoá' : 'Xoá'}
+                </button>
+              </li>
+            ))}
+          </ul>
         </section>
       </main>
     </div>
