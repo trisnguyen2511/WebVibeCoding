@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react'
 import type { GameEvent, Player, RoleDef } from '@/lib/werewolf/types'
 import { getBlockedActorIds, getNightQueue, usesRemaining } from '@/lib/werewolf/night-queue'
+import { getPendingDeathIds } from '@/lib/werewolf/resolve-night'
 import { getActiveNightActions } from '@/lib/werewolf/selectors'
 import { factionOf } from '@/lib/werewolf/faction'
 import { EFFECT_COLOR } from '@/lib/werewolf/effect-color'
@@ -41,7 +42,14 @@ export function NightPanel({ roles, players, night, events, onCommitAction, onEn
       setReveal({ targetName: target.name, isWolf: factionOf(target, roles) === 'wolf', blocked: blockedIds.has(actorPlayerId) })
       return
     }
-    onCommitAction(role.id, actorPlayerId, selected, false)
+    const isUntargetedRevive = role.effect === 'revive' && role.targetCount === 0
+    if (isUntargetedRevive) {
+      const candidates = getPendingDeathIds(roles, players, doneActions)
+      const chosen = candidates.length > 1 ? (selected[0] ?? candidates[0]) : undefined
+      onCommitAction(role.id, actorPlayerId, chosen ? [chosen] : [], false)
+    } else {
+      onCommitAction(role.id, actorPlayerId, selected, false)
+    }
     setSelected([])
     setReveal(null)
   }
@@ -82,6 +90,14 @@ export function NightPanel({ roles, players, night, events, onCommitAction, onEn
   const canConfirm = role.targetCount === 0 || selected.length === role.targetCount
   const remaining = usesRemaining(role, actorPlayerId, events)
   const isBlocked = blockedIds.has(actorPlayerId)
+
+  // Bình cứu không chỉ định (Phù thủy) — nếu có từ 2 người trở lên đang sắp
+  // chết cùng đêm, bắt MC tự chọn cứu ai thay vì tự động cứu hết. Mặc định
+  // chọn sẵn người đầu tiên (theo thứ tự hành động gây chết).
+  const isUntargetedRevive = role.effect === 'revive' && role.targetCount === 0
+  const reviveCandidates = isUntargetedRevive ? getPendingDeathIds(roles, players, doneActions) : []
+  const needsReviveChoice = isUntargetedRevive && reviveCandidates.length > 1
+  const reviveChoice = selected[0] ?? reviveCandidates[0]
 
   if (reveal) {
     return (
@@ -179,6 +195,33 @@ export function NightPanel({ roles, players, night, events, onCommitAction, onEn
         </div>
       ) : (
         <>
+          {needsReviveChoice && (
+            <div className="space-y-2">
+              <p className="text-center text-xs text-muted">
+                Có {reviveCandidates.length} người đang sắp chết đêm nay — chọn 1 người để cứu:
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {reviveCandidates.map((id) => {
+                  const p = players.find((pl) => pl.id === id)
+                  if (!p) return null
+                  const isChosen = reviveChoice === id
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setSelected([id])}
+                      className={`rounded-xl border px-3 py-2.5 text-sm transition-colors ${
+                        isChosen ? 'border-accent bg-accent/10 text-fg' : 'border-border bg-surface text-fg hover:border-accent/40'
+                      }`}
+                    >
+                      {p.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {role.targetCount > 0 &&
             (useList ? (
               <ListTargetPicker

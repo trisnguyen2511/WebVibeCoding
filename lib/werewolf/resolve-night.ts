@@ -1,20 +1,22 @@
 import type { NightAction, NightResolution, Player, RoleDef } from './types'
 
-export function resolveNight(
-  roles: RoleDef[],
-  players: Player[],
-  actions: NightAction[],
-  night: number
-): NightResolution {
-  const roleById = new Map(roles.map((r) => [r.id, r]))
+interface NightOutcome {
+  blocked: Set<string>
+  protectedIds: Set<string>
+  pendingDeath: Map<string, string> // playerId -> roleId gây chết
+  linked: [string, string][]
+  healed: { actorPlayerId: string; playerId: string }[]
+  notes: string[]
+}
+
+/**
+ * Chạy toàn bộ hành động (đã sort theo thứ tự thức dậy) và tính ra ai đang
+ * "chờ chết" tại thời điểm cuối danh sách — dùng chung cho cả resolveNight
+ * (tính kết quả cuối đêm) lẫn getPendingDeathIds (Phù thủy cần biết đang có
+ * bao nhiêu người sắp chết NGAY LÚC thao tác, trước khi đêm kết thúc).
+ */
+function runNightActions(roleById: Map<string, RoleDef>, players: Player[], sorted: NightAction[]): NightOutcome {
   const nameById = new Map(players.map((p) => [p.id, p.name]))
-  const sorted = actions
-    .filter((a) => !a.skipped)
-    .sort((a, b) => {
-      const pa = roleById.get(a.roleId)?.priority ?? 999
-      const pb = roleById.get(b.roleId)?.priority ?? 999
-      return pa - pb
-    })
 
   // Nguyệt Nữ khóa ai đêm nay — tính trước để các vai xử lý sau (priority lớn hơn) bị vô hiệu hoá.
   const blocked = new Set<string>()
@@ -35,9 +37,8 @@ export function resolveNight(
   }
 
   const protectedIds = new Set<string>()
-  const pendingDeath = new Map<string, string>() // playerId -> roleId gây chết
+  const pendingDeath = new Map<string, string>()
   const linked: [string, string][] = []
-  const conversions: { playerId: string; addRoleId: string }[] = []
   const healed: { actorPlayerId: string; playerId: string }[] = []
   const notes: string[] = []
 
@@ -81,7 +82,10 @@ export function resolveNight(
         break
       case 'revive':
         if (action.targetPlayerIds.length === 0) {
-          // Bình thuốc giải kiểu Phù thủy — cứu bất kỳ ai đang sắp chết đêm nay, không cần chỉ định.
+          // Bình thuốc giải kiểu Phù thủy khi chỉ có tối đa 1 người sắp chết —
+          // cứu người đó (nếu có) mà không cần chỉ định. Khi có từ 2 người
+          // sắp chết trở lên, UI đêm sẽ bắt MC chọn cụ thể 1 người (xem
+          // getPendingDeathIds) nên nhánh này chỉ còn gặp lúc ≤1 ứng viên.
           const savedIds = Array.from(pendingDeath.keys())
           pendingDeath.clear()
           for (const id of savedIds) healed.push({ actorPlayerId: action.actorPlayerId, playerId: id })
@@ -107,8 +111,49 @@ export function resolveNight(
     }
   }
 
+  return { blocked, protectedIds, pendingDeath, linked, healed, notes }
+}
+
+/**
+ * Những ai đang "chờ chết" ngay TRƯỚC 1 hành động cụ thể trong đêm (chưa xử
+ * lý xong đêm) — dùng để Phù thủy biết đang có bao nhiêu người sắp chết lúc
+ * bình cứu (không chỉ định) được thao tác. Nếu ≥2 người, MC cần tự chọn cứu
+ * ai thay vì tự động cứu hết.
+ */
+export function getPendingDeathIds(roles: RoleDef[], players: Player[], actionsSoFar: NightAction[]): string[] {
+  const roleById = new Map(roles.map((r) => [r.id, r]))
+  const sorted = actionsSoFar
+    .filter((a) => !a.skipped)
+    .sort((a, b) => (roleById.get(a.roleId)?.priority ?? 999) - (roleById.get(b.roleId)?.priority ?? 999))
+
+  const { protectedIds, pendingDeath } = runNightActions(roleById, players, sorted)
+
+  return Array.from(pendingDeath.entries())
+    .filter(([id, causeRoleId]) => !(roleById.get(causeRoleId)?.effect === 'kill' && protectedIds.has(id)))
+    .map(([id]) => id)
+}
+
+export function resolveNight(
+  roles: RoleDef[],
+  players: Player[],
+  actions: NightAction[],
+  night: number
+): NightResolution {
+  const roleById = new Map(roles.map((r) => [r.id, r]))
+  const sorted = actions
+    .filter((a) => !a.skipped)
+    .sort((a, b) => {
+      const pa = roleById.get(a.roleId)?.priority ?? 999
+      const pb = roleById.get(b.roleId)?.priority ?? 999
+      return pa - pb
+    })
+
+  const { blocked, protectedIds, pendingDeath, linked, healed, notes } = runNightActions(roleById, players, sorted)
+  const nameById = new Map(players.map((p) => [p.id, p.name]))
+
   const saved: string[] = []
   const deaths: string[] = []
+  const conversions: { playerId: string; addRoleId: string }[] = []
   for (const [playerId, causeRoleId] of Array.from(pendingDeath.entries())) {
     const causeRole = roleById.get(causeRoleId)
     if (causeRole?.effect === 'kill' && protectedIds.has(playerId)) {

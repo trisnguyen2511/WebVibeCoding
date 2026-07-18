@@ -2,6 +2,8 @@
 import { useState } from 'react'
 import type { GameEvent, Player, RoleDef } from '@/lib/werewolf/types'
 import { getLiveAssignQueue } from '@/lib/werewolf/live-assign-queue'
+import { getPendingDeathIds } from '@/lib/werewolf/resolve-night'
+import { getActiveNightActions } from '@/lib/werewolf/selectors'
 import { factionOf } from '@/lib/werewolf/faction'
 import { EFFECT_COLOR } from '@/lib/werewolf/effect-color'
 import { TargetGraph } from './target-graph'
@@ -109,6 +111,14 @@ export function NightLiveAssign({
   const actor = actorPlayer!
   const edgeColor = EFFECT_COLOR[role.effect]
   const canConfirm = role.targetCount === 0 || selected.length === role.targetCount
+  const doneActions = getActiveNightActions(events, night)
+
+  // Bình cứu không chỉ định (Phù thủy) — nếu có từ 2 người trở lên đang sắp
+  // chết cùng đêm, bắt MC tự chọn cứu ai thay vì tự động cứu hết.
+  const isUntargetedRevive = role.effect === 'revive' && role.targetCount === 0
+  const reviveCandidates = isUntargetedRevive ? getPendingDeathIds(roles, players, doneActions) : []
+  const needsReviveChoice = isUntargetedRevive && reviveCandidates.length > 1
+  const reviveChoice = selected[0] ?? reviveCandidates[0]
 
   function confirmAction() {
     if (role.effect === 'inspect' && !reveal) {
@@ -117,7 +127,13 @@ export function NightLiveAssign({
       setReveal({ targetName: target.name, isWolf: factionOf(target, roles) === 'wolf' })
       return
     }
-    onCommitAction(role.id, actor.id, selected, false)
+    if (isUntargetedRevive) {
+      const candidates = getPendingDeathIds(roles, players, doneActions)
+      const chosen = candidates.length > 1 ? (selected[0] ?? candidates[0]) : undefined
+      onCommitAction(role.id, actor.id, chosen ? [chosen] : [], false)
+    } else {
+      onCommitAction(role.id, actor.id, selected, false)
+    }
     setSelected([])
     setReveal(null)
   }
@@ -169,6 +185,33 @@ export function NightLiveAssign({
           {useList ? 'Dùng graph kéo thả' : 'Dùng danh sách'}
         </button>
       </div>
+
+      {needsReviveChoice && (
+        <div className="space-y-2">
+          <p className="text-center text-xs text-muted">
+            Có {reviveCandidates.length} người đang sắp chết đêm nay — chọn 1 người để cứu:
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {reviveCandidates.map((id) => {
+              const p = players.find((pl) => pl.id === id)
+              if (!p) return null
+              const isChosen = reviveChoice === id
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setSelected([id])}
+                  className={`rounded-xl border px-3 py-2.5 text-sm transition-colors ${
+                    isChosen ? 'border-accent bg-accent/10 text-fg' : 'border-border bg-surface text-fg hover:border-accent/40'
+                  }`}
+                >
+                  {p.name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {role.targetCount > 0 &&
         (useList ? (
