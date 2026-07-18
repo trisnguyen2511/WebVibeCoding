@@ -1,5 +1,6 @@
 'use client'
 import type { PlayerSetup, RoleDef } from '@/lib/werewolf/types'
+import { groupRoles } from '@/lib/werewolf/role-bundles'
 
 interface SetupAssignProps {
   players: PlayerSetup[]
@@ -18,28 +19,32 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export function SetupAssign({ players, allRoles, counts, onChange }: SetupAssignProps) {
-  const roleById = new Map(allRoles.map((r) => [r.id, r]))
+  const groups = groupRoles(allRoles)
 
   function randomize() {
-    const pool: string[] = []
-    for (const [roleId, count] of Object.entries(counts)) {
-      for (let i = 0; i < count; i++) pool.push(roleId)
+    const pool: string[][] = []
+    for (const group of groups) {
+      const count = counts[group.roleIds[0]] ?? 0
+      for (let i = 0; i < count; i++) pool.push(group.roleIds)
     }
     const shuffled = shuffle(pool)
-    onChange(players.map((p, i) => ({ ...p, roleIds: shuffled[i] ? [shuffled[i]] : [] })))
+    onChange(players.map((p, i) => ({ ...p, roleIds: shuffled[i] ?? [] })))
   }
 
-  function toggleRole(playerId: string, roleId: string) {
+  function toggleGroup(playerId: string, roleIds: string[]) {
     onChange(
       players.map((p) => {
         if (p.id !== playerId) return p
-        const has = p.roleIds.includes(roleId)
-        return { ...p, roleIds: has ? p.roleIds.filter((id) => id !== roleId) : [...p.roleIds, roleId] }
+        const hasAll = roleIds.every((id) => p.roleIds.includes(id))
+        return {
+          ...p,
+          roleIds: hasAll ? p.roleIds.filter((id) => !roleIds.includes(id)) : [...p.roleIds, ...roleIds.filter((id) => !p.roleIds.includes(id))],
+        }
       })
     )
   }
 
-  const availableRoles = allRoles.filter((r) => (counts[r.id] ?? 0) > 0)
+  const availableGroups = groups.filter((g) => (counts[g.roleIds[0]] ?? 0) > 0)
 
   return (
     <div className="space-y-3">
@@ -56,20 +61,20 @@ export function SetupAssign({ players, allRoles, counts, onChange }: SetupAssign
           <li key={player.id} className="rounded-lg border border-border bg-surface p-2.5">
             <p className="mb-1.5 text-sm font-medium text-fg">{player.name}</p>
             <div className="flex flex-wrap gap-1.5">
-              {availableRoles.map((role) => {
-                const active = player.roleIds.includes(role.id)
+              {availableGroups.map((group) => {
+                const active = group.roleIds.every((id) => player.roleIds.includes(id))
                 return (
                   <button
-                    key={role.id}
+                    key={group.key}
                     type="button"
-                    onClick={() => toggleRole(player.id, role.id)}
+                    onClick={() => toggleGroup(player.id, group.roleIds)}
                     className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
                       active
                         ? 'border-accent bg-accent/15 text-fg'
                         : 'border-border text-muted hover:border-accent/40'
                     }`}
                   >
-                    {role.icon} {role.name}
+                    {group.icon} {group.name}
                   </button>
                 )
               })}

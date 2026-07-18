@@ -40,6 +40,8 @@ export interface RoleDef {
   turnsWolfOnBite?: boolean
   /** Nếu bị dân làng vote loại thì thắng cả ván ngay lập tức (VD Thằng Đần). */
   winsIfVotedOut?: boolean
+  /** Các vai cùng bundleId luôn được đếm số lượng và gán chung 1 người (VD 2 bình Phù thủy). */
+  bundleId?: string
 }
 
 export interface Player {

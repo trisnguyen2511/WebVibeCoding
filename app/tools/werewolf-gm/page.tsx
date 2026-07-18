@@ -9,6 +9,7 @@ import { findDeathTrigger } from '@/lib/werewolf/night-queue'
 import { resolveDay } from '@/lib/werewolf/resolve-day'
 import { resolveNight } from '@/lib/werewolf/resolve-night'
 import { getActiveNightActions } from '@/lib/werewolf/selectors'
+import { totalRoleSlots } from '@/lib/werewolf/role-bundles'
 import { clearGameState, loadGameState, saveGameState } from '@/lib/werewolf/storage'
 import type { GameEvent, GameState, RoleDef } from '@/lib/werewolf/types'
 
@@ -205,7 +206,7 @@ export default function WerewolfGmPage() {
     setState((s) => ({ ...s, roles: [...s.roles, role] }))
   }
 
-  const totalAssigned = Object.values(state.setupRoleCounts).reduce((sum, n) => sum + n, 0)
+  const totalAssigned = totalRoleSlots(state.setupRoleCounts, state.roles)
   const everyoneHasRole = state.setupPlayers.every((p) => p.roleIds.length > 0)
   const canStart = state.setupPlayers.length >= 4 && totalAssigned === state.setupPlayers.length && everyoneHasRole
 

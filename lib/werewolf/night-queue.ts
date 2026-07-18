@@ -4,6 +4,8 @@ import { getActiveNightActions } from './selectors'
 export interface NightSlot {
   role: RoleDef
   actorPlayerId: string
+  /** Người giữ vai đã chết hoặc đã dùng hết lượt — MC vẫn "gọi giả" cho công bằng, không có hiệu lực thật. */
+  isFake: boolean
 }
 
 /** Số lần vai này (gắn với 1 actor cụ thể) còn được dùng trong cả ván. null = không giới hạn. */
@@ -44,7 +46,12 @@ export function getBlockedActorIds(roles: RoleDef[], players: Player[], events: 
   return blocked
 }
 
-/** Thứ tự vai trò cần thức dậy đêm nay, mỗi vai gắn với 1 người chơi đại diện thao tác. */
+/**
+ * Thứ tự vai trò cần thức dậy đêm nay, mỗi vai gắn với 1 người chơi đại diện
+ * thao tác. Vai của người đã chết (hoặc đã dùng hết lượt) vẫn được xếp vào
+ * hàng đợi dưới dạng "gọi giả" — MC vẫn giả vờ gọi tên vai đó mỗi đêm để
+ * người chơi bên ngoài không đoán được ai đã chết qua việc vai nào bị bỏ qua.
+ */
 export function getNightQueue(roles: RoleDef[], players: Player[], night: number, events: GameEvent[]): NightSlot[] {
   const eligibleRoles = roles
     .filter((r) => r.actsAtNight && (!r.firstNightOnly || night === 1))
@@ -52,16 +59,23 @@ export function getNightQueue(roles: RoleDef[], players: Player[], night: number
 
   const slots: NightSlot[] = []
   for (const role of eligibleRoles) {
-    const holders = players.filter((p) => p.isAlive && p.roleIds.includes(role.id))
-    if (holders.length === 0) continue
+    const everHolders = players.filter((p) => p.roleIds.includes(role.id))
+    if (everHolders.length === 0) continue
+
     if (role.isCouncil) {
-      slots.push({ role, actorPlayerId: holders[0].id })
+      const livingHolders = everHolders.filter((p) => p.isAlive)
+      const rep = livingHolders[0] ?? everHolders[0]
+      slots.push({ role, actorPlayerId: rep.id, isFake: livingHolders.length === 0 })
       continue
     }
-    for (const holder of holders) {
+
+    for (const holder of everHolders) {
+      if (!holder.isAlive) {
+        slots.push({ role, actorPlayerId: holder.id, isFake: true })
+        continue
+      }
       const remaining = usesRemaining(role, holder.id, events)
-      if (remaining !== null && remaining <= 0) continue
-      slots.push({ role, actorPlayerId: holder.id })
+      slots.push({ role, actorPlayerId: holder.id, isFake: remaining !== null && remaining <= 0 })
     }
   }
   return slots

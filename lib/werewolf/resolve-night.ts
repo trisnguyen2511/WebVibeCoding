@@ -79,9 +79,20 @@ export function resolveNight(
         notes.push(`${role.name} (${actorName}) dùng thuốc độc trên ${targetNames.join(', ')}`)
         break
       case 'revive':
-        for (const id of action.targetPlayerIds) {
-          pendingDeath.delete(id)
-          notes.push(`${role.name} (${actorName}) hồi sinh/cứu ${nameById.get(id) ?? '?'}`)
+        if (action.targetPlayerIds.length === 0) {
+          // Bình thuốc giải kiểu Phù thủy — cứu bất kỳ ai đang sắp chết đêm nay, không cần chỉ định.
+          const savedNames = Array.from(pendingDeath.keys()).map((id) => nameById.get(id) ?? '?')
+          pendingDeath.clear()
+          notes.push(
+            savedNames.length
+              ? `${role.name} (${actorName}) dùng thuốc giải — cứu ${savedNames.join(', ')}`
+              : `${role.name} (${actorName}) dùng thuốc giải nhưng không có ai sắp chết đêm nay`
+          )
+        } else {
+          for (const id of action.targetPlayerIds) {
+            pendingDeath.delete(id)
+            notes.push(`${role.name} (${actorName}) hồi sinh/cứu ${nameById.get(id) ?? '?'}`)
+          }
         }
         break
       case 'swap':

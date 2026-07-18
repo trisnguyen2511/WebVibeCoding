@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import type { RoleDef } from '@/lib/werewolf/types'
+import { groupRoles } from '@/lib/werewolf/role-bundles'
 import { RoleEditorDialog } from './role-editor-dialog'
 
 const FACTION_LABEL: Record<RoleDef['faction'], string> = {
@@ -19,47 +20,58 @@ interface SetupRolesProps {
 
 export function SetupRoles({ allRoles, counts, onCountsChange, onAddCustomRole, totalPlayers }: SetupRolesProps) {
   const [showEditor, setShowEditor] = useState(false)
-  const totalAssigned = Object.values(counts).reduce((sum, n) => sum + n, 0)
+  const groups = groupRoles(allRoles)
+  const totalAssigned = groups.reduce((sum, g) => sum + (counts[g.roleIds[0]] ?? 0), 0)
 
-  function setCount(roleId: string, count: number) {
-    onCountsChange({ ...counts, [roleId]: Math.max(0, count) })
+  function setGroupCount(roleIds: string[], count: number) {
+    const clamped = Math.max(0, count)
+    const next = { ...counts }
+    for (const roleId of roleIds) next[roleId] = clamped
+    onCountsChange(next)
   }
 
   return (
     <div className="space-y-3">
       <ul className="space-y-2">
-        {allRoles.map((role) => (
-          <li
-            key={role.id}
-            className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5"
-          >
-            <span className="text-lg">{role.icon}</span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-fg">
-                {role.name}{' '}
-                <span className="font-mono text-xs text-muted">({FACTION_LABEL[role.faction]})</span>
-              </p>
-              <p className="truncate text-xs text-muted">{role.description}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setCount(role.id, (counts[role.id] ?? 0) - 1)}
-                className="h-7 w-7 rounded-md border border-border text-muted hover:text-fg"
-              >
-                −
-              </button>
-              <span className="w-5 text-center font-mono text-sm text-fg">{counts[role.id] ?? 0}</span>
-              <button
-                type="button"
-                onClick={() => setCount(role.id, (counts[role.id] ?? 0) + 1)}
-                className="h-7 w-7 rounded-md border border-border text-muted hover:text-fg"
-              >
-                +
-              </button>
-            </div>
-          </li>
-        ))}
+        {groups.map((group) => {
+          const count = counts[group.roleIds[0]] ?? 0
+          const atMax = group.maxCount !== undefined && count >= group.maxCount
+          return (
+            <li
+              key={group.key}
+              className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5"
+            >
+              <span className="text-lg">{group.icon}</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-fg">
+                  {group.name}{' '}
+                  <span className="font-mono text-xs text-muted">({FACTION_LABEL[group.roles[0].faction]})</span>
+                </p>
+                <p className="truncate text-xs text-muted">
+                  {group.roles.length > 1 ? group.roles.map((r) => r.description).join(' ') : group.roles[0].description}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setGroupCount(group.roleIds, count - 1)}
+                  className="h-7 w-7 rounded-md border border-border text-muted hover:text-fg"
+                >
+                  −
+                </button>
+                <span className="w-5 text-center font-mono text-sm text-fg">{count}</span>
+                <button
+                  type="button"
+                  onClick={() => setGroupCount(group.roleIds, count + 1)}
+                  disabled={atMax}
+                  className="h-7 w-7 rounded-md border border-border text-muted hover:text-fg disabled:opacity-30"
+                >
+                  +
+                </button>
+              </div>
+            </li>
+          )
+        })}
       </ul>
 
       {showEditor ? (

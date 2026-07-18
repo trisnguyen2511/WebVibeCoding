@@ -22,7 +22,7 @@ interface NightPanelProps {
 export function NightPanel({ roles, players, night, events, onCommitAction, onEndNight }: NightPanelProps) {
   const [selected, setSelected] = useState<string[]>([])
   const [useList, setUseList] = useState(players.length > LIST_FALLBACK_THRESHOLD)
-  const [reveal, setReveal] = useState<{ targetName: string; isWolf: boolean | null } | null>(null)
+  const [reveal, setReveal] = useState<{ targetName: string; isWolf: boolean; blocked: boolean } | null>(null)
 
   const roleById = new Map(roles.map((r) => [r.id, r]))
   const queue = useMemo(() => getNightQueue(roles, players, night, events), [roles, players, night, events])
@@ -40,8 +40,7 @@ export function NightPanel({ roles, players, night, events, onCommitAction, onEn
     if (role.effect === 'inspect' && !reveal) {
       const target = players.find((p) => p.id === selected[0])
       if (!target) return
-      const isBlocked = blockedIds.has(actorPlayerId)
-      setReveal(isBlocked ? { targetName: target.name, isWolf: null } : { targetName: target.name, isWolf: factionOf(target, roles) === 'wolf' })
+      setReveal({ targetName: target.name, isWolf: factionOf(target, roles) === 'wolf', blocked: blockedIds.has(actorPlayerId) })
       return
     }
     onCommitAction(role.id, actorPlayerId, selected, false)
@@ -89,22 +88,15 @@ export function NightPanel({ roles, players, night, events, onCommitAction, onEn
   if (reveal) {
     return (
       <div className="space-y-4">
-        <div
-          className={`rounded-2xl border px-5 py-8 text-center ${
-            reveal.isWolf === null ? 'border-amber-500/40 bg-amber-500/10' : 'border-blue-500/40 bg-blue-500/10'
-          }`}
-        >
-          <p className="text-3xl">{reveal.isWolf === null ? '🔒' : reveal.isWolf ? '🐺' : '🕊️'}</p>
-          <p className="mt-3 text-sm text-muted">Kết quả soi (chỉ MC thấy)</p>
-          {reveal.isWolf === null ? (
-            <p className="mt-1 font-display text-base font-semibold text-fg">
-              Tiên tri bị Nguyệt Nữ khóa đêm nay — không có kết quả thật.
-              <br />
-              <span className="text-xs font-normal text-muted">MC tự quyết định: không trả lời hoặc chỉ ngược kết quả.</span>
-            </p>
-          ) : (
-            <p className="mt-1 font-display text-lg font-semibold text-fg">
-              {reveal.targetName} {reveal.isWolf ? 'LÀ phe Sói' : 'KHÔNG PHẢI phe Sói'}
+        <div className="rounded-2xl border border-blue-500/40 bg-blue-500/10 px-5 py-8 text-center">
+          <p className="text-3xl">{reveal.isWolf ? '🐺' : '🕊️'}</p>
+          <p className="mt-3 text-sm text-muted">Kết quả soi thật (chỉ MC thấy)</p>
+          <p className="mt-1 font-display text-lg font-semibold text-fg">
+            {reveal.targetName} {reveal.isWolf ? 'LÀ phe Sói' : 'KHÔNG PHẢI phe Sói'}
+          </p>
+          {reveal.blocked && (
+            <p className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+              ⚠️ Tiên tri đã bị Nguyệt Nữ ngủ đêm nay — MC tự quyết định nói thật, nói ngược, hay không trả lời.
             </p>
           )}
         </div>
@@ -155,7 +147,25 @@ export function NightPanel({ roles, players, night, events, onCommitAction, onEn
         )}
       </div>
 
-      {isBlocked ? (
+      {currentSlot.isFake ? (
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-border bg-surface px-4 py-6 text-center">
+            <p className="text-2xl">📢</p>
+            <p className="mt-2 text-sm text-fg">
+              {actor?.isAlive
+                ? 'Đã dùng hết lượt — MC vẫn giả vờ gọi vai này để người chơi không đoán được ai còn khả năng.'
+                : 'Người giữ vai này đã chết — MC vẫn giả vờ gọi tên vai để người chơi không đoán được ai đã chết.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={skip}
+            className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg shadow-lg shadow-accent/20 transition-transform active:scale-[0.98]"
+          >
+            Đã gọi giả — tiếp tục
+          </button>
+        </div>
+      ) : isBlocked && role.effect !== 'inspect' ? (
         <div className="space-y-3">
           <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-6 text-center">
             <p className="text-2xl">🔒</p>
@@ -201,7 +211,7 @@ export function NightPanel({ roles, players, night, events, onCommitAction, onEn
                 onClick={skip}
                 className="rounded-xl border border-border px-4 py-3 text-sm text-muted transition-colors hover:border-accent/40 hover:text-fg"
               >
-                Bỏ qua lượt
+                {role.effect === 'revive' && role.targetCount === 0 ? 'Không cứu' : 'Bỏ qua lượt'}
               </button>
             )}
             <button
@@ -210,7 +220,7 @@ export function NightPanel({ roles, players, night, events, onCommitAction, onEn
               disabled={!canConfirm}
               className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg shadow-lg shadow-accent/20 transition-transform active:scale-[0.98] disabled:opacity-40 disabled:shadow-none"
             >
-              Xác nhận vai này
+              {role.effect === 'revive' && role.targetCount === 0 ? '🍵 Cứu' : 'Xác nhận vai này'}
             </button>
           </div>
         </>
