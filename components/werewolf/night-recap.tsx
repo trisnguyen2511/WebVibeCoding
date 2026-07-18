@@ -13,39 +13,46 @@ interface NightRecapProps {
   healed: { actorPlayerId: string; playerId: string }[]
   onToggleAlive: (playerId: string, isAlive: boolean) => void
   onConfirm: () => void
+  /** Chỉ xem lại (VD tóm tắt cuối ván) — ẩn nút sửa trạng thái và nút xác nhận. */
+  readOnly?: boolean
 }
 
 function markerId(color: string) {
   return `recap-arrow-${color.replace('#', '')}`
 }
 
-// Bán kính ngang cố định để chiều rộng không bao giờ vượt màn hình — với
-// nhóm đông người, bán kính dọc giãn ra thay vì phóng to cả 2 chiều.
-const RADIUS_X = 148
+// Vòng tròn kích thước cố định — KHÔNG giãn thành elip theo số người, vì elip
+// cao buộc MC phải cuộn xuống mới bấm được nút xác nhận.
+const RADIUS = 148
 const NODE_R = 26
 const PAD_X = 32
 const PAD_Y = 40
+const WIDTH = RADIUS * 2 + NODE_R * 2 + PAD_X * 2
+const HEIGHT = RADIUS * 2 + NODE_R * 2 + PAD_Y * 2
+const CENTER_X = WIDTH / 2
+const CENTER_Y = HEIGHT / 2
 
-function ellipseGeometry(count: number) {
-  const radiusY = count <= 8 ? RADIUS_X : RADIUS_X + (count - 8) * 18
-  const width = RADIUS_X * 2 + NODE_R * 2 + PAD_X * 2
-  const height = radiusY * 2 + NODE_R * 2 + PAD_Y * 2
-  return { radiusX: RADIUS_X, radiusY, width, height, centerX: width / 2, centerY: height / 2 }
-}
-
-function nodePosition(
-  index: number,
-  total: number,
-  geo: { radiusX: number; radiusY: number; centerX: number; centerY: number }
-) {
+function nodePosition(index: number, total: number) {
   const angle = (index / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2
-  return { x: geo.centerX + geo.radiusX * Math.cos(angle), y: geo.centerY + geo.radiusY * Math.sin(angle) }
+  return { x: CENTER_X + RADIUS * Math.cos(angle), y: CENTER_Y + RADIUS * Math.sin(angle) }
 }
 
-export function NightRecap({ players, roles, night, actions, deaths, healed, onToggleAlive, onConfirm }: NightRecapProps) {
+/**
+ * Node (vẽ sau, r=NODE_R) đè lên trên line — nếu mũi tên chạm đúng tâm node
+ * thì bị che khuất hoàn toàn (đây là lý do đường dẫn thao tác không thấy mũi
+ * tên). Kéo lùi điểm cuối ra khỏi mép node để mũi tên hiện rõ bên ngoài.
+ */
+function pullBackToEdge(from: { x: number; y: number }, to: { x: number; y: number }, distance: number) {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const len = Math.hypot(dx, dy)
+  if (len <= distance) return to
+  return { x: to.x - (dx / len) * distance, y: to.y - (dy / len) * distance }
+}
+
+export function NightRecap({ players, roles, night, actions, deaths, healed, onToggleAlive, onConfirm, readOnly = false }: NightRecapProps) {
   const roleById = new Map(roles.map((r) => [r.id, r]))
-  const geo = ellipseGeometry(players.length)
-  const positions = new Map(players.map((p, i) => [p.id, nodePosition(i, players.length, geo)]))
+  const positions = new Map(players.map((p, i) => [p.id, nodePosition(i, players.length)]))
   const deathSet = new Set(deaths)
 
   const actionArrows = actions
@@ -59,7 +66,7 @@ export function NightRecap({ players, roles, night, actions, deaths, healed, onT
         .map((targetId) => {
           const to = positions.get(targetId)
           if (!from || !to) return null
-          return { key: `${a.id}-${targetId}`, from, to, color }
+          return { key: `${a.id}-${targetId}`, from, to: pullBackToEdge(from, to, NODE_R + 4), color }
         })
         .filter((x): x is { key: string; from: { x: number; y: number }; to: { x: number; y: number }; color: string } => !!x)
     })
@@ -71,7 +78,7 @@ export function NightRecap({ players, roles, night, actions, deaths, healed, onT
       const from = positions.get(h.actorPlayerId)
       const to = positions.get(h.playerId)
       if (!from || !to) return null
-      return { key: `heal-${h.actorPlayerId}-${h.playerId}`, from, to, color: EFFECT_COLOR.revive }
+      return { key: `heal-${h.actorPlayerId}-${h.playerId}`, from, to: pullBackToEdge(from, to, NODE_R + 4), color: EFFECT_COLOR.revive }
     })
     .filter((x): x is { key: string; from: { x: number; y: number }; to: { x: number; y: number }; color: string } => !!x)
 
@@ -88,7 +95,7 @@ export function NightRecap({ players, roles, night, actions, deaths, healed, onT
         </p>
       </div>
 
-      <svg viewBox={`0 0 ${geo.width} ${geo.height}`} className="mx-auto h-auto w-full max-w-[400px] select-none">
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="mx-auto h-auto w-full max-w-[400px] select-none">
         <defs>
           {arrowColors.map((color) => (
             <marker key={color} id={markerId(color)} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
@@ -185,30 +192,38 @@ export function NightRecap({ players, roles, night, actions, deaths, healed, onT
                     {player.linkedWith.length > 0 && <span className="text-pink-400"> · 💘 Cặp đôi</span>}
                   </span>
                 </span>
-                <button
-                  type="button"
-                  onClick={() => onToggleAlive(player.id, !player.isAlive)}
-                  className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    player.isAlive
-                      ? 'border-border text-muted hover:border-red-500/40 hover:text-red-400'
-                      : 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10'
-                  }`}
-                >
-                  {player.isAlive ? 'Đang sống · cho chết' : 'Đã chết · hồi sinh'}
-                </button>
+                {readOnly ? (
+                  <span className={`shrink-0 text-xs ${player.isAlive ? 'text-muted' : 'text-red-400'}`}>
+                    {player.isAlive ? 'Còn sống' : 'Đã chết'}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onToggleAlive(player.id, !player.isAlive)}
+                    className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      player.isAlive
+                        ? 'border-border text-muted hover:border-red-500/40 hover:text-red-400'
+                        : 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10'
+                    }`}
+                  >
+                    {player.isAlive ? 'Đang sống · cho chết' : 'Đã chết · hồi sinh'}
+                  </button>
+                )}
               </li>
             )
           })}
         </ul>
       </div>
 
-      <button
-        type="button"
-        onClick={onConfirm}
-        className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg shadow-lg shadow-accent/20 transition-transform active:scale-[0.98]"
-      >
-        ✅ Xác nhận, sang ngày
-      </button>
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg shadow-lg shadow-accent/20 transition-transform active:scale-[0.98]"
+        >
+          ✅ Xác nhận, sang ngày
+        </button>
+      )}
     </div>
   )
 }

@@ -25,6 +25,7 @@ import { DeathTriggerPanel } from '@/components/werewolf/death-trigger-panel'
 import { TimelineView } from '@/components/werewolf/timeline-view'
 import { RosterView } from '@/components/werewolf/roster-view'
 import { WinBanner } from '@/components/werewolf/win-banner'
+import { GameSummary } from '@/components/werewolf/game-summary'
 
 function initialState(): GameState {
   return {
@@ -47,6 +48,10 @@ export default function WerewolfGmPage() {
   const [showTimeline, setShowTimeline] = useState(false)
   const [showRoster, setShowRoster] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  // Ngăn xếp redo — event cuối mảng là cái sắp được redo tiếp theo. Bị xoá
+  // sạch bất cứ khi nào có 1 event MỚI được ghi (không phải do undo/redo),
+  // vì lúc đó "tương lai" đã undo không còn hợp lệ nữa.
+  const [redoStack, setRedoStack] = useState<GameEvent[]>([])
 
   useEffect(() => {
     try {
@@ -89,6 +94,7 @@ export default function WerewolfGmPage() {
   )
 
   function pushEvent(event: GameEvent) {
+    setRedoStack([])
     setState((s) => ({ ...s, events: [...s.events, event] }))
   }
 
@@ -129,6 +135,7 @@ export default function WerewolfGmPage() {
     const nextEvents: GameEvent[] = [...state.events, { id: crypto.randomUUID(), type: 'day_resolved', payload: resolution }]
     const nextPlayers = derivePlayers(state.setupPlayers, state.roles, nextEvents)
     const ended = !!resolution.foolWinnerId || !!checkWinCondition(nextPlayers, state.roles) || !!checkLoversWin(nextPlayers)
+    setRedoStack([])
     setState((s) => ({
       ...s,
       events: nextEvents,
@@ -165,6 +172,7 @@ export default function WerewolfGmPage() {
     // chỉ kết thúc ván sớm nếu phát bắn này vừa phân định thắng thua.
     const nextPlayers = derivePlayers(state.setupPlayers, state.roles, nextEvents)
     const ended = !!checkWinCondition(nextPlayers, state.roles) || !!checkLoversWin(nextPlayers)
+    setRedoStack([])
     setState((s) => ({ ...s, events: nextEvents, currentPhase: ended ? 'ended' : s.currentPhase }))
   }
 
@@ -172,6 +180,7 @@ export default function WerewolfGmPage() {
     const { events: nextEvents, popped } = popLastEvent(state.events)
     if (!popped) return
     const transition = phaseAfterUndo(popped)
+    setRedoStack((r) => [...r, popped])
     setState((s) => ({
       ...s,
       events: nextEvents,
@@ -181,11 +190,42 @@ export default function WerewolfGmPage() {
     }))
   }
 
+  /** Redo lại đúng 1 event vừa undo — suy ra phase tương ứng theo loại event,
+   * giống hệt logic của các hàm push tương ứng lúc event đó lần đầu xảy ra. */
+  function handleRedo() {
+    if (redoStack.length === 0) return
+    const event = redoStack[redoStack.length - 1]
+    const nextEvents = [...state.events, event]
+    const nextPlayers = derivePlayers(state.setupPlayers, state.roles, nextEvents)
+
+    let nextPhase = state.currentPhase
+    let nextNight = state.currentNight
+    let nextDay = state.currentDay
+
+    if (event.type === 'night_resolved') {
+      nextPhase = 'recap'
+    } else if (event.type === 'day_resolved') {
+      const ended = !!event.payload.foolWinnerId || !!checkWinCondition(nextPlayers, state.roles) || !!checkLoversWin(nextPlayers)
+      nextPhase = ended ? 'ended' : 'night'
+      nextNight = ended ? state.currentNight : state.currentDay + 1
+      nextDay = ended ? state.currentDay : state.currentDay + 1
+    } else if (event.type === 'death_trigger_resolved') {
+      const ended = !!checkWinCondition(nextPlayers, state.roles) || !!checkLoversWin(nextPlayers)
+      if (ended) nextPhase = 'ended'
+    }
+    // 'manual_override' và 'night_action' không đổi phase/đêm/ngày.
+
+    setRedoStack((r) => r.slice(0, -1))
+    setState((s) => ({ ...s, events: nextEvents, currentPhase: nextPhase, currentNight: nextNight, currentDay: nextDay }))
+  }
+
   function handleUndoTo(index: number) {
+    const removed = state.events.slice(index)
     const nextEvents = state.events.slice(0, index)
     const transition = phaseAfterTruncate(nextEvents)
     const nextPlayers = derivePlayers(state.setupPlayers, state.roles, nextEvents)
     const ended = !!checkWinCondition(nextPlayers, state.roles) || !!checkLoversWin(nextPlayers)
+    setRedoStack([...removed].reverse())
     setState((s) => ({
       ...s,
       events: nextEvents,
@@ -201,6 +241,7 @@ export default function WerewolfGmPage() {
    * nhập/chọn lại từ đầu, chỉ cần đi qua bước "Gán vai" một lần nữa.
    */
   function handlePlayAgain() {
+    setRedoStack([])
     setState((s) => ({
       ...s,
       setupPlayers: s.setupPlayers.map((p) => ({ ...p, roleIds: [] })),
@@ -222,6 +263,7 @@ export default function WerewolfGmPage() {
   function handleResetEverything() {
     clearGameState()
     setState(initialState())
+    setRedoStack([])
     setSetupStep('players')
     setShowTimeline(false)
   }
@@ -306,6 +348,15 @@ export default function WerewolfGmPage() {
                   className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-accent/40 hover:text-fg"
                 >
                   ↩ Hoàn tác
+                </button>
+              )}
+              {redoStack.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleRedo}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-accent/40 hover:text-fg"
+                >
+                  ↪ Làm lại
                 </button>
               )}
             </div>
@@ -450,20 +501,23 @@ export default function WerewolfGmPage() {
         )}
 
         {!showTimeline && !showRoster && state.currentPhase === 'ended' && (
-          <WinBanner
-            winner={checkWinCondition(players, state.roles) ?? 'village'}
-            soloWinnerName={foolWinEvent ? players.find((p) => p.id === foolWinEvent.payload.foolWinnerId)?.name : undefined}
-            loverNames={(() => {
-              const lovers = checkLoversWin(players)
-              if (!lovers) return undefined
-              const [a, b] = lovers
-              const nameA = players.find((p) => p.id === a)?.name
-              const nameB = players.find((p) => p.id === b)?.name
-              return nameA && nameB ? ([nameA, nameB] as [string, string]) : undefined
-            })()}
-            onPlayAgain={handlePlayAgain}
-            onResetAll={handleResetEverything}
-          />
+          <>
+            <WinBanner
+              winner={checkWinCondition(players, state.roles) ?? 'village'}
+              soloWinnerName={foolWinEvent ? players.find((p) => p.id === foolWinEvent.payload.foolWinnerId)?.name : undefined}
+              loverNames={(() => {
+                const lovers = checkLoversWin(players)
+                if (!lovers) return undefined
+                const [a, b] = lovers
+                const nameA = players.find((p) => p.id === a)?.name
+                const nameB = players.find((p) => p.id === b)?.name
+                return nameA && nameB ? ([nameA, nameB] as [string, string]) : undefined
+              })()}
+              onPlayAgain={handlePlayAgain}
+              onResetAll={handleResetEverything}
+            />
+            <GameSummary events={state.events} setupPlayers={state.setupPlayers} roles={state.roles} />
+          </>
         )}
 
         {!showTimeline && !showRoster && state.currentPhase === 'recap' && lastNightResolution && (
