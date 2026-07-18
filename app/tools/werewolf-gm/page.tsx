@@ -10,6 +10,7 @@ import { resolveDay } from '@/lib/werewolf/resolve-day'
 import { resolveNight } from '@/lib/werewolf/resolve-night'
 import { getActiveNightActions } from '@/lib/werewolf/selectors'
 import { totalRoleSlots } from '@/lib/werewolf/role-bundles'
+import { randomizeAssignment } from '@/lib/werewolf/randomize-assignment'
 import { clearGameState, loadGameState, saveGameState } from '@/lib/werewolf/storage'
 import type { GameEvent, GameState, RoleDef } from '@/lib/werewolf/types'
 
@@ -18,6 +19,7 @@ import { SetupRoles } from '@/components/werewolf/setup-roles'
 import { SetupAssign } from '@/components/werewolf/setup-assign'
 import { SetupOrder } from '@/components/werewolf/setup-order'
 import { NightPanel } from '@/components/werewolf/night-panel'
+import { NightLiveAssign } from '@/components/werewolf/night-live-assign'
 import { NightRecap } from '@/components/werewolf/night-recap'
 import { DayPanel } from '@/components/werewolf/day-panel'
 import { DeathTriggerPanel } from '@/components/werewolf/death-trigger-panel'
@@ -30,6 +32,7 @@ function initialState(): GameState {
     setupPlayers: [],
     roles: cloneBuiltInRoles(),
     setupRoleCounts: {},
+    assignMode: 'preset',
     events: [],
     currentNight: 1,
     currentDay: 1,
@@ -37,7 +40,7 @@ function initialState(): GameState {
   }
 }
 
-type SetupStep = 'players' | 'roles' | 'assign' | 'order'
+type SetupStep = 'players' | 'order' | 'roles' | 'assign'
 
 export default function WerewolfGmPage() {
   const [state, setState] = useState<GameState>(initialState)
@@ -85,6 +88,10 @@ export default function WerewolfGmPage() {
       type: 'night_action',
       payload: { id: crypto.randomUUID(), night: state.currentNight, roleId, actorPlayerId, targetPlayerIds, skipped, createdAt: Date.now() },
     })
+  }
+
+  function handleSeatCalled(playerId: string) {
+    pushEvent({ id: crypto.randomUUID(), type: 'seat_called', payload: { night: state.currentNight, playerId } })
   }
 
   function handleEndNight() {
@@ -174,12 +181,15 @@ export default function WerewolfGmPage() {
     }))
   }
 
-  /** Chơi ván mới nhưng giữ nguyên danh sách người chơi (và các vai trò tùy chỉnh đã tạo) để MC không phải nhập lại từ đầu. */
+  /**
+   * Chơi ván mới nhưng giữ nguyên danh sách người chơi, số lượng vai đã chọn
+   * và chế độ gán vai (chỉ cần assign lại người cho vai) — MC không phải
+   * nhập/chọn lại từ đầu, chỉ cần đi qua bước "Gán vai" một lần nữa.
+   */
   function handlePlayAgain() {
     setState((s) => ({
       ...s,
       setupPlayers: s.setupPlayers.map((p) => ({ ...p, roleIds: [] })),
-      setupRoleCounts: {},
       events: [],
       currentNight: 1,
       currentDay: 1,
@@ -207,14 +217,26 @@ export default function WerewolfGmPage() {
   }
 
   const totalAssigned = totalRoleSlots(state.setupRoleCounts, state.roles)
+  const rolesFullyChosen = totalAssigned === state.setupPlayers.length
   const everyoneHasRole = state.setupPlayers.every((p) => p.roleIds.length > 0)
-  const canStart = state.setupPlayers.length >= 4 && totalAssigned === state.setupPlayers.length && everyoneHasRole
+  const canStart =
+    state.setupPlayers.length >= 4 && rolesFullyChosen && (state.assignMode === 'live' || everyoneHasRole)
+
+  function handleStartGame() {
+    setState((s) => ({
+      ...s,
+      setupPlayers: s.assignMode === 'live' ? randomizeAssignment(s.setupPlayers, s.roles, s.setupRoleCounts) : s.setupPlayers,
+      currentPhase: 'night',
+      currentNight: 1,
+      currentDay: 1,
+    }))
+  }
 
   const SETUP_STEPS: { key: SetupStep; label: string }[] = [
     { key: 'players', label: 'Người chơi' },
+    { key: 'order', label: 'Sắp xếp' },
     { key: 'roles', label: 'Vai trò' },
     { key: 'assign', label: 'Gán vai' },
-    { key: 'order', label: 'Sắp xếp' },
   ]
   const stepIndex = SETUP_STEPS.findIndex((s) => s.key === setupStep)
 
@@ -309,11 +331,36 @@ export default function WerewolfGmPage() {
                 <button
                   type="button"
                   disabled={state.setupPlayers.length < 4}
-                  onClick={() => setSetupStep('roles')}
+                  onClick={() => setSetupStep('order')}
                   className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg transition-transform active:scale-[0.98] disabled:opacity-40"
                 >
-                  Tiếp: chọn vai trò
+                  Tiếp: sắp xếp vị trí
                 </button>
+              </>
+            )}
+
+            {setupStep === 'order' && (
+              <>
+                <SetupOrder
+                  players={state.setupPlayers}
+                  onChange={(setupPlayers) => setState((s) => ({ ...s, setupPlayers }))}
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSetupStep('players')}
+                    className="rounded-xl border border-border px-4 py-3 text-sm text-muted transition-colors hover:text-fg"
+                  >
+                    Quay lại
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSetupStep('roles')}
+                    className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg transition-transform active:scale-[0.98]"
+                  >
+                    Tiếp: chọn vai trò
+                  </button>
+                </div>
               </>
             )}
 
@@ -329,14 +376,14 @@ export default function WerewolfGmPage() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setSetupStep('players')}
+                    onClick={() => setSetupStep('order')}
                     className="rounded-xl border border-border px-4 py-3 text-sm text-muted transition-colors hover:text-fg"
                   >
                     Quay lại
                   </button>
                   <button
                     type="button"
-                    disabled={totalAssigned !== state.setupPlayers.length}
+                    disabled={!rolesFullyChosen}
                     onClick={() => setSetupStep('assign')}
                     className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg transition-transform active:scale-[0.98] disabled:opacity-40"
                   >
@@ -352,6 +399,8 @@ export default function WerewolfGmPage() {
                   players={state.setupPlayers}
                   allRoles={state.roles}
                   counts={state.setupRoleCounts}
+                  assignMode={state.assignMode}
+                  onAssignModeChange={(assignMode) => setState((s) => ({ ...s, assignMode }))}
                   onChange={(setupPlayers) => setState((s) => ({ ...s, setupPlayers }))}
                 />
                 <div className="flex gap-2">
@@ -365,34 +414,7 @@ export default function WerewolfGmPage() {
                   <button
                     type="button"
                     disabled={!canStart}
-                    onClick={() => setSetupStep('order')}
-                    className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg transition-transform active:scale-[0.98] disabled:opacity-40"
-                  >
-                    Tiếp: sắp xếp vị trí
-                  </button>
-                </div>
-              </>
-            )}
-
-            {setupStep === 'order' && (
-              <>
-                <SetupOrder
-                  players={state.setupPlayers}
-                  allRoles={state.roles}
-                  onChange={(setupPlayers) => setState((s) => ({ ...s, setupPlayers }))}
-                />
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSetupStep('assign')}
-                    className="rounded-xl border border-border px-4 py-3 text-sm text-muted transition-colors hover:text-fg"
-                  >
-                    Quay lại
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canStart}
-                    onClick={() => setState((s) => ({ ...s, currentPhase: 'night', currentNight: 1, currentDay: 1 }))}
+                    onClick={handleStartGame}
                     className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg shadow-lg shadow-accent/20 transition-transform active:scale-[0.98] disabled:opacity-40 disabled:shadow-none"
                   >
                     🌙 Bắt đầu ván
@@ -438,16 +460,30 @@ export default function WerewolfGmPage() {
             />
           )}
 
-        {!showTimeline && !showRoster && state.currentPhase === 'night' && !pendingTrigger && (
-          <NightPanel
-            roles={state.roles}
-            players={players}
-            night={state.currentNight}
-            events={state.events}
-            onCommitAction={handleCommitNightAction}
-            onEndNight={handleEndNight}
-          />
-        )}
+        {!showTimeline &&
+          !showRoster &&
+          state.currentPhase === 'night' &&
+          !pendingTrigger &&
+          (state.currentNight === 1 && state.assignMode === 'live' ? (
+            <NightLiveAssign
+              roles={state.roles}
+              players={players}
+              night={state.currentNight}
+              events={state.events}
+              onCommitAction={handleCommitNightAction}
+              onSeatCalled={handleSeatCalled}
+              onEndNight={handleEndNight}
+            />
+          ) : (
+            <NightPanel
+              roles={state.roles}
+              players={players}
+              night={state.currentNight}
+              events={state.events}
+              onCommitAction={handleCommitNightAction}
+              onEndNight={handleEndNight}
+            />
+          ))}
 
         {!showTimeline && !showRoster && state.currentPhase === 'day' && !pendingTrigger && (
           <DayPanel players={players} day={state.currentDay} onEliminate={handleEliminate} onSkip={handleSkipDay} />

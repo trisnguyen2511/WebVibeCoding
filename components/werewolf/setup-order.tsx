@@ -1,17 +1,14 @@
 'use client'
-import type { PlayerSetup, RoleDef } from '@/lib/werewolf/types'
+import type { PlayerSetup } from '@/lib/werewolf/types'
 
 interface SetupOrderProps {
   players: PlayerSetup[]
-  allRoles: RoleDef[]
   onChange: (players: PlayerSetup[]) => void
 }
 
 // Thứ tự trong mảng players quyết định vị trí trên vòng tròn của TargetGraph —
 // sắp xếp lại đây để khớp với chỗ ngồi thật ngoài đời, giúp MC dễ hướng dẫn.
-export function SetupOrder({ players, allRoles, onChange }: SetupOrderProps) {
-  const roleById = new Map(allRoles.map((r) => [r.id, r]))
-
+export function SetupOrder({ players, onChange }: SetupOrderProps) {
   function move(index: number, direction: -1 | 1) {
     const target = index + direction
     if (target < 0 || target >= players.length) return
@@ -23,7 +20,7 @@ export function SetupOrder({ players, allRoles, onChange }: SetupOrderProps) {
   return (
     <div className="space-y-2">
       <p className="text-xs text-muted">
-        Sắp xếp theo đúng vị trí ngồi ngoài đời để khi thao tác trên vòng tròn dễ chỉ tay hơn.
+        Sắp xếp theo đúng vị trí ngồi ngoài đời trước khi chia vai — giúp vòng tròn thao tác đêm dễ chỉ tay hơn.
       </p>
       <ul className="space-y-1.5">
         {players.map((player, i) => (
@@ -34,12 +31,7 @@ export function SetupOrder({ players, allRoles, onChange }: SetupOrderProps) {
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border font-mono text-xs text-muted">
               {i + 1}
             </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm text-fg">{player.name}</p>
-              <p className="truncate text-xs text-muted">
-                {player.roleIds.map((id) => roleById.get(id)?.name).filter(Boolean).join(', ') || 'Chưa có vai trò'}
-              </p>
-            </div>
+            <p className="min-w-0 flex-1 truncate text-sm text-fg">{player.name}</p>
             <div className="flex shrink-0 gap-1">
               <button
                 type="button"

@@ -99,6 +99,8 @@ export type GameEvent =
   | { id: string; type: 'death_trigger_resolved'; payload: { playerId: string; targetPlayerIds: string[]; roleId: string } }
   /** MC tự sửa tay trạng thái sống/chết khi phát hiện hệ thống tính nhầm. */
   | { id: string; type: 'manual_override'; payload: { playerId: string; isAlive: boolean } }
+  /** MC đã gọi xong 1 người trong chế độ gán vai trực tiếp đêm 1 (kể cả người không có hành động). */
+  | { id: string; type: 'seat_called'; payload: { night: number; playerId: string } }
 
 export type GamePhase = 'setup' | 'night' | 'recap' | 'day' | 'ended'
 
@@ -108,10 +110,14 @@ export interface PlayerSetup {
   roleIds: string[]
 }
 
+export type AssignMode = 'preset' | 'live'
+
 export interface GameState {
   setupPlayers: PlayerSetup[]
   roles: RoleDef[]
   setupRoleCounts: Record<string, number>
+  /** 'preset' = gán vai xong xuôi trước khi vào đêm; 'live' = gọi từng người theo chỗ ngồi ngay trong đêm 1 rồi mới gán. */
+  assignMode: AssignMode
   events: GameEvent[]
   currentNight: number
   currentDay: number

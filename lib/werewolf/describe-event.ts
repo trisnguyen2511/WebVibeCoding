@@ -38,5 +38,7 @@ export function describeEvent(event: GameEvent, players: Player[], roles: RoleDe
     }
     case 'manual_override':
       return `MC sửa tay — ${name(event.payload.playerId)} → ${event.payload.isAlive ? 'sống lại' : 'cho chết'}`
+    case 'seat_called':
+      return `Đêm ${event.payload.night} — đã gọi và gán vai cho ${name(event.payload.playerId)}`
   }
 }
