@@ -188,6 +188,12 @@ export default function WerewolfGmPage() {
     setShowTimeline(false)
   }
 
+  /** Nút "Chơi lại" giữa ván đang chơi — hỏi xác nhận vì sẽ hủy toàn bộ tiến trình đêm/ngày hiện tại. */
+  function handleRestartGame() {
+    if (!window.confirm('Hủy ván đang chơi và quay lại màn hình thêm người chơi? (vẫn giữ danh sách tên hiện tại)')) return
+    handlePlayAgain()
+  }
+
   function handleResetEverything() {
     clearGameState()
     setState(initialState())
@@ -238,15 +244,26 @@ export default function WerewolfGmPage() {
                 {showRoster ? '✕ Đóng vai trò' : '👥 Vai trò'}
               </button>
             </div>
-            {state.events.length > 0 && (
-              <button
-                type="button"
-                onClick={handleUndo}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-accent/40 hover:text-fg"
-              >
-                ↩ Hoàn tác
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {state.currentPhase !== 'ended' && (
+                <button
+                  type="button"
+                  onClick={handleRestartGame}
+                  className="rounded-lg border border-red-500/30 px-3 py-1.5 text-xs text-red-400 transition-colors hover:border-red-500/60 hover:bg-red-500/10"
+                >
+                  🔄 Chơi lại
+                </button>
+              )}
+              {state.events.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleUndo}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-accent/40 hover:text-fg"
+                >
+                  ↩ Hoàn tác
+                </button>
+              )}
+            </div>
           </div>
         )}
 
