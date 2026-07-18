@@ -26,7 +26,7 @@ function markerId(color: string) {
 const RADIUS = 148
 const NODE_R = 26
 const PAD_X = 32
-const PAD_Y = 40
+const PAD_Y = 48
 const WIDTH = RADIUS * 2 + NODE_R * 2 + PAD_X * 2
 const HEIGHT = RADIUS * 2 + NODE_R * 2 + PAD_Y * 2
 const CENTER_X = WIDTH / 2
@@ -125,6 +125,16 @@ export function NightRecap({ players, roles, night, actions, deaths, healed, onT
           return (
             <g key={player.id} opacity={player.isAlive ? 1 : 0.35}>
               <circle cx={pos.x} cy={pos.y} r={NODE_R} fill="rgb(var(--color-surface))" stroke={color} strokeWidth={2.5} />
+              {role && (
+                <text
+                  x={pos.x}
+                  y={pos.y - NODE_R - (deathSet.has(player.id) && !player.isAlive ? 20 : 8)}
+                  textAnchor="middle"
+                  className="pointer-events-none select-none text-[10px] fill-muted"
+                >
+                  {role.shortName ?? role.name}
+                </text>
+              )}
               {role?.actsAtNight && (
                 <g>
                   <circle cx={pos.x + NODE_R - 4} cy={pos.y - NODE_R + 4} r={7} fill={color} />
