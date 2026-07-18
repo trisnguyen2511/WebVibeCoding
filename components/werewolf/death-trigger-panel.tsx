@@ -6,12 +6,13 @@ import { ListTargetPicker } from './list-target-picker'
 
 interface DeathTriggerPanelProps {
   role: RoleDef
+  roles: RoleDef[]
   actorPlayerId: string
   players: Player[]
   onCommit: (targetPlayerIds: string[]) => void
 }
 
-export function DeathTriggerPanel({ role, actorPlayerId, players, onCommit }: DeathTriggerPanelProps) {
+export function DeathTriggerPanel({ role, roles, actorPlayerId, players, onCommit }: DeathTriggerPanelProps) {
   const [selected, setSelected] = useState<string[]>([])
   const [useList, setUseList] = useState(false)
   const actor = players.find((p) => p.id === actorPlayerId)
@@ -42,6 +43,7 @@ export function DeathTriggerPanel({ role, actorPlayerId, players, onCommit }: De
         ) : (
           <TargetGraph
             players={players}
+            roles={roles}
             actorId={actorPlayerId}
             targetCount={role.targetCount}
             selected={selected}

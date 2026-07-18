@@ -1,9 +1,11 @@
 'use client'
 import { useRef, useState } from 'react'
-import type { Player } from '@/lib/werewolf/types'
+import type { Player, RoleDef } from '@/lib/werewolf/types'
+import { primaryRole } from '@/lib/werewolf/primary-role'
 
 interface TargetGraphProps {
   players: Player[]
+  roles: RoleDef[]
   actorId: string
   targetCount: 0 | 1 | 2
   selected: string[]
@@ -26,12 +28,9 @@ function nodePosition(index: number, total: number) {
   }
 }
 
-function initials(name: string) {
-  return name.trim().slice(0, 2).toUpperCase()
-}
-
 export function TargetGraph({
   players,
+  roles,
   actorId,
   targetCount,
   selected,
@@ -43,6 +42,7 @@ export function TargetGraph({
   const svgRef = useRef<SVGSVGElement>(null)
   const draggingRef = useRef(false)
   const [dragPoint, setDragPoint] = useState<{ x: number; y: number } | null>(null)
+  const roleById = new Map(roles.map((r) => [r.id, r]))
 
   const eligible = players.filter((p) => p.isAlive || p.id === actorId)
   const positions = new Map(eligible.map((p, i) => [p.id, nodePosition(i, eligible.length)]))
@@ -132,6 +132,8 @@ export function TargetGraph({
           if (!pos) return null
           const isActor = player.id === actorId
           const isSelected = selected.includes(player.id)
+          const role = primaryRole(player, roleById)
+          const isCouple = player.linkedWith.length > 0
           return (
             <g
               key={player.id}
@@ -157,10 +159,21 @@ export function TargetGraph({
                 y={pos.y}
                 textAnchor="middle"
                 dominantBaseline="central"
-                className="pointer-events-none select-none font-mono text-[10px] fill-fg"
+                className="pointer-events-none select-none text-[16px]"
               >
-                {initials(player.name)}
+                {role?.icon ?? '❓'}
               </text>
+              {isCouple && (
+                <text
+                  x={pos.x + NODE_R - 4}
+                  y={pos.y - NODE_R + 4}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  className="pointer-events-none select-none text-[11px]"
+                >
+                  💘
+                </text>
+              )}
               <text
                 x={pos.x}
                 y={pos.y + NODE_R + 11}

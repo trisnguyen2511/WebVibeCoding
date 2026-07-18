@@ -229,3 +229,13 @@ export const BUILT_IN_ROLES: RoleDef[] = [
 export function cloneBuiltInRoles(): RoleDef[] {
   return BUILT_IN_ROLES.map((role) => ({ ...role }))
 }
+
+/**
+ * Đồng bộ ván đã lưu (localStorage) với bộ vai trò mặc định mới nhất — vá cả
+ * vai mới thêm sau này (VD Nguyệt Nữ, Bán Sói, Thằng Đần) lẫn field mới trên
+ * vai cũ, trong khi vẫn giữ nguyên các vai trò tùy chỉnh MC đã tự tạo.
+ */
+export function syncBuiltInRoles(existingRoles: RoleDef[]): RoleDef[] {
+  const customRoles = existingRoles.filter((r) => !r.isBuiltIn)
+  return [...cloneBuiltInRoles(), ...customRoles]
+}

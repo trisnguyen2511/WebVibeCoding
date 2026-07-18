@@ -184,6 +184,7 @@ export function NightPanel({ roles, players, night, events, onCommitAction, onEn
             ) : (
               <TargetGraph
                 players={players}
+                roles={roles}
                 actorId={actorPlayerId}
                 targetCount={role.targetCount}
                 selected={selected}

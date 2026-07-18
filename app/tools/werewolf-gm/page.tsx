@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import { ToolShell } from '@/components/tool-shell'
-import { cloneBuiltInRoles } from '@/lib/werewolf/built-in-roles'
+import { cloneBuiltInRoles, syncBuiltInRoles } from '@/lib/werewolf/built-in-roles'
 import { derivePlayers } from '@/lib/werewolf/derive-game-state'
 import { checkWinCondition } from '@/lib/werewolf/check-win-condition'
 import { phaseAfterTruncate, phaseAfterUndo, popLastEvent } from '@/lib/werewolf/game-actions'
@@ -47,7 +47,7 @@ export default function WerewolfGmPage() {
 
   useEffect(() => {
     const saved = loadGameState()
-    if (saved) setState(saved)
+    if (saved) setState({ ...saved, roles: syncBuiltInRoles(saved.roles) })
     setLoaded(true)
   }, [])
 
@@ -430,6 +430,7 @@ export default function WerewolfGmPage() {
           pendingTrigger && (
             <DeathTriggerPanel
               role={state.roles.find((r) => r.id === pendingTrigger.roleId)!}
+              roles={state.roles}
               actorPlayerId={pendingTrigger.playerId}
               players={players}
               onCommit={handleDeathTriggerCommit}

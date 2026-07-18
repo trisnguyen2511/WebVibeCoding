@@ -1,6 +1,7 @@
 'use client'
 import type { Player, RoleDef } from '@/lib/werewolf/types'
 import { EFFECT_COLOR } from '@/lib/werewolf/effect-color'
+import { primaryRole } from '@/lib/werewolf/primary-role'
 
 interface NightRecapProps {
   players: Player[]
@@ -19,16 +20,6 @@ const NODE_R = 22
 function nodePosition(index: number, total: number) {
   const angle = (index / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2
   return { x: CENTER + RADIUS * Math.cos(angle), y: CENTER + RADIUS * Math.sin(angle) }
-}
-
-function initials(name: string) {
-  return name.trim().slice(0, 2).toUpperCase()
-}
-
-function primaryRole(player: Player, roleById: Map<string, RoleDef>): RoleDef | undefined {
-  const owned = player.roleIds.map((id) => roleById.get(id)).filter((r): r is RoleDef => !!r)
-  const acting = owned.filter((r) => r.actsAtNight).sort((a, b) => a.priority - b.priority)
-  return acting[0] ?? owned[0]
 }
 
 export function NightRecap({ players, roles, night, deaths, onToggleAlive, onConfirm }: NightRecapProps) {
@@ -52,6 +43,7 @@ export function NightRecap({ players, roles, night, deaths, onToggleAlive, onCon
           if (!pos) return null
           const role = primaryRole(player, roleById)
           const color = role ? EFFECT_COLOR[role.effect] : '#52525B'
+          const isCouple = player.linkedWith.length > 0
           return (
             <g key={player.id} opacity={player.isAlive ? 1 : 0.35}>
               <circle cx={pos.x} cy={pos.y} r={NODE_R} fill="rgb(var(--color-surface))" stroke={color} strokeWidth={2.5} />
@@ -69,14 +61,25 @@ export function NightRecap({ players, roles, night, deaths, onToggleAlive, onCon
                   </text>
                 </g>
               )}
+              {isCouple && (
+                <text
+                  x={pos.x - NODE_R + 4}
+                  y={pos.y - NODE_R + 4}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  className="pointer-events-none select-none text-[10px]"
+                >
+                  💘
+                </text>
+              )}
               <text
                 x={pos.x}
                 y={pos.y}
                 textAnchor="middle"
                 dominantBaseline="central"
-                className="pointer-events-none select-none font-mono text-[10px] fill-fg"
+                className="pointer-events-none select-none text-[15px]"
               >
-                {initials(player.name)}
+                {role?.icon ?? '❓'}
               </text>
               <text x={pos.x} y={pos.y + NODE_R + 11} textAnchor="middle" className="pointer-events-none select-none text-[9px] fill-muted">
                 {player.name.length > 8 ? `${player.name.slice(0, 7)}…` : player.name}
