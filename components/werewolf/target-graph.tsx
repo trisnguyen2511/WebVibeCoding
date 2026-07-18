@@ -15,16 +15,30 @@ interface TargetGraphProps {
   readOnly?: boolean
 }
 
-const SIZE = 380
-const CENTER = SIZE / 2
-const RADIUS = 148
+// Bán kính ngang cố định để chiều rộng không bao giờ vượt màn hình — với nhóm
+// đông người, bán kính dọc giãn ra thay vì phóng to cả 2 chiều, biến vòng
+// tròn thành hình elip kéo dài xuống (cuộn dọc) thay vì tràn ngang màn hình.
+const RADIUS_X = 148
 const NODE_R = 28
+const PAD_X = 32 // chừa chỗ cho tên người/tên vai bị lệch ra ngoài bán kính ngang
+const PAD_Y = 44 // chừa chỗ cho nhãn vai phía trên nút trên/dưới cùng không bị cắt
 
-function nodePosition(index: number, total: number) {
+function ellipseGeometry(count: number) {
+  const radiusY = count <= 8 ? RADIUS_X : RADIUS_X + (count - 8) * 18
+  const width = RADIUS_X * 2 + NODE_R * 2 + PAD_X * 2
+  const height = radiusY * 2 + NODE_R * 2 + PAD_Y * 2
+  return { radiusX: RADIUS_X, radiusY, width, height, centerX: width / 2, centerY: height / 2 }
+}
+
+function nodePosition(
+  index: number,
+  total: number,
+  geo: { radiusX: number; radiusY: number; centerX: number; centerY: number }
+) {
   const angle = (index / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2
   return {
-    x: CENTER + RADIUS * Math.cos(angle),
-    y: CENTER + RADIUS * Math.sin(angle),
+    x: geo.centerX + geo.radiusX * Math.cos(angle),
+    y: geo.centerY + geo.radiusY * Math.sin(angle),
   }
 }
 
@@ -45,7 +59,8 @@ export function TargetGraph({
   const roleById = new Map(roles.map((r) => [r.id, r]))
 
   const eligible = players.filter((p) => p.isAlive || p.id === actorId)
-  const positions = new Map(eligible.map((p, i) => [p.id, nodePosition(i, eligible.length)]))
+  const geo = ellipseGeometry(eligible.length)
+  const positions = new Map(eligible.map((p, i) => [p.id, nodePosition(i, eligible.length, geo)]))
   const actorPos = positions.get(actorId)
 
   function toSvgPoint(clientX: number, clientY: number) {
@@ -53,8 +68,8 @@ export function TargetGraph({
     if (!svg) return { x: 0, y: 0 }
     const rect = svg.getBoundingClientRect()
     return {
-      x: ((clientX - rect.left) / rect.width) * SIZE,
-      y: ((clientY - rect.top) / rect.height) * SIZE,
+      x: ((clientX - rect.left) / rect.width) * geo.width,
+      y: ((clientY - rect.top) / rect.height) * geo.height,
     }
   }
 
@@ -91,7 +106,7 @@ export function TargetGraph({
     <div className="flex flex-col items-center gap-2">
       <svg
         ref={svgRef}
-        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        viewBox={`0 0 ${geo.width} ${geo.height}`}
         className="mx-auto h-auto w-full max-w-[400px] touch-none select-none"
       >
         {selected.map((targetId) => {
@@ -161,7 +176,7 @@ export function TargetGraph({
                   textAnchor="middle"
                   className="pointer-events-none select-none text-[10px] fill-muted"
                 >
-                  {role.name}
+                  {role.shortName ?? role.name}
                 </text>
               )}
               <text

@@ -48,6 +48,8 @@ export interface RoleDef {
    * khi bị treo cổ ban ngày, 'both' = cả hai (mặc định nếu bỏ trống).
    */
   deathTriggerCondition?: 'night' | 'day' | 'both'
+  /** Tên ngắn gọn để hiển thị trong vòng tròn (VD "Phù thủy" thay vì "Phù thủy — Thuốc giải"). Mặc định dùng name. */
+  shortName?: string
 }
 
 export interface Player {

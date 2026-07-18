@@ -97,6 +97,7 @@ export const BUILT_IN_ROLES: RoleDef[] = [
   {
     id: 'role-witch-heal',
     name: 'Phù thủy — Thuốc giải',
+    shortName: 'Phù thủy',
     faction: 'village',
     icon: '🍵',
     isBuiltIn: true,
@@ -117,6 +118,7 @@ export const BUILT_IN_ROLES: RoleDef[] = [
   {
     id: 'role-witch-poison',
     name: 'Phù thủy — Thuốc độc',
+    shortName: 'Phù thủy',
     faction: 'village',
     icon: '🧪',
     isBuiltIn: true,
@@ -137,6 +139,7 @@ export const BUILT_IN_ROLES: RoleDef[] = [
   {
     id: 'role-hunter-both',
     name: 'Thợ săn (chết đêm hoặc treo cổ)',
+    shortName: 'Thợ săn',
     faction: 'village',
     icon: '🏹',
     isBuiltIn: true,
@@ -156,6 +159,7 @@ export const BUILT_IN_ROLES: RoleDef[] = [
   {
     id: 'role-hunter-night',
     name: 'Thợ săn (chỉ chết đêm)',
+    shortName: 'Thợ săn',
     faction: 'village',
     icon: '🏹',
     isBuiltIn: true,
@@ -175,6 +179,7 @@ export const BUILT_IN_ROLES: RoleDef[] = [
   {
     id: 'role-hunter-day',
     name: 'Thợ săn (chỉ bị treo cổ)',
+    shortName: 'Thợ săn',
     faction: 'village',
     icon: '🏹',
     isBuiltIn: true,

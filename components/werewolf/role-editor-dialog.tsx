@@ -5,6 +5,8 @@ import type { EffectType, Faction, RoleDef } from '@/lib/werewolf/types'
 interface RoleEditorDialogProps {
   onCreate: (role: RoleDef) => void
   onCancel: () => void
+  /** Nếu có — form ở chế độ sửa vai trò tùy chỉnh đã tồn tại thay vì tạo mới. */
+  editingRole?: RoleDef
 }
 
 const FACTIONS: { value: Faction; label: string }[] = [
@@ -27,25 +29,26 @@ const EFFECTS: { value: EffectType; label: string }[] = [
 
 // Không dùng modal/dialog thật (repo chưa có dependency Radix Dialog) — đây
 // là 1 panel mở rộng ngay trong dòng chảy setup, đủ dùng cho form ngắn này.
-export function RoleEditorDialog({ onCreate, onCancel }: RoleEditorDialogProps) {
-  const [name, setName] = useState('')
-  const [faction, setFaction] = useState<Faction>('village')
-  const [effect, setEffect] = useState<EffectType>('custom')
-  const [targetCount, setTargetCount] = useState<0 | 1 | 2>(1)
-  const [priority, setPriority] = useState(50)
-  const [description, setDescription] = useState('')
-  const [skippable, setSkippable] = useState(true)
-  const [limitedUses, setLimitedUses] = useState(false)
-  const [usesPerGame, setUsesPerGame] = useState(1)
+export function RoleEditorDialog({ onCreate, onCancel, editingRole }: RoleEditorDialogProps) {
+  const [name, setName] = useState(editingRole?.name ?? '')
+  const [icon, setIcon] = useState(editingRole?.icon ?? '✨')
+  const [faction, setFaction] = useState<Faction>(editingRole?.faction ?? 'village')
+  const [effect, setEffect] = useState<EffectType>(editingRole?.effect ?? 'custom')
+  const [targetCount, setTargetCount] = useState<0 | 1 | 2>(editingRole?.targetCount ?? 1)
+  const [priority, setPriority] = useState(editingRole?.priority ?? 50)
+  const [description, setDescription] = useState(editingRole?.description ?? '')
+  const [skippable, setSkippable] = useState(editingRole?.skippable ?? true)
+  const [limitedUses, setLimitedUses] = useState(editingRole?.usesPerGame !== undefined)
+  const [usesPerGame, setUsesPerGame] = useState(editingRole?.usesPerGame ?? 1)
 
   function submit() {
     const trimmed = name.trim()
     if (!trimmed) return
     onCreate({
-      id: crypto.randomUUID(),
+      id: editingRole?.id ?? crypto.randomUUID(),
       name: trimmed,
       faction,
-      icon: '✨',
+      icon: icon.trim() || '✨',
       isBuiltIn: false,
       actsAtNight: targetCount > 0 || effect !== 'custom',
       priority,
@@ -64,14 +67,23 @@ export function RoleEditorDialog({ onCreate, onCancel }: RoleEditorDialogProps) 
 
   return (
     <div className="space-y-3 rounded-lg border border-accent/40 bg-surface p-3">
-      <p className="text-sm font-medium text-fg">Vai trò tùy chỉnh mới</p>
+      <p className="text-sm font-medium text-fg">{editingRole ? 'Sửa vai trò tùy chỉnh' : 'Vai trò tùy chỉnh mới'}</p>
 
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Tên vai trò..."
-        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg outline-none focus:border-accent"
-      />
+      <div className="flex gap-2">
+        <input
+          value={icon}
+          onChange={(e) => setIcon(e.target.value)}
+          placeholder="✨"
+          aria-label="Icon vai trò — bấm rồi mở bàn phím emoji mặc định để chọn"
+          className="w-14 shrink-0 rounded-lg border border-border bg-background px-2 py-2 text-center text-lg text-fg outline-none focus:border-accent"
+        />
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Tên vai trò..."
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg outline-none focus:border-accent"
+        />
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <label className="text-xs text-muted">
@@ -170,7 +182,7 @@ export function RoleEditorDialog({ onCreate, onCancel }: RoleEditorDialogProps) 
           disabled={!name.trim()}
           className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-fg disabled:opacity-40"
         >
-          Tạo vai trò
+          {editingRole ? 'Lưu thay đổi' : 'Tạo vai trò'}
         </button>
       </div>
     </div>

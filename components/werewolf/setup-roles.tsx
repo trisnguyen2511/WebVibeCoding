@@ -15,11 +15,22 @@ interface SetupRolesProps {
   counts: Record<string, number>
   onCountsChange: (counts: Record<string, number>) => void
   onAddCustomRole: (role: RoleDef) => void
+  onUpdateCustomRole: (role: RoleDef) => void
+  onDeleteCustomRole: (roleId: string) => void
   totalPlayers: number
 }
 
-export function SetupRoles({ allRoles, counts, onCountsChange, onAddCustomRole, totalPlayers }: SetupRolesProps) {
+export function SetupRoles({
+  allRoles,
+  counts,
+  onCountsChange,
+  onAddCustomRole,
+  onUpdateCustomRole,
+  onDeleteCustomRole,
+  totalPlayers,
+}: SetupRolesProps) {
   const [showEditor, setShowEditor] = useState(false)
+  const [editingRole, setEditingRole] = useState<RoleDef | null>(null)
   const groups = groupRoles(allRoles)
   const totalAssigned = groups.reduce((sum, g) => sum + (counts[g.roleIds[0]] ?? 0), 0)
 
@@ -30,12 +41,18 @@ export function SetupRoles({ allRoles, counts, onCountsChange, onAddCustomRole, 
     onCountsChange(next)
   }
 
+  function handleDelete(role: RoleDef) {
+    if (!window.confirm(`Xoá vai trò tùy chỉnh "${role.name}"? Không thể hoàn tác.`)) return
+    onDeleteCustomRole(role.id)
+  }
+
   return (
     <div className="space-y-3">
       <ul className="space-y-2">
         {groups.map((group) => {
           const count = counts[group.roleIds[0]] ?? 0
           const atMax = group.maxCount !== undefined && count >= group.maxCount
+          const isCustom = group.roles.length === 1 && !group.roles[0].isBuiltIn
           return (
             <li
               key={group.key}
@@ -51,6 +68,29 @@ export function SetupRoles({ allRoles, counts, onCountsChange, onAddCustomRole, 
                   {group.roles.length > 1 ? group.roles.map((r) => r.description).join(' ') : group.roles[0].description}
                 </p>
               </div>
+              {isCustom && (
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label={`Sửa ${group.name}`}
+                    onClick={() => {
+                      setEditingRole(group.roles[0])
+                      setShowEditor(false)
+                    }}
+                    className="h-7 w-7 rounded-md border border-border text-xs text-muted hover:border-accent/50 hover:text-fg"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Xoá ${group.name}`}
+                    onClick={() => handleDelete(group.roles[0])}
+                    className="h-7 w-7 rounded-md border border-border text-xs text-muted hover:border-red-500/50 hover:text-red-400"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              )}
               <div className="flex shrink-0 items-center gap-1.5">
                 <button
                   type="button"
@@ -74,7 +114,16 @@ export function SetupRoles({ allRoles, counts, onCountsChange, onAddCustomRole, 
         })}
       </ul>
 
-      {showEditor ? (
+      {editingRole ? (
+        <RoleEditorDialog
+          editingRole={editingRole}
+          onCreate={(role) => {
+            onUpdateCustomRole(role)
+            setEditingRole(null)
+          }}
+          onCancel={() => setEditingRole(null)}
+        />
+      ) : showEditor ? (
         <RoleEditorDialog
           onCreate={(role) => {
             onAddCustomRole(role)

@@ -230,6 +230,18 @@ export default function WerewolfGmPage() {
     setState((s) => ({ ...s, roles: [...s.roles, role] }))
   }
 
+  function updateCustomRole(role: RoleDef) {
+    setState((s) => ({ ...s, roles: s.roles.map((r) => (r.id === role.id ? role : r)) }))
+  }
+
+  /** Xoá vai trò tùy chỉnh — bỏ luôn số lượng đã chọn cho vai này ở bước chọn vai. */
+  function removeCustomRole(roleId: string) {
+    setState((s) => {
+      const { [roleId]: _removed, ...restCounts } = s.setupRoleCounts
+      return { ...s, roles: s.roles.filter((r) => r.id !== roleId), setupRoleCounts: restCounts }
+    })
+  }
+
   const totalAssigned = totalRoleSlots(state.setupRoleCounts, state.roles)
   const rolesFullyChosen = totalAssigned === state.setupPlayers.length
   const everyoneHasRole = state.setupPlayers.every((p) => p.roleIds.length > 0)
@@ -381,6 +393,8 @@ export default function WerewolfGmPage() {
                   counts={state.setupRoleCounts}
                   onCountsChange={(setupRoleCounts) => setState((s) => ({ ...s, setupRoleCounts }))}
                   onAddCustomRole={addCustomRole}
+                  onUpdateCustomRole={updateCustomRole}
+                  onDeleteCustomRole={removeCustomRole}
                   totalPlayers={state.setupPlayers.length}
                 />
                 <div className="flex gap-2">

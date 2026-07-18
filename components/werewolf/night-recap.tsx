@@ -19,19 +19,33 @@ function markerId(color: string) {
   return `recap-arrow-${color.replace('#', '')}`
 }
 
-const SIZE = 380
-const CENTER = SIZE / 2
-const RADIUS = 148
+// Bán kính ngang cố định để chiều rộng không bao giờ vượt màn hình — với
+// nhóm đông người, bán kính dọc giãn ra thay vì phóng to cả 2 chiều.
+const RADIUS_X = 148
 const NODE_R = 26
+const PAD_X = 32
+const PAD_Y = 40
 
-function nodePosition(index: number, total: number) {
+function ellipseGeometry(count: number) {
+  const radiusY = count <= 8 ? RADIUS_X : RADIUS_X + (count - 8) * 18
+  const width = RADIUS_X * 2 + NODE_R * 2 + PAD_X * 2
+  const height = radiusY * 2 + NODE_R * 2 + PAD_Y * 2
+  return { radiusX: RADIUS_X, radiusY, width, height, centerX: width / 2, centerY: height / 2 }
+}
+
+function nodePosition(
+  index: number,
+  total: number,
+  geo: { radiusX: number; radiusY: number; centerX: number; centerY: number }
+) {
   const angle = (index / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2
-  return { x: CENTER + RADIUS * Math.cos(angle), y: CENTER + RADIUS * Math.sin(angle) }
+  return { x: geo.centerX + geo.radiusX * Math.cos(angle), y: geo.centerY + geo.radiusY * Math.sin(angle) }
 }
 
 export function NightRecap({ players, roles, night, actions, deaths, healed, onToggleAlive, onConfirm }: NightRecapProps) {
   const roleById = new Map(roles.map((r) => [r.id, r]))
-  const positions = new Map(players.map((p, i) => [p.id, nodePosition(i, players.length)]))
+  const geo = ellipseGeometry(players.length)
+  const positions = new Map(players.map((p, i) => [p.id, nodePosition(i, players.length, geo)]))
   const deathSet = new Set(deaths)
 
   const actionArrows = actions
@@ -74,7 +88,7 @@ export function NightRecap({ players, roles, night, actions, deaths, healed, onT
         </p>
       </div>
 
-      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="mx-auto h-auto w-full max-w-[400px] select-none">
+      <svg viewBox={`0 0 ${geo.width} ${geo.height}`} className="mx-auto h-auto w-full max-w-[400px] select-none">
         <defs>
           {arrowColors.map((color) => (
             <marker key={color} id={markerId(color)} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
