@@ -64,8 +64,12 @@ export function SetupPlayers({ players, onChange }: SetupPlayersProps) {
     }
   }
 
-  function applyGroup(group: PlayerGroup) {
-    onChange([...players, ...group.playerNames.map((n) => ({ id: crypto.randomUUID(), name: n, roleIds: [] }))])
+  function applyGroup(group: PlayerGroup, mode: 'replace' | 'append') {
+    if (mode === 'replace' && players.length > 0) {
+      if (!window.confirm(`Thay thế toàn bộ ${players.length} người chơi hiện tại bằng nhóm "${group.name}"?`)) return
+    }
+    const newPlayers = group.playerNames.map((n) => ({ id: crypto.randomUUID(), name: n, roleIds: [] }))
+    onChange(mode === 'replace' ? newPlayers : [...players, ...newPlayers])
     setShowGroups(false)
   }
 
@@ -112,17 +116,28 @@ export function SetupPlayers({ players, onChange }: SetupPlayersProps) {
             <p className="px-1 py-2 text-xs text-muted">Chưa có nhóm nào được lưu — tạo ở trang Quản lý nhóm.</p>
           ) : (
             groups.map((group) => (
-              <button
-                key={group.id}
-                type="button"
-                onClick={() => applyGroup(group)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-left text-xs transition-colors hover:border-accent/50"
-              >
-                <span className="block font-medium text-fg">{group.name}</span>
-                <span className="block truncate text-muted">
+              <div key={group.id} className="rounded-lg border border-border bg-background px-3 py-2 text-xs">
+                <p className="font-medium text-fg">{group.name}</p>
+                <p className="truncate text-muted">
                   {group.playerNames.length} người · {group.playerNames.join(', ')}
-                </span>
-              </button>
+                </p>
+                <div className="mt-1.5 flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => applyGroup(group, 'append')}
+                    className="flex-1 rounded-md border border-border px-2 py-1.5 text-[11px] text-muted transition-colors hover:border-accent/50 hover:text-fg"
+                  >
+                    ➕ Thêm vào danh sách
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyGroup(group, 'replace')}
+                    className="flex-1 rounded-md border border-border px-2 py-1.5 text-[11px] text-muted transition-colors hover:border-accent/50 hover:text-fg"
+                  >
+                    🔄 Thay thế danh sách
+                  </button>
+                </div>
+              </div>
             ))
           )}
         </div>
