@@ -114,4 +114,11 @@ export const tools: Tool[] = [
     description: 'Công cụ quản trò Ma Sói — chia vai, điều hành đêm, kéo thả chọn mục tiêu, undo, lịch sử ván',
     category: 'game',
   },
+  {
+    name: 'Games',
+    slug: 'games',
+    icon: '🎲',
+    description: 'Danh sách game tự code, chơi trực tiếp trên web — PC host phòng, điện thoại làm tay cầm cảm biến',
+    category: 'game',
+  },
 ]

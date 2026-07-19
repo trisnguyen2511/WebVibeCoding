@@ -25,7 +25,16 @@ export type RomUrlInput = {
   system: string
 }
 
-export type ControllerInput = ButtonInput | RomUrlInput
+// Raw compass heading from the phone's DeviceOrientationEvent — sent as-is
+// (still wrapped 0-360) so the host can unwrap it itself; that keeps the
+// phone a dumb sensor client with no physics/continuity state of its own.
+export type OrientationInput = {
+  type: 'orientation'
+  alpha: number
+  ts: number
+}
+
+export type ControllerInput = ButtonInput | RomUrlInput | OrientationInput
 
 export type InputMessage = ControllerInput & { peerId: string }
 
@@ -38,6 +47,8 @@ export type PlayerInfo = {
 export type RoomHandle = {
   cleanup: () => void
   kickPlayer: (peerId: string) => void
+  /** Push a message down to one connected phone (e.g. game state to render on its screen). */
+  sendToPlayer: <T>(peerId: string, data: T) => void
 }
 
 // ── Host side ────────────────────────────────────────────────────
@@ -46,7 +57,7 @@ export async function createRoom(
   onInput: (msg: InputMessage) => void,
   onPlayersChange: (players: PlayerInfo[]) => void
 ): Promise<RoomHandle> {
-  const peers = new Map<string, { pc: RTCPeerConnection; playerIndex: number; connected: boolean }>()
+  const peers = new Map<string, { pc: RTCPeerConnection; dc: RTCDataChannel; playerIndex: number; connected: boolean }>()
 
   const notify = () =>
     onPlayersChange(
@@ -68,7 +79,7 @@ export async function createRoom(
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
     const dc = pc.createDataChannel('input')
 
-    peers.set(peerId, { pc, playerIndex, connected: false })
+    peers.set(peerId, { pc, dc, playerIndex, connected: false })
 
     dc.onopen = () => {
       const peer = peers.get(peerId)
@@ -137,6 +148,10 @@ export async function createRoom(
       if (peer) peer.pc.close()
       // dc.onclose fires automatically → peers.delete + notify
     },
+    sendToPlayer: (peerId, data) => {
+      const peer = peers.get(peerId)
+      if (peer?.dc.readyState === 'open') peer.dc.send(JSON.stringify(data))
+    },
   }
 }
 
@@ -145,7 +160,8 @@ export async function createRoom(
 export async function joinRoom(
   roomId: string,
   onAssigned: (playerIndex: number) => void,
-  onDisconnected: () => void
+  onDisconnected: () => void,
+  onHostMessage?: (data: unknown) => void
 ): Promise<{
   sendInput: (msg: ControllerInput) => void
   disconnect: () => void
@@ -161,6 +177,7 @@ export async function joinRoom(
   pc.ondatachannel = (e) => {
     dataChannel = e.channel
     dataChannel.onclose = onDisconnected
+    dataChannel.onmessage = (msg) => onHostMessage?.(JSON.parse(msg.data as string))
   }
 
   pc.onicecandidate = ({ candidate }) => {
