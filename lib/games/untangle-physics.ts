@@ -11,6 +11,13 @@
 // player does anything). `visualAngle` is only a smoothed *rendering* lag
 // on top of the kinematic twist, purely for weight/feel, and settles and
 // stays the moment input stops (no free energy, no auto-decay).
+//
+// Total rotation required per axis is deliberately small: a phone can't
+// be spun through multiple continuous 360° turns in one natural wrist
+// motion the way a Joy-Con can, and the model tracks *signed* rotation
+// (undoing the specific wind direction, not just "shake it a lot"), so
+// asking for full multi-turn spins made the puzzle feel unresponsive to
+// normal hand movement.
 
 export interface TorsionParams {
   /** Response rate (rad/s-ish) for how quickly the visual angle catches up to the input — feel only, doesn't affect the win condition. */
@@ -30,21 +37,37 @@ export interface TorsionState {
   winHoldTime: number // seconds both axes have stayed within the win band together
 }
 
-export const WIN_TWIST_THRESHOLD = 0.14 // rad (~8°), applies to each axis independently
-export const WIN_HOLD_DURATION = 0.6    // seconds held before declaring a win
+export const WIN_TWIST_THRESHOLD = 0.1 // rad (~6°), applies to each axis independently
+export const WIN_HOLD_DURATION = 0.5   // seconds held before declaring a win
 
 export const MIN_WIND_COUNT = 1
 export const MAX_WIND_COUNT = 10
 
-/** Pitch physically can't do many full turns while the phone stays flat, so it scales far more gently than yaw's full spins. */
-export function pitchTurnsFor(windCount: number): number {
-  const n = Math.max(MIN_WIND_COUNT, Math.min(MAX_WIND_COUNT, windCount))
-  return Math.min(1, Math.max(0.25, n * 0.15))
+// A comfortable single wrist rotation is roughly 90-180° — these targets
+// stay well inside that even at max difficulty, so the puzzle responds
+// clearly to normal hand movement instead of demanding full spins.
+const YAW_DEGREES_PER_WIND = 24
+const PITCH_BASE_DEGREES = 18
+const PITCH_DEGREES_PER_WIND = 5
+
+function clampWindCount(windCount: number): number {
+  return Math.max(MIN_WIND_COUNT, Math.min(MAX_WIND_COUNT, windCount))
 }
 
-/** Higher wind counts feel slightly heavier to swing around — more turns to clear, less snappy response. */
+/** Total yaw (left/right) rotation needed to fully untangle, in radians. */
+export function yawTotalRadians(windCount: number): number {
+  return (clampWindCount(windCount) * YAW_DEGREES_PER_WIND * Math.PI) / 180
+}
+
+/** Total pitch (up/down) rotation needed to fully untangle, in radians. */
+export function pitchTotalRadians(windCount: number): number {
+  const n = clampWindCount(windCount)
+  return ((PITCH_BASE_DEGREES + n * PITCH_DEGREES_PER_WIND) * Math.PI) / 180
+}
+
+/** Higher wind counts feel slightly heavier to swing around — more rotation to clear, less snappy response. */
 export function difficultyParams(windCount: number): TorsionParams {
-  const n = Math.max(MIN_WIND_COUNT, Math.min(MAX_WIND_COUNT, windCount))
+  const n = clampWindCount(windCount)
   return { smoothing: 10 / (1 + 0.06 * (n - 1)) }
 }
 
@@ -64,10 +87,9 @@ function stepAxis(axis: AxisState, smoothing: number, dt: number): AxisState {
 }
 
 export function createTorsionState(windCount: number): TorsionState {
-  const n = Math.max(MIN_WIND_COUNT, Math.min(MAX_WIND_COUNT, windCount))
   return {
-    yaw: createAxis(n * Math.PI * 2),
-    pitch: createAxis(pitchTurnsFor(n) * Math.PI * 2),
+    yaw: createAxis(yawTotalRadians(windCount)),
+    pitch: createAxis(pitchTotalRadians(windCount)),
     won: false,
     winHoldTime: 0,
   }
@@ -104,9 +126,8 @@ function axisProgress(axis: AxisState, totalTwist: number): number {
 
 /** Overall progress — capped by whichever axis is furthest from done, since both must clear to win. */
 export function twistProgress(state: TorsionState, windCount: number): number {
-  const n = Math.max(MIN_WIND_COUNT, Math.min(MAX_WIND_COUNT, windCount))
-  const yawP = axisProgress(state.yaw, n * Math.PI * 2)
-  const pitchP = axisProgress(state.pitch, pitchTurnsFor(n) * Math.PI * 2)
+  const yawP = axisProgress(state.yaw, yawTotalRadians(windCount))
+  const pitchP = axisProgress(state.pitch, pitchTotalRadians(windCount))
   return Math.min(yawP, pitchP)
 }
 
