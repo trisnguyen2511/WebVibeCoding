@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, type Ref } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import {
@@ -82,11 +82,13 @@ function OutlinedMesh({
   color,
   gradientMap,
   outlineScale = 1.05,
+  materialRef,
 }: {
   geometry: THREE.BufferGeometry
   color: string
   gradientMap: THREE.Texture
   outlineScale?: number
+  materialRef?: Ref<THREE.MeshToonMaterial>
 }) {
   return (
     <group>
@@ -94,7 +96,7 @@ function OutlinedMesh({
         <meshBasicMaterial color="#08080E" side={THREE.BackSide} />
       </mesh>
       <mesh geometry={geometry}>
-        <meshToonMaterial color={color} gradientMap={gradientMap} />
+        <meshToonMaterial ref={materialRef} color={color} gradientMap={gradientMap} />
       </mesh>
     </group>
   )
@@ -114,10 +116,22 @@ interface ChestRigProps {
 }
 
 const CHEST_HALF_HEIGHT = 0.32
-const CHECKPOINTS = [0.25, 0.5, 0.75]
 const WOOD_COLOR = '#8B5A2B'
 const GOLD_COLOR = '#E8B84B'
 const WIN_GLOW_COLOR = '#FFD86B'
+
+// Each checkpoint closes half of the *remaining* distance to 100% — 50,
+// 75, 87.5, 93.75%... — so they land closer and closer together as the
+// player nears the end, building suspense with faster, brighter chimes.
+const CHECKPOINTS: number[] = (() => {
+  const points: number[] = []
+  let p = 0.5
+  while (p < 0.999) {
+    points.push(p)
+    p += (1 - p) / 2
+  }
+  return points
+})()
 
 // Physics lives here, inside the Canvas's own render loop (useFrame), so
 // each player's simulation runs off real frame-delta time and never fights
@@ -142,6 +156,7 @@ function ChestRig({ windCount, won, getRawOrientation, onProgress, onCheckpoint 
   const chestGroupRef = useRef<THREE.Group>(null) // follows yaw + pitch — the chest itself can tumble freely
   const chainMeshRef = useRef<THREE.Mesh>(null)
   const chainMatRef = useRef<THREE.MeshToonMaterial>(null)
+  const chestMatRef = useRef<THREE.MeshToonMaterial>(null)
   const tipMeshRef = useRef<THREE.Mesh>(null)
   const chainGeoRef = useRef<THREE.BufferGeometry>(initialChainGeo)
   const torsionRef = useRef(createTorsionState(windCount))
@@ -193,10 +208,18 @@ function ChestRig({ windCount, won, getRawOrientation, onProgress, onCheckpoint 
 
     const reached = CHECKPOINTS.filter((c) => progress >= c).length
     if (reached > checkpointRef.current) {
+      // A fast rotation can cross more than one checkpoint in a single
+      // frame, especially near the end where they're packed close
+      // together — fire each one in a quick staggered burst instead of
+      // silently skipping straight to the highest one.
+      const from = checkpointRef.current
       checkpointRef.current = reached
-      playCheckpointChime(reached - 1)
+      for (let i = from; i < reached; i++) {
+        const delayMs = (i - from) * 70
+        setTimeout(() => playCheckpointChime(i), delayMs)
+        setTimeout(() => onCheckpoint?.(i + 1), delayMs)
+      }
       pulseRef.current = 1
-      onCheckpoint?.(reached)
     }
     if (state.won && !wonSoundedRef.current) {
       wonSoundedRef.current = true
@@ -204,6 +227,13 @@ function ChestRig({ windCount, won, getRawOrientation, onProgress, onCheckpoint 
       pulseRef.current = 1
     }
     if (chainMatRef.current) chainMatRef.current.color.set(state.won ? WIN_GLOW_COLOR : GOLD_COLOR)
+    // The chest glows a little brighter gold with every checkpoint cleared —
+    // watching its color is how you can tell how close to the final
+    // checkpoint you are, without waiting for the win itself.
+    if (chestMatRef.current) {
+      const glowT = state.won ? 1 : checkpointRef.current / CHECKPOINTS.length
+      chestMatRef.current.color.set(WOOD_COLOR).lerp(new THREE.Color(WIN_GLOW_COLOR), glowT)
+    }
 
     const now = performance.now()
     if (now - lastReportRef.current > 150) {
@@ -224,7 +254,7 @@ function ChestRig({ windCount, won, getRawOrientation, onProgress, onCheckpoint 
       </group>
 
       <group ref={chestGroupRef}>
-        <OutlinedMesh geometry={chestGeo} color={won ? WIN_GLOW_COLOR : WOOD_COLOR} gradientMap={gradientMap} />
+        <OutlinedMesh geometry={chestGeo} color={won ? WIN_GLOW_COLOR : WOOD_COLOR} gradientMap={gradientMap} materialRef={chestMatRef} />
         <mesh geometry={bandGeo} rotation={[Math.PI / 2, 0, 0]} position={[0, 0.12, 0]}>
           <meshToonMaterial color={GOLD_COLOR} gradientMap={gradientMap} />
         </mesh>

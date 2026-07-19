@@ -23,12 +23,12 @@ function tone(freq: number, startAt: number, duration: number, ctx: AudioContext
   osc.stop(startAt + duration + 0.02)
 }
 
-/** A short rising chime for a progress checkpoint — step 0/1/2 for 25/50/75%, each brighter than the last. */
+/** A short rising chime for a progress checkpoint — step 0,1,2... rising a semitone each time, brighter as it climbs. */
 export function playCheckpointChime(step: number) {
   const ctx = getAudioContext()
   if (!ctx) return
   const base = 523.25 // C5
-  tone(base * Math.pow(2, step / 6), ctx.currentTime, 0.35, ctx)
+  tone(base * Math.pow(2, step / 12), ctx.currentTime, 0.3, ctx)
 }
 
 /** A little two-note fanfare for the win. */
