@@ -28,6 +28,11 @@ function gridClass(count: number) {
 interface CellState {
   progress: number
   won: boolean
+  elapsed: number
+}
+
+function formatTimer(seconds: number) {
+  return seconds.toFixed(2)
 }
 
 // Split-screen grid: each connected phone gets its own cell showing only
@@ -59,8 +64,8 @@ function GameGrid({ roomId, windCount }: { roomId: string; windCount: number }) 
     }
   }, [roomId])
 
-  const handleProgress = (peerId: string, progress: number, won: boolean) => {
-    setCellStates((prev) => ({ ...prev, [peerId]: { progress, won } }))
+  const handleProgress = (peerId: string, progress: number, won: boolean, elapsed: number) => {
+    setCellStates((prev) => ({ ...prev, [peerId]: { progress, won, elapsed } }))
     handleRef.current?.sendToPlayer<UntangleProgressMessage>(peerId, { type: 'untangle-progress', progress, won })
   }
 
@@ -85,11 +90,14 @@ function GameGrid({ roomId, windCount }: { roomId: string; windCount: number }) 
             >
               P{i + 1} — {Math.round((cell?.progress ?? 0) * 100)}%{cell?.won ? ' 🎉' : ''}
             </div>
+            <div className="absolute bottom-2 right-2 z-10 rounded-lg border border-border bg-background/80 px-2 py-1 font-mono text-lg font-bold text-fg">
+              {formatTimer(cell?.elapsed ?? 0)}
+            </div>
             <UntangleChestScene
               windCount={windCount}
               won={cell?.won ?? false}
               getRawAlpha={() => rawAlphaRef.current[p.peerId] ?? null}
-              onProgress={(progress, won) => handleProgress(p.peerId, progress, won)}
+              onProgress={(progress, won, elapsed) => handleProgress(p.peerId, progress, won, elapsed)}
             />
           </div>
         )
