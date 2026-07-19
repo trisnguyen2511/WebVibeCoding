@@ -26,8 +26,31 @@ function UntangleControllerInner() {
   const [error, setError] = useState<string | null>(null)
   const connRef = useRef<{ sendInput: (msg: { type: 'orientation'; alpha: number; beta: number; ts: number }) => void; disconnect: () => void } | null>(null)
   const wonRef = useRef(false)
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null)
 
-  useEffect(() => () => { connRef.current?.disconnect() }, [])
+  // The lock is auto-released whenever the tab/screen goes hidden (e.g. the
+  // OS blanks the display right before our own request lands) — re-acquire
+  // it whenever the page becomes visible again while a game is in progress.
+  const requestWakeLock = async () => {
+    try {
+      wakeLockRef.current = await navigator.wakeLock?.request('screen')
+    } catch {
+      // Not supported or denied — game still works, screen may just sleep.
+    }
+  }
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && status === 'playing') void requestWakeLock()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [status])
+
+  useEffect(() => () => {
+    connRef.current?.disconnect()
+    wakeLockRef.current?.release().catch(() => {})
+  }, [])
 
   const start = async () => {
     if (!roomId) { setError('Thiếu mã phòng — quay lại quét QR từ màn hình PC.'); return }
@@ -48,8 +71,8 @@ function UntangleControllerInner() {
     try {
       const conn = await joinRoom(
         roomId,
-        (idx) => { setPlayerNum(idx + 1); setStatus('playing') },
-        () => setStatus('disconnected'),
+        (idx) => { setPlayerNum(idx + 1); setStatus('playing'); void requestWakeLock() },
+        () => { setStatus('disconnected'); wakeLockRef.current?.release().catch(() => {}) },
         (data) => {
           if (!isProgressMessage(data)) return
           setProgress(data.progress)
