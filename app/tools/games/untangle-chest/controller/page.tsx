@@ -24,7 +24,7 @@ function UntangleControllerInner() {
   const [progress, setProgress] = useState(0)
   const [won, setWon] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const connRef = useRef<{ sendInput: (msg: { type: 'orientation'; alpha: number; ts: number }) => void; disconnect: () => void } | null>(null)
+  const connRef = useRef<{ sendInput: (msg: { type: 'orientation'; alpha: number; beta: number; ts: number }) => void; disconnect: () => void } | null>(null)
   const wonRef = useRef(false)
 
   useEffect(() => () => { connRef.current?.disconnect() }, [])
@@ -71,7 +71,7 @@ function UntangleControllerInner() {
         const now = Date.now()
         if (now - lastRef.current < 16) return
         lastRef.current = now
-        conn.sendInput({ type: 'orientation', alpha: e.alpha, ts: now })
+        conn.sendInput({ type: 'orientation', alpha: e.alpha, beta: e.beta ?? 0, ts: now })
       })
     } catch {
       setError('Không kết nối được phòng — kiểm tra lại mã phòng.')
@@ -103,7 +103,7 @@ function UntangleControllerInner() {
         <p className="text-4xl">📱</p>
         <h1 className="font-display text-lg font-semibold text-fg">Lật ngửa điện thoại lên</h1>
         <p className="max-w-xs text-sm text-muted">
-          Đặt điện thoại nằm ngửa trên bàn/tay, rồi bấm bắt đầu — sau đó xoay điện thoại để gỡ dây quấn rương trên màn hình PC.
+          Đặt điện thoại nằm ngửa trên bàn/tay, rồi bấm bắt đầu — sau đó vừa xoay trái/phải vừa nghiêng lên/xuống điện thoại để gỡ dây quấn rương trên màn hình PC. Cần đúng cả 2 chiều cùng lúc mới gỡ được.
         </p>
       </div>
       <button

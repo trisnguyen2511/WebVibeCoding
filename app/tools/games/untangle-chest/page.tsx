@@ -5,6 +5,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { ToolShell } from '@/components/tool-shell'
 import { createRoom, InputMessage, PlayerInfo, RoomHandle } from '@/lib/webrtc'
 import { MAX_WIND_COUNT, MIN_WIND_COUNT, UntangleProgressMessage } from '@/lib/games/untangle-physics'
+import type { RawOrientation } from '@/components/games/untangle-chest-scene'
 
 // Three.js/WebGL only exists client-side — keep it out of the SSR bundle.
 const UntangleChestScene = dynamic(
@@ -42,7 +43,7 @@ function GameGrid({ roomId, windCount }: { roomId: string; windCount: number }) 
   const [players, setPlayers] = useState<PlayerInfo[]>([])
   const [cellStates, setCellStates] = useState<Record<string, CellState>>({})
   const handleRef = useRef<RoomHandle | null>(null)
-  const rawAlphaRef = useRef<Record<string, number>>({})
+  const rawOrientationRef = useRef<Record<string, RawOrientation>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -50,7 +51,7 @@ function GameGrid({ roomId, windCount }: { roomId: string; windCount: number }) 
       roomId,
       (msg: InputMessage) => {
         if (msg.type !== 'orientation') return
-        rawAlphaRef.current[msg.peerId] = msg.alpha
+        rawOrientationRef.current[msg.peerId] = { alpha: msg.alpha, beta: msg.beta }
       },
       (newPlayers) => { if (!cancelled) setPlayers(newPlayers.slice(0, MAX_PLAYERS)) }
     ).then((handle) => {
@@ -96,7 +97,7 @@ function GameGrid({ roomId, windCount }: { roomId: string; windCount: number }) 
             <UntangleChestScene
               windCount={windCount}
               won={cell?.won ?? false}
-              getRawAlpha={() => rawAlphaRef.current[p.peerId] ?? null}
+              getRawOrientation={() => rawOrientationRef.current[p.peerId] ?? null}
               onProgress={(progress, won, elapsed) => handleProgress(p.peerId, progress, won, elapsed)}
             />
           </div>
@@ -183,7 +184,8 @@ function UntangleChestHost() {
             <div className="rounded-xl border border-border/50 bg-surface/60 p-3 space-y-1.5 text-xs text-muted">
               <p className="font-medium text-fg">Cách chơi</p>
               <p>→ Tối đa 4 người, mỗi người có ô riêng trên màn hình.</p>
-              <p>→ Điện thoại lật ngửa, xoay để gỡ dây — không cần render gì trên điện thoại.</p>
+              <p>→ Điện thoại lật ngửa, kết hợp xoay trái/phải VÀ nghiêng lên/xuống để gỡ dây — không cần render gì trên điện thoại.</p>
+              <p>→ Chỉ xoay một chiều thôi sẽ không đủ — dây chỉ hết khi cả 2 chiều đều đúng cùng lúc.</p>
               <p>→ Xoay sai chiều/quá tay có thể làm dây quấn lại — cần xoay mượt.</p>
             </div>
           </div>

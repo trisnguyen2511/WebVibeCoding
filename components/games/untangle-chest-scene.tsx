@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import {
-  applyRotation,
+  applyPitchRotation,
+  applyYawRotation,
   createTorsionState,
   difficultyParams,
   stepTorsion,
@@ -99,10 +100,15 @@ function OutlinedMesh({
   )
 }
 
+export interface RawOrientation {
+  alpha: number // compass heading — left/right spin
+  beta: number  // front-back tilt — up/down
+}
+
 interface ChestRigProps {
   windCount: number
   won: boolean
-  getRawAlpha: () => number | null
+  getRawOrientation: () => RawOrientation | null
   onProgress: (progress: number, won: boolean, elapsedSeconds: number) => void
 }
 
@@ -113,7 +119,7 @@ const BOX_HALF_HEIGHT = 0.35
 // React's render cycle — only a throttled progress readout bubbles back up.
 // The chain geometry itself rebuilds every frame (cheap at this vertex
 // count) for smooth motion instead of the previous 150ms-stepped rebuild.
-function ChestRig({ windCount, won, getRawAlpha, onProgress }: ChestRigProps) {
+function ChestRig({ windCount, won, getRawOrientation, onProgress }: ChestRigProps) {
   const gradientMap = useMemo(() => makeToonGradient(), [])
   const chestGeo = useMemo(() => new THREE.BoxGeometry(1, 0.7, 0.7), [])
   const initialChainGeo = useMemo(() => buildChainGeometry(windCount, BOX_HALF_HEIGHT), [windCount])
@@ -124,20 +130,28 @@ function ChestRig({ windCount, won, getRawAlpha, onProgress }: ChestRigProps) {
   const torsionRef = useRef(createTorsionState(windCount))
   const paramsRef = useRef(difficultyParams(windCount))
   const lastAlphaRef = useRef<number | null>(null)
+  const lastBetaRef = useRef<number | null>(null)
   const lastReportRef = useRef(0)
   const startTimeRef = useRef(performance.now())
 
   useFrame((_, delta) => {
-    const raw = getRawAlpha()
+    const raw = getRawOrientation()
     if (raw !== null) {
-      const newTopAngle = unwrapDegreesToRadians(lastAlphaRef.current, torsionRef.current.topAngle, raw)
-      torsionRef.current = applyRotation(torsionRef.current, newTopAngle)
-      lastAlphaRef.current = raw
+      const newYaw = unwrapDegreesToRadians(lastAlphaRef.current, torsionRef.current.yaw.topAngle, raw.alpha)
+      torsionRef.current = applyYawRotation(torsionRef.current, newYaw)
+      lastAlphaRef.current = raw.alpha
+
+      const newPitch = unwrapDegreesToRadians(lastBetaRef.current, torsionRef.current.pitch.topAngle, raw.beta)
+      torsionRef.current = applyPitchRotation(torsionRef.current, newPitch)
+      lastBetaRef.current = raw.beta
     }
     torsionRef.current = stepTorsion(torsionRef.current, paramsRef.current, Math.min(delta, 0.05))
 
     const state = torsionRef.current
-    if (chestGroupRef.current) chestGroupRef.current.rotation.y = state.chestAngle
+    if (chestGroupRef.current) {
+      chestGroupRef.current.rotation.y = state.yaw.visualAngle
+      chestGroupRef.current.rotation.x = state.pitch.visualAngle
+    }
 
     const progress = twistProgress(state, windCount)
     if (chainMeshRef.current) {
@@ -167,17 +181,17 @@ function ChestRig({ windCount, won, getRawAlpha, onProgress }: ChestRigProps) {
 export interface UntangleChestSceneProps {
   windCount: number
   won: boolean
-  getRawAlpha: () => number | null
+  getRawOrientation: () => RawOrientation | null
   onProgress: (progress: number, won: boolean, elapsedSeconds: number) => void
 }
 
-export function UntangleChestScene({ windCount, won, getRawAlpha, onProgress }: UntangleChestSceneProps) {
+export function UntangleChestScene({ windCount, won, getRawOrientation, onProgress }: UntangleChestSceneProps) {
   return (
     <Canvas orthographic camera={{ zoom: 90, position: [3, 2, 4], near: 0.1, far: 20 }} dpr={[1, 1.5]}>
       <ambientLight intensity={0.7} />
       <directionalLight position={[3, 5, 2]} intensity={1.1} />
       <CameraLookAt />
-      <ChestRig windCount={windCount} won={won} getRawAlpha={getRawAlpha} onProgress={onProgress} />
+      <ChestRig windCount={windCount} won={won} getRawOrientation={getRawOrientation} onProgress={onProgress} />
     </Canvas>
   )
 }

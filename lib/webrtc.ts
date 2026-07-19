@@ -25,12 +25,14 @@ export type RomUrlInput = {
   system: string
 }
 
-// Raw compass heading from the phone's DeviceOrientationEvent — sent as-is
-// (still wrapped 0-360) so the host can unwrap it itself; that keeps the
-// phone a dumb sensor client with no physics/continuity state of its own.
+// Raw compass heading + front-back tilt from the phone's
+// DeviceOrientationEvent — sent as-is (alpha still wrapped 0-360) so the
+// host can unwrap it itself; that keeps the phone a dumb sensor client
+// with no physics/continuity state of its own.
 export type OrientationInput = {
   type: 'orientation'
   alpha: number
+  beta: number
   ts: number
 }
 
