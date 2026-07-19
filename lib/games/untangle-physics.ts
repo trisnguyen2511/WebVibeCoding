@@ -118,10 +118,18 @@ export function stepTorsion(state: TorsionState, params: TorsionParams, dt: numb
   return { ...state, yaw, pitch, winHoldTime, won: winHoldTime >= WIN_HOLD_DURATION }
 }
 
-/** 0 = fully wound, 1 = untangled, for one axis. */
+// 0 = fully wound, 1 = at (or past) the actual win threshold for this axis.
+// Measuring against literal zero twist instead of the threshold undercounts
+// progress on whichever axis has the smaller total (pitch): the win band
+// is a much bigger *fraction* of a small total than a large one, so the
+// game could already be won while this reported something like 83%,
+// cutting the checkpoint schedule short well before its final, densest
+// milestones ever got a chance to fire.
 function axisProgress(axis: AxisState, totalTwist: number): number {
-  if (totalTwist === 0) return 1
-  return Math.max(0, Math.min(1, 1 - Math.abs(axis.twist) / totalTwist))
+  const remaining = Math.abs(axis.twist)
+  if (remaining <= WIN_TWIST_THRESHOLD) return 1
+  const span = Math.max(totalTwist - WIN_TWIST_THRESHOLD, 0.0001)
+  return Math.max(0, Math.min(1, 1 - (remaining - WIN_TWIST_THRESHOLD) / span))
 }
 
 /** Overall progress — capped by whichever axis is furthest from done, since both must clear to win. */
