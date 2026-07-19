@@ -36,7 +36,13 @@ export type OrientationInput = {
   ts: number
 }
 
-export type ControllerInput = ButtonInput | RomUrlInput | OrientationInput
+// Any connected phone can request a restart — the host reacts by
+// resetting every player's own chest instance for a fresh round.
+export type RestartInput = {
+  type: 'restart'
+}
+
+export type ControllerInput = ButtonInput | RomUrlInput | OrientationInput | RestartInput
 
 export type InputMessage = ControllerInput & { peerId: string }
 

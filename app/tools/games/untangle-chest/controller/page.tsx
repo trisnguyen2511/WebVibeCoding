@@ -24,7 +24,10 @@ function UntangleControllerInner() {
   const [progress, setProgress] = useState(0)
   const [won, setWon] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const connRef = useRef<{ sendInput: (msg: { type: 'orientation'; alpha: number; beta: number; ts: number }) => void; disconnect: () => void } | null>(null)
+  const connRef = useRef<{
+    sendInput: (msg: { type: 'orientation'; alpha: number; beta: number; ts: number } | { type: 'restart' }) => void
+    disconnect: () => void
+  } | null>(null)
   const wonRef = useRef(false)
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
 
@@ -114,6 +117,12 @@ function UntangleControllerInner() {
               {Math.round(progress * 100)}%
             </p>
             <p className="text-sm text-muted">{won ? '🎉 Đã gỡ xong!' : 'Xoay điện thoại để gỡ dây'}</p>
+            <button
+              onClick={() => connRef.current?.sendInput({ type: 'restart' })}
+              className="mt-2 rounded-xl border border-border bg-surface px-5 py-2.5 text-sm font-medium text-fg transition-colors hover:border-accent/40 hover:text-accent-soft"
+            >
+              🔄 Restart cho tất cả
+            </button>
           </>
         )}
       </div>

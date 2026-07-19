@@ -1,9 +1,9 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { QRCodeSVG } from 'qrcode.react'
 import { ToolShell } from '@/components/tool-shell'
-import { createRoom, InputMessage, PlayerInfo, RoomHandle } from '@/lib/webrtc'
+import { createRoom, InputMessage, PlayerInfo, RestartInput, RoomHandle } from '@/lib/webrtc'
 import { MAX_WIND_COUNT, MIN_WIND_COUNT, UntangleProgressMessage } from '@/lib/games/untangle-physics'
 import type { RawOrientation } from '@/components/games/untangle-chest-scene'
 
@@ -39,73 +39,91 @@ function formatTimer(seconds: number) {
 // Split-screen grid: each connected phone gets its own cell showing only
 // its own chest — created only once the host presses "Mở phòng" so the
 // wind-count difficulty can't change mid-session.
-function GameGrid({ roomId, windCount }: { roomId: string; windCount: number }) {
-  const [players, setPlayers] = useState<PlayerInfo[]>([])
-  const [cellStates, setCellStates] = useState<Record<string, CellState>>({})
-  const handleRef = useRef<RoomHandle | null>(null)
-  const rawOrientationRef = useRef<Record<string, RawOrientation>>({})
+const GameGrid = forwardRef<{ restartAll: () => void }, { roomId: string; windCount: number }>(
+  function GameGrid({ roomId, windCount }, ref) {
+    const [players, setPlayers] = useState<PlayerInfo[]>([])
+    const [cellStates, setCellStates] = useState<Record<string, CellState>>({})
+    const [roundKey, setRoundKey] = useState(0)
+    const handleRef = useRef<RoomHandle | null>(null)
+    const rawOrientationRef = useRef<Record<string, RawOrientation>>({})
 
-  useEffect(() => {
-    let cancelled = false
-    createRoom(
-      roomId,
-      (msg: InputMessage) => {
-        if (msg.type !== 'orientation') return
-        rawOrientationRef.current[msg.peerId] = { alpha: msg.alpha, beta: msg.beta }
-      },
-      (newPlayers) => { if (!cancelled) setPlayers(newPlayers.slice(0, MAX_PLAYERS)) }
-    ).then((handle) => {
-      if (cancelled) handle.cleanup()
-      else handleRef.current = handle
-    })
-    return () => {
-      cancelled = true
-      handleRef.current?.cleanup()
-      handleRef.current = null
+    // Bumping roundKey remounts every player's UntangleChestScene (fresh
+    // physics refs), clearing cellStates resets the % / timer labels —
+    // each remounted chest reports progress=0 within its first tick, which
+    // also auto-propagates the reset to that player's phone.
+    const restartAll = useCallback(() => {
+      setRoundKey((k) => k + 1)
+      setCellStates({})
+    }, [])
+
+    useImperativeHandle(ref, () => ({ restartAll }), [restartAll])
+
+    useEffect(() => {
+      let cancelled = false
+      createRoom(
+        roomId,
+        (msg: InputMessage) => {
+          if (msg.type === 'orientation') {
+            rawOrientationRef.current[msg.peerId] = { alpha: msg.alpha, beta: msg.beta }
+          } else if (msg.type === 'restart') {
+            restartAll()
+          }
+        },
+        (newPlayers) => { if (!cancelled) setPlayers(newPlayers.slice(0, MAX_PLAYERS)) }
+      ).then((handle) => {
+        if (cancelled) handle.cleanup()
+        else handleRef.current = handle
+      })
+      return () => {
+        cancelled = true
+        handleRef.current?.cleanup()
+        handleRef.current = null
+      }
+    }, [roomId, restartAll])
+
+    const handleProgress = (peerId: string, progress: number, won: boolean, elapsed: number) => {
+      setCellStates((prev) => ({ ...prev, [peerId]: { progress, won, elapsed } }))
+      handleRef.current?.sendToPlayer<UntangleProgressMessage>(peerId, { type: 'untangle-progress', progress, won })
     }
-  }, [roomId])
 
-  const handleProgress = (peerId: string, progress: number, won: boolean, elapsed: number) => {
-    setCellStates((prev) => ({ ...prev, [peerId]: { progress, won, elapsed } }))
-    handleRef.current?.sendToPlayer<UntangleProgressMessage>(peerId, { type: 'untangle-progress', progress, won })
-  }
+    if (players.length === 0) {
+      return (
+        <div className="flex h-[60vh] items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted">
+          Đang chờ người chơi quét QR để vào phòng...
+        </div>
+      )
+    }
 
-  if (players.length === 0) {
     return (
-      <div className="flex h-[60vh] items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted">
-        Đang chờ người chơi quét QR để vào phòng...
+      <div className={`grid h-[60vh] gap-3 ${gridClass(players.length)}`}>
+        {players.map((p, i) => {
+          const cell = cellStates[p.peerId]
+          const color = PLAYER_BADGE_COLORS[i % PLAYER_BADGE_COLORS.length]
+          return (
+            <div key={p.peerId} className="relative overflow-hidden rounded-xl border border-border bg-surface">
+              <div
+                className="absolute left-2 top-2 z-10 rounded-full border bg-background/80 px-2 py-0.5 font-mono text-xs font-bold"
+                style={{ borderColor: color, color }}
+              >
+                P{i + 1} — {Math.round((cell?.progress ?? 0) * 100)}%{cell?.won ? ' 🎉' : ''}
+              </div>
+              <div className="absolute bottom-2 right-2 z-10 rounded-lg border border-border bg-background/80 px-2 py-1 font-mono text-lg font-bold text-fg">
+                {formatTimer(cell?.elapsed ?? 0)}
+              </div>
+              <UntangleChestScene
+                key={`${p.peerId}-${roundKey}`}
+                windCount={windCount}
+                won={cell?.won ?? false}
+                getRawOrientation={() => rawOrientationRef.current[p.peerId] ?? null}
+                onProgress={(progress, won, elapsed) => handleProgress(p.peerId, progress, won, elapsed)}
+              />
+            </div>
+          )
+        })}
       </div>
     )
   }
-
-  return (
-    <div className={`grid h-[60vh] gap-3 ${gridClass(players.length)}`}>
-      {players.map((p, i) => {
-        const cell = cellStates[p.peerId]
-        const color = PLAYER_BADGE_COLORS[i % PLAYER_BADGE_COLORS.length]
-        return (
-          <div key={p.peerId} className="relative overflow-hidden rounded-xl border border-border bg-surface">
-            <div
-              className="absolute left-2 top-2 z-10 rounded-full border bg-background/80 px-2 py-0.5 font-mono text-xs font-bold"
-              style={{ borderColor: color, color }}
-            >
-              P{i + 1} — {Math.round((cell?.progress ?? 0) * 100)}%{cell?.won ? ' 🎉' : ''}
-            </div>
-            <div className="absolute bottom-2 right-2 z-10 rounded-lg border border-border bg-background/80 px-2 py-1 font-mono text-lg font-bold text-fg">
-              {formatTimer(cell?.elapsed ?? 0)}
-            </div>
-            <UntangleChestScene
-              windCount={windCount}
-              won={cell?.won ?? false}
-              getRawOrientation={() => rawOrientationRef.current[p.peerId] ?? null}
-              onProgress={(progress, won, elapsed) => handleProgress(p.peerId, progress, won, elapsed)}
-            />
-          </div>
-        )
-      })}
-    </div>
-  )
-}
+)
 
 function UntangleChestHost() {
   // Generated client-side only — a useState initializer would run once
@@ -113,9 +131,23 @@ function UntangleChestHost() {
   // different random codes and a text-mismatch hydration error.
   const [roomId, setRoomId] = useState<string | null>(null)
   const [windCount, setWindCount] = useState(3)
+  // Free-typing buffer for the difficulty input — kept separate from the
+  // clamped `windCount` so mid-edit states like "" or "1" (on the way to
+  // typing "10") don't get force-clamped on every keystroke. Clamping
+  // eagerly there caused the controlled value to snap back and reset the
+  // caret, making it impossible to type past 1.
+  const [windCountInput, setWindCountInput] = useState('3')
   const [started, setStarted] = useState(false)
+  const gameGridRef = useRef<{ restartAll: () => void } | null>(null)
 
   useEffect(() => { setRoomId(generateRoomId()) }, [])
+
+  const commitWindCount = () => {
+    const parsed = Math.round(Number(windCountInput))
+    const clamped = Math.max(MIN_WIND_COUNT, Math.min(MAX_WIND_COUNT, Number.isFinite(parsed) && parsed > 0 ? parsed : MIN_WIND_COUNT))
+    setWindCount(clamped)
+    setWindCountInput(String(clamped))
+  }
 
   const controllerUrl =
     roomId ? `${window.location.origin}/tools/games/untangle-chest/controller?room=${roomId}` : ''
@@ -126,7 +158,7 @@ function UntangleChestHost() {
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_270px]">
           <div>
             {started && roomId ? (
-              <GameGrid roomId={roomId} windCount={windCount} />
+              <GameGrid ref={gameGridRef} roomId={roomId} windCount={windCount} />
             ) : (
               <div className="flex h-[60vh] items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted">
                 Chọn độ khó rồi bấm &quot;Mở phòng&quot; để bắt đầu
@@ -162,21 +194,28 @@ function UntangleChestHost() {
                 type="number"
                 min={MIN_WIND_COUNT}
                 max={MAX_WIND_COUNT}
-                value={windCount}
+                value={windCountInput}
                 disabled={started}
-                onChange={(e) =>
-                  setWindCount(Math.max(MIN_WIND_COUNT, Math.min(MAX_WIND_COUNT, Number(e.target.value) || MIN_WIND_COUNT)))
-                }
+                onChange={(e) => setWindCountInput(e.target.value)}
+                onBlur={commitWindCount}
+                onKeyDown={(e) => { if (e.key === 'Enter') { commitWindCount(); e.currentTarget.blur() } }}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-lg text-fg outline-none focus:border-accent/40 disabled:opacity-50"
               />
               <p className="text-xs text-muted">Càng nhiều vòng, dây càng cứng và càng dễ lắc quá tay.</p>
-              {!started && (
+              {!started ? (
                 <button
                   onClick={() => setStarted(true)}
                   disabled={!roomId}
                   className="w-full rounded-lg border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-medium text-accent-soft transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Mở phòng
+                </button>
+              ) : (
+                <button
+                  onClick={() => gameGridRef.current?.restartAll()}
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-fg transition-colors hover:border-accent/40 hover:text-accent-soft"
+                >
+                  🔄 Restart game
                 </button>
               )}
             </div>
