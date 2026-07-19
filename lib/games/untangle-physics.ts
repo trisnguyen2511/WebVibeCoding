@@ -138,6 +138,12 @@ export interface UntangleProgressMessage {
   won: boolean
 }
 
+/** Host → phone: fires once per 25/50/75% milestone so the phone can buzz along with the chime on the big screen. */
+export interface UntangleCheckpointMessage {
+  type: 'untangle-checkpoint'
+  step: number
+}
+
 /**
  * Accumulates a raw angle into a continuous value so a wrap (e.g. 359°→1°
  * for a compass heading) reads as +2° instead of -358°. Returns radians.

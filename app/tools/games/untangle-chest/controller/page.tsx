@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { joinRoom } from '@/lib/webrtc'
-import { UntangleProgressMessage } from '@/lib/games/untangle-physics'
+import { UntangleCheckpointMessage, UntangleProgressMessage } from '@/lib/games/untangle-physics'
 
 // iOS 13+ gates motion/orientation sensors behind a permission prompt that
 // must be triggered from a user gesture — this is the documented shape of
@@ -15,6 +15,10 @@ type Status = 'idle' | 'connecting' | 'playing' | 'disconnected'
 
 function isProgressMessage(data: unknown): data is UntangleProgressMessage {
   return typeof data === 'object' && data !== null && (data as { type?: unknown }).type === 'untangle-progress'
+}
+
+function isCheckpointMessage(data: unknown): data is UntangleCheckpointMessage {
+  return typeof data === 'object' && data !== null && (data as { type?: unknown }).type === 'untangle-checkpoint'
 }
 
 function UntangleControllerInner() {
@@ -77,6 +81,11 @@ function UntangleControllerInner() {
         (idx) => { setPlayerNum(idx + 1); setStatus('playing'); void requestWakeLock() },
         () => { setStatus('disconnected'); wakeLockRef.current?.release().catch(() => {}) },
         (data) => {
+          if (isCheckpointMessage(data)) {
+            // Escalating buzz pattern — more pulses at later checkpoints.
+            navigator.vibrate?.(Array(data.step).fill([40, 60]).flat())
+            return
+          }
           if (!isProgressMessage(data)) return
           setProgress(data.progress)
           if (data.won && !wonRef.current) {
@@ -113,7 +122,7 @@ function UntangleControllerInner() {
         ) : (
           <>
             <p className="font-mono text-xs uppercase tracking-widest text-muted">Người chơi {playerNum}</p>
-            <p className={`font-mono text-6xl font-bold ${won ? 'text-green-400' : 'text-accent-soft'}`}>
+            <p className={`font-mono text-6xl font-bold ${won ? 'text-amber-400' : 'text-accent-soft'}`}>
               {Math.round(progress * 100)}%
             </p>
             <p className="text-sm text-muted">{won ? '🎉 Đã gỡ xong!' : 'Xoay điện thoại để gỡ dây'}</p>

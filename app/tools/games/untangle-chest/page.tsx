@@ -3,8 +3,8 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import dynamic from 'next/dynamic'
 import { QRCodeSVG } from 'qrcode.react'
 import { ToolShell } from '@/components/tool-shell'
-import { createRoom, InputMessage, PlayerInfo, RestartInput, RoomHandle } from '@/lib/webrtc'
-import { MAX_WIND_COUNT, MIN_WIND_COUNT, UntangleProgressMessage } from '@/lib/games/untangle-physics'
+import { createRoom, InputMessage, PlayerInfo, RoomHandle } from '@/lib/webrtc'
+import { MAX_WIND_COUNT, MIN_WIND_COUNT, UntangleCheckpointMessage, UntangleProgressMessage } from '@/lib/games/untangle-physics'
 import type { RawOrientation } from '@/components/games/untangle-chest-scene'
 
 // Three.js/WebGL only exists client-side — keep it out of the SSR bundle.
@@ -116,6 +116,9 @@ const GameGrid = forwardRef<{ restartAll: () => void }, { roomId: string; windCo
                 won={cell?.won ?? false}
                 getRawOrientation={() => rawOrientationRef.current[p.peerId] ?? null}
                 onProgress={(progress, won, elapsed) => handleProgress(p.peerId, progress, won, elapsed)}
+                onCheckpoint={(step) =>
+                  handleRef.current?.sendToPlayer<UntangleCheckpointMessage>(p.peerId, { type: 'untangle-checkpoint', step })
+                }
               />
             </div>
           )
