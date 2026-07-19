@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import {
+  applyRotation,
   createTorsionState,
   difficultyParams,
   stepTorsion,
@@ -28,24 +29,42 @@ function makeToonGradient(): THREE.Texture {
   return tex
 }
 
-// A chain curve that spirals *around* the chest's own body (matching the
-// reference clip: a chain wound around the crate itself, not a rope hanging
-// above it), for `turns` full loops from top to bottom.
-function buildCoilCurve(turns: number, height: number, radius: number): THREE.CatmullRomCurve3 {
-  const segments = Math.max(16, Math.round(turns * 24))
+const CHAIN_RADIUS = 0.6      // how far the wrap sits from the box's center
+const CHAIN_ANCHOR_Y = 1.25   // where the chain would reach if fully wound (matches the old fixed support chain)
+
+// One continuous chain: a straight hang from the anchor down to where the
+// wrap begins, then a spiral around the box for `turns` loops. Both the
+// hang length and the turn count shrink with `turns`, so winding down to 0
+// makes the *whole* chain — hanging part included — disappear together,
+// instead of animating a separate "support chain" that never changes.
+function buildChainCurve(turns: number, boxHalfHeight: number): THREE.CatmullRomCurve3 {
+  const safeTurns = Math.max(0.001, turns)
+  const hangLength = Math.min(CHAIN_ANCHOR_Y - boxHalfHeight, 0.22 * safeTurns)
+  const topY = boxHalfHeight + hangLength
+  const totalSpan = hangLength + boxHalfHeight * 2
+  const hangFraction = totalSpan > 0 ? hangLength / totalSpan : 0
+  const segments = Math.max(16, Math.round(safeTurns * 24) + 8)
+
   const points: THREE.Vector3[] = []
   for (let i = 0; i <= segments; i++) {
     const t = i / segments
-    const angle = t * turns * Math.PI * 2
-    const y = height / 2 - t * height
+    const y = topY - t * totalSpan
+    let radius = 0
+    let angle = 0
+    if (t > hangFraction) {
+      const wrapT = (t - hangFraction) / (1 - hangFraction)
+      radius = CHAIN_RADIUS
+      angle = wrapT * safeTurns * Math.PI * 2
+    }
     points.push(new THREE.Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius))
   }
   return new THREE.CatmullRomCurve3(points)
 }
 
-function buildCoilGeometry(turns: number): THREE.TubeGeometry {
-  const safeTurns = Math.max(0.02, turns)
-  return new THREE.TubeGeometry(buildCoilCurve(safeTurns, 0.74, 0.6), Math.max(16, Math.round(safeTurns * 24)), 0.055, 8, false)
+function buildChainGeometry(turns: number, boxHalfHeight: number): THREE.TubeGeometry {
+  const safeTurns = Math.max(0.001, turns)
+  const curve = buildChainCurve(safeTurns, boxHalfHeight)
+  return new THREE.TubeGeometry(curve, Math.max(16, Math.round(safeTurns * 24) + 8), 0.05, 8, false)
 }
 
 function CameraLookAt() {
@@ -87,17 +106,21 @@ interface ChestRigProps {
   onProgress: (progress: number, won: boolean, elapsedSeconds: number) => void
 }
 
+const BOX_HALF_HEIGHT = 0.35
+
 // Physics lives here, inside the Canvas's own render loop (useFrame), so
 // each player's simulation runs off real frame-delta time and never fights
 // React's render cycle — only a throttled progress readout bubbles back up.
+// The chain geometry itself rebuilds every frame (cheap at this vertex
+// count) for smooth motion instead of the previous 150ms-stepped rebuild.
 function ChestRig({ windCount, won, getRawAlpha, onProgress }: ChestRigProps) {
   const gradientMap = useMemo(() => makeToonGradient(), [])
   const chestGeo = useMemo(() => new THREE.BoxGeometry(1, 0.7, 0.7), [])
-  const initialCoilGeo = useMemo(() => buildCoilGeometry(windCount), [windCount])
+  const initialChainGeo = useMemo(() => buildChainGeometry(windCount, BOX_HALF_HEIGHT), [windCount])
 
   const chestGroupRef = useRef<THREE.Group>(null)
-  const coilMeshRef = useRef<THREE.Mesh>(null)
-  const coilGeoRef = useRef<THREE.BufferGeometry>(initialCoilGeo)
+  const chainMeshRef = useRef<THREE.Mesh>(null)
+  const chainGeoRef = useRef<THREE.BufferGeometry>(initialChainGeo)
   const torsionRef = useRef(createTorsionState(windCount))
   const paramsRef = useRef(difficultyParams(windCount))
   const lastAlphaRef = useRef<number | null>(null)
@@ -107,7 +130,8 @@ function ChestRig({ windCount, won, getRawAlpha, onProgress }: ChestRigProps) {
   useFrame((_, delta) => {
     const raw = getRawAlpha()
     if (raw !== null) {
-      torsionRef.current.topAngle = unwrapDegreesToRadians(lastAlphaRef.current, torsionRef.current.topAngle, raw)
+      const newTopAngle = unwrapDegreesToRadians(lastAlphaRef.current, torsionRef.current.topAngle, raw)
+      torsionRef.current = applyRotation(torsionRef.current, newTopAngle)
       lastAlphaRef.current = raw
     }
     torsionRef.current = stepTorsion(torsionRef.current, paramsRef.current, Math.min(delta, 0.05))
@@ -116,35 +140,26 @@ function ChestRig({ windCount, won, getRawAlpha, onProgress }: ChestRigProps) {
     if (chestGroupRef.current) chestGroupRef.current.rotation.y = state.chestAngle
 
     const progress = twistProgress(state, windCount)
+    if (chainMeshRef.current) {
+      const nextGeo = buildChainGeometry(windCount * (1 - progress), BOX_HALF_HEIGHT)
+      chainGeoRef.current.dispose()
+      chainGeoRef.current = nextGeo
+      chainMeshRef.current.geometry = nextGeo
+    }
+
     const now = performance.now()
     if (now - lastReportRef.current > 150) {
       lastReportRef.current = now
-      // Rebuild the chain with fewer physical loops as progress climbs —
-      // wraps visibly coming undone, not just a fading texture.
-      if (coilMeshRef.current) {
-        const nextGeo = buildCoilGeometry(windCount * (1 - progress))
-        coilGeoRef.current.dispose()
-        coilGeoRef.current = nextGeo
-        coilMeshRef.current.geometry = nextGeo
-      }
       onProgress(progress, state.won, (now - startTimeRef.current) / 1000)
     }
   })
 
   return (
-    <group>
-      {/* Single support chain — the crate hangs from one line, like the reference clip */}
-      <mesh position={[0, 1.25, 0]}>
-        <cylinderGeometry args={[0.02, 0.02, 1.3, 6]} />
-        <meshBasicMaterial color="#3A3A46" />
+    <group ref={chestGroupRef} position={[0, 0.15, 0]}>
+      <OutlinedMesh geometry={chestGeo} color={won ? '#4ADE80' : '#C9A063'} gradientMap={gradientMap} />
+      <mesh ref={chainMeshRef} geometry={initialChainGeo}>
+        <meshToonMaterial color="#71717A" gradientMap={gradientMap} />
       </mesh>
-
-      <group ref={chestGroupRef} position={[0, 0.15, 0]}>
-        <OutlinedMesh geometry={chestGeo} color={won ? '#4ADE80' : '#C9A063'} gradientMap={gradientMap} />
-        <mesh ref={coilMeshRef} geometry={initialCoilGeo}>
-          <meshToonMaterial color="#71717A" gradientMap={gradientMap} />
-        </mesh>
-      </group>
     </group>
   )
 }

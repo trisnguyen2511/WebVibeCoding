@@ -1,79 +1,76 @@
-// Torsional spring-damper model for "Gỡ Rối Rương Xoay": the rope between
-// the player's phone and the hanging chest acts like a torsion spring —
-// twisting it (chestAngle vs topAngle out of sync) creates a restoring
-// torque, and damping bleeds off angular velocity so the chest settles
-// instead of spinning forever. Untangling = driving that twist to zero.
+// "Gỡ Rối Rương Xoay" physics: the chain's remaining twist only ever
+// changes in response to the player's own rotation — turning the phone
+// one way pays it out, turning the other way winds it back up. There is
+// no restoring spring force driving it toward zero on its own: a real
+// twisted rope actually would unwind itself over time if just left
+// hanging, but that makes for a bad game (it "solves itself" before the
+// player does anything) — so `twist` is a purely kinematic quantity, not
+// a simulated spring. `chestAngle` is only a smoothed *visual* lag on top
+// of that, purely for weight/feel, and settles and stays the moment input
+// stops (no free energy, no auto-decay).
 
 export interface TorsionParams {
-  stiffness: number // k — restoring torque per radian of twist
-  damping: number   // c — torque per rad/s of angular velocity
-  inertia: number   // I — angular inertia of the chest
+  /** Response rate (rad/s-ish) for how quickly the visual chest angle catches up to the input — feel only, doesn't affect the win condition. */
+  smoothing: number
 }
 
 export interface TorsionState {
-  topAngle: number        // continuous (unwrapped) phone angle, radians
-  chestAngle: number      // continuous (unwrapped) chest angle, radians
-  chestAngularVel: number // rad/s
+  topAngle: number    // continuous (unwrapped) phone angle, radians
+  twist: number       // remaining signed wind amount, radians — 0 = untangled
+  chestAngle: number  // smoothed visual angle = lagged toward (topAngle + twist)
   won: boolean
-  winHoldTime: number     // seconds the twist has stayed within the win band
+  winHoldTime: number // seconds the twist has stayed within the win band
 }
 
 export const WIN_TWIST_THRESHOLD = 0.14 // rad (~8°)
-export const WIN_VEL_THRESHOLD = 0.6    // rad/s
 export const WIN_HOLD_DURATION = 0.6    // seconds held before declaring a win
 
 export const MIN_WIND_COUNT = 1
 export const MAX_WIND_COUNT = 10
 
-/** Higher wind counts get a stiffer, twitchier rope — more turns to fix, less room for error. */
+/** Higher wind counts feel slightly heavier to swing around — more turns to clear, less snappy response. */
 export function difficultyParams(windCount: number): TorsionParams {
   const n = Math.max(MIN_WIND_COUNT, Math.min(MAX_WIND_COUNT, windCount))
-  return {
-    stiffness: 6 * (1 + 0.15 * (n - 1)),
-    damping: 3.2 / (1 + 0.1 * (n - 1)),
-    inertia: 1,
-  }
+  return { smoothing: 10 / (1 + 0.06 * (n - 1)) }
 }
 
 export function createTorsionState(windCount: number): TorsionState {
   const n = Math.max(MIN_WIND_COUNT, Math.min(MAX_WIND_COUNT, windCount))
+  const initialTwist = n * Math.PI * 2
   return {
     topAngle: 0,
-    chestAngle: n * Math.PI * 2,
-    chestAngularVel: 0,
+    twist: initialTwist,
+    chestAngle: initialTwist,
     won: false,
     winHoldTime: 0,
   }
 }
 
+/** Call whenever a new raw orientation sample arrives — the only thing that ever changes `twist`. */
+export function applyRotation(state: TorsionState, newTopAngle: number): TorsionState {
+  const delta = newTopAngle - state.topAngle
+  return { ...state, topAngle: newTopAngle, twist: state.twist - delta }
+}
+
+/** Call every frame — smooths the visual angle toward the current input and checks the win condition. dt in seconds. */
 export function stepTorsion(state: TorsionState, params: TorsionParams, dt: number): TorsionState {
   if (state.won) return state
 
-  const twist = state.chestAngle - state.topAngle
-  const torque = -params.stiffness * twist - params.damping * state.chestAngularVel
-  const chestAngularVel = state.chestAngularVel + (torque / params.inertia) * dt
-  const chestAngle = state.chestAngle + chestAngularVel * dt
-  const newTwist = chestAngle - state.topAngle
+  const target = state.topAngle + state.twist
+  const smoothingFactor = 1 - Math.exp(-params.smoothing * dt)
+  const chestAngle = state.chestAngle + (target - state.chestAngle) * smoothingFactor
 
-  const withinBand =
-    Math.abs(newTwist) < WIN_TWIST_THRESHOLD && Math.abs(chestAngularVel) < WIN_VEL_THRESHOLD
+  const withinBand = Math.abs(state.twist) < WIN_TWIST_THRESHOLD
   const winHoldTime = withinBand ? state.winHoldTime + dt : 0
 
-  return {
-    ...state,
-    chestAngle,
-    chestAngularVel,
-    winHoldTime,
-    won: winHoldTime >= WIN_HOLD_DURATION,
-  }
+  return { ...state, chestAngle, winHoldTime, won: winHoldTime >= WIN_HOLD_DURATION }
 }
 
 /** 0 = fully wound, 1 = untangled. Used for the phone's progress readout and the PC's cell label. */
 export function twistProgress(state: TorsionState, windCount: number): number {
   const totalTwist = Math.max(MIN_WIND_COUNT, Math.min(MAX_WIND_COUNT, windCount)) * Math.PI * 2
   if (totalTwist === 0) return 1
-  const remaining = Math.abs(state.chestAngle - state.topAngle)
-  return Math.max(0, Math.min(1, 1 - remaining / totalTwist))
+  return Math.max(0, Math.min(1, 1 - Math.abs(state.twist) / totalTwist))
 }
 
 /** Host → phone: lets each phone show its own player's live untangle progress. */
