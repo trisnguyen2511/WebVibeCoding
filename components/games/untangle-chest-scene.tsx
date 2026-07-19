@@ -28,37 +28,11 @@ function makeToonGradient(): THREE.Texture {
   return tex
 }
 
-// Diagonal barber-pole stripe — its vertical offset is driven by the twist
-// angle each frame, giving the illusion of the rope coiling/uncoiling
-// without rebuilding geometry every frame.
-function makeStripeTexture(): THREE.Texture {
-  const size = 64
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = '#C9A063'
-  ctx.fillRect(0, 0, size, size)
-  ctx.strokeStyle = '#7C5A2E'
-  ctx.lineWidth = size * 0.22
-  for (let i = -size; i < size * 2; i += size * 0.4) {
-    ctx.beginPath()
-    ctx.moveTo(i, size)
-    ctx.lineTo(i + size, 0)
-    ctx.stroke()
-  }
-  const tex = new THREE.CanvasTexture(canvas)
-  tex.wrapS = THREE.RepeatWrapping
-  tex.wrapT = THREE.RepeatWrapping
-  tex.repeat.set(1, 4)
-  return tex
-}
-
-// A rope curve that spirals *around* the chest's own body (matching the
-// reference clip: twine wound around the crate itself, not a rope hanging
-// above it) — one static geometry per wind count, no per-frame rebuild.
+// A chain curve that spirals *around* the chest's own body (matching the
+// reference clip: a chain wound around the crate itself, not a rope hanging
+// above it), for `turns` full loops from top to bottom.
 function buildCoilCurve(turns: number, height: number, radius: number): THREE.CatmullRomCurve3 {
-  const segments = Math.max(32, Math.round(turns * 24))
+  const segments = Math.max(16, Math.round(turns * 24))
   const points: THREE.Vector3[] = []
   for (let i = 0; i <= segments; i++) {
     const t = i / segments
@@ -67,6 +41,11 @@ function buildCoilCurve(turns: number, height: number, radius: number): THREE.Ca
     points.push(new THREE.Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius))
   }
   return new THREE.CatmullRomCurve3(points)
+}
+
+function buildCoilGeometry(turns: number): THREE.TubeGeometry {
+  const safeTurns = Math.max(0.02, turns)
+  return new THREE.TubeGeometry(buildCoilCurve(safeTurns, 0.74, 0.6), Math.max(16, Math.round(safeTurns * 24)), 0.055, 8, false)
 }
 
 function CameraLookAt() {
@@ -113,16 +92,12 @@ interface ChestRigProps {
 // React's render cycle — only a throttled progress readout bubbles back up.
 function ChestRig({ windCount, won, getRawAlpha, onProgress }: ChestRigProps) {
   const gradientMap = useMemo(() => makeToonGradient(), [])
-  const stripeTex = useMemo(() => makeStripeTexture(), [])
   const chestGeo = useMemo(() => new THREE.BoxGeometry(1, 0.7, 0.7), [])
-  const coilGeo = useMemo(() => {
-    const turns = Math.max(1, windCount)
-    const curve = buildCoilCurve(turns, 0.74, 0.62)
-    return new THREE.TubeGeometry(curve, Math.max(64, turns * 24), 0.045, 8, false)
-  }, [windCount])
+  const initialCoilGeo = useMemo(() => buildCoilGeometry(windCount), [windCount])
 
   const chestGroupRef = useRef<THREE.Group>(null)
-  const coilMatRef = useRef<THREE.MeshBasicMaterial>(null)
+  const coilMeshRef = useRef<THREE.Mesh>(null)
+  const coilGeoRef = useRef<THREE.BufferGeometry>(initialCoilGeo)
   const torsionRef = useRef(createTorsionState(windCount))
   const paramsRef = useRef(difficultyParams(windCount))
   const lastAlphaRef = useRef<number | null>(null)
@@ -138,38 +113,36 @@ function ChestRig({ windCount, won, getRawAlpha, onProgress }: ChestRigProps) {
     torsionRef.current = stepTorsion(torsionRef.current, paramsRef.current, Math.min(delta, 0.05))
 
     const state = torsionRef.current
-    const progress = twistProgress(state, windCount)
     if (chestGroupRef.current) chestGroupRef.current.rotation.y = state.chestAngle
-    if (coilMatRef.current) {
-      const map = coilMatRef.current.map
-      if (map) map.offset.y = -(state.chestAngle - state.topAngle) / (Math.PI * 2)
-      // Twine visibly falls away as the wrap comes undone.
-      coilMatRef.current.opacity = Math.max(0, 1 - progress)
-    }
 
+    const progress = twistProgress(state, windCount)
     const now = performance.now()
     if (now - lastReportRef.current > 150) {
       lastReportRef.current = now
+      // Rebuild the chain with fewer physical loops as progress climbs —
+      // wraps visibly coming undone, not just a fading texture.
+      if (coilMeshRef.current) {
+        const nextGeo = buildCoilGeometry(windCount * (1 - progress))
+        coilGeoRef.current.dispose()
+        coilGeoRef.current = nextGeo
+        coilMeshRef.current.geometry = nextGeo
+      }
       onProgress(progress, state.won, (now - startTimeRef.current) / 1000)
     }
   })
 
   return (
     <group>
-      {/* Two support chains hinting the crate is suspended mid-air, like the reference clip */}
-      <mesh position={[-0.35, 1.25, 0]} rotation={[0, 0, 0.22]}>
-        <cylinderGeometry args={[0.02, 0.02, 1.3, 6]} />
-        <meshBasicMaterial color="#3A3A46" />
-      </mesh>
-      <mesh position={[0.35, 1.25, 0]} rotation={[0, 0, -0.22]}>
+      {/* Single support chain — the crate hangs from one line, like the reference clip */}
+      <mesh position={[0, 1.25, 0]}>
         <cylinderGeometry args={[0.02, 0.02, 1.3, 6]} />
         <meshBasicMaterial color="#3A3A46" />
       </mesh>
 
       <group ref={chestGroupRef} position={[0, 0.15, 0]}>
         <OutlinedMesh geometry={chestGeo} color={won ? '#4ADE80' : '#C9A063'} gradientMap={gradientMap} />
-        <mesh geometry={coilGeo}>
-          <meshBasicMaterial ref={coilMatRef} map={stripeTex} transparent />
+        <mesh ref={coilMeshRef} geometry={initialCoilGeo}>
+          <meshToonMaterial color="#71717A" gradientMap={gradientMap} />
         </mesh>
       </group>
     </group>
