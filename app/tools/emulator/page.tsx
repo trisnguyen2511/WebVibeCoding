@@ -157,6 +157,14 @@ function EmulatorHost() {
   const [urlError,     setUrlError]     = useState<string | null>(null)
   const [showRomSwap,  setShowRomSwap]  = useState(false)
   const [cacheStatus,  setCacheStatus]  = useState<'idle' | 'cleaning' | 'done' | 'error'>('idle')
+  // iOS Safari has no Fullscreen API for plain elements (only <video> can go
+  // native fullscreen there) — requestFullscreen() is either undefined or
+  // silently rejects, so the button did nothing on iPhone. Fall back to a
+  // CSS-only "fake fullscreen" (fixed, covers the viewport) whenever the
+  // real API is missing or fails.
+  const [fakeFullscreen, setFakeFullscreen] = useState(false)
+  const [runtimeError,   setRuntimeError]   = useState(false)
+  const [loadAttempt,    setLoadAttempt]    = useState(0)
 
   const ejsRef     = useRef<EJSManager | null>(null)
   const prevRef    = useRef<Record<string, Record<string, boolean>>>({})
@@ -165,13 +173,28 @@ function EmulatorHost() {
   const scriptRef  = useRef<HTMLScriptElement | null>(null)
   const screenRef  = useRef<HTMLDivElement | null>(null)
 
-  // Browsers only honor a fullscreen request while there's still an active
-  // user gesture — by the time the ROM/core finishes loading that gesture
-  // has usually expired, so this can silently fail. The manual "⛶" button
-  // below is the reliable fallback when it does.
-  const requestFullscreen = useCallback(() => {
-    screenRef.current?.requestFullscreen?.().catch(() => { /* no active user gesture — use the manual button */ })
+  // Best-effort, silent — used right when the game finishes loading
+  // (EJS_onGameStart), which isn't a real user gesture so the browser is
+  // very likely to reject it anyway. No fallback here: we don't want to
+  // auto-drop the page into the CSS fake-fullscreen overlay without the
+  // user actually asking for it.
+  const tryAutoFullscreen = useCallback(() => {
+    screenRef.current?.requestFullscreen?.().catch(() => { /* expected — no active user gesture */ })
   }, [])
+
+  // The manual "⛶" button — a real user gesture, so requestFullscreen()
+  // should work here even where the auto-attempt above didn't. On iOS
+  // Safari there's no Fullscreen API for a plain <div> at all (only
+  // <video> gets native fullscreen there), so this falls back to a
+  // CSS-only "fake fullscreen" (fixed, covers the viewport) whenever the
+  // real API is missing or still fails.
+  const requestFullscreen = useCallback(() => {
+    const el = screenRef.current
+    if (!el?.requestFullscreen) { setFakeFullscreen(true); return }
+    el.requestFullscreen().catch(() => setFakeFullscreen(true))
+  }, [])
+
+  const exitFakeFullscreen = useCallback(() => setFakeFullscreen(false), [])
 
   // Clear all browser storage used by EmulatorJS (Cache API cores, IndexedDB saves, localStorage)
   const cleanCache = async () => {
@@ -322,6 +345,7 @@ function EmulatorHost() {
       try { document.body.removeChild(scriptRef.current) } catch { /* already removed */ }
       scriptRef.current = null
     }
+    setRuntimeError(false)
 
     // blob: URLs carry no filename at all (just an opaque id) — FBNeo needs
     // the real filename (its MAME/FBNeo "short name", e.g. "dino.zip") to
@@ -350,28 +374,57 @@ function EmulatorHost() {
         try { gm?.setControllerPortDevice(port, RETRO_DEVICE_JOYPAD) } catch { /* core doesn't support this many players */ }
       }
       setGameReady(true)
-      requestFullscreen()
+      setRuntimeError(false)
+      tryAutoFullscreen()
     }
 
     const s  = document.createElement('script')
-    s.src    = EJS_LOADER
+    // Cache-bust on retry so a "Thử lại" tap forces a fresh network request
+    // instead of reusing whatever just failed.
+    s.src    = loadAttempt > 0 ? `${EJS_LOADER}?retry=${loadAttempt}` : EJS_LOADER
     s.async  = true
+    s.onerror = () => setRuntimeError(true)
     document.body.appendChild(s)
     scriptRef.current = s
 
+    // EmulatorJS gives no explicit "failed to init" callback — if the core
+    // hasn't reported ready after a generous timeout, treat it as failed
+    // (CDN hiccup, ad blocker, or a WASM/asset fetch that silently stalled)
+    // instead of leaving the "Loading..." badge spinning forever.
+    const timeout = setTimeout(() => {
+      if (!window.EJS_emulator) setRuntimeError(true)
+    }, 20000)
+
     return () => {
+      clearTimeout(timeout)
       if (scriptRef.current && document.body.contains(scriptRef.current)) {
         document.body.removeChild(scriptRef.current)
         scriptRef.current = null
       }
     }
-  }, [romUrl, romName, system, biosUrl, requestFullscreen])
+  }, [romUrl, romName, system, biosUrl, tryAutoFullscreen, loadAttempt])
+
+  const retryLoad = useCallback(() => {
+    setRuntimeError(false)
+    setGameReady(false)
+    setLoadAttempt((n) => n + 1)
+  }, [])
 
   // Revoke blobs on unmount
   useEffect(() => () => {
     if (blobRef.current) URL.revokeObjectURL(blobRef.current)
     if (biosBlobRef.current) URL.revokeObjectURL(biosBlobRef.current)
   }, [])
+
+  // Lock page scroll behind the CSS fake-fullscreen overlay, same as a real
+  // fullscreen would — otherwise the page underneath can still scroll on
+  // touch devices while the emulator looks fullscreen.
+  useEffect(() => {
+    if (!fakeFullscreen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [fakeFullscreen])
 
   const resetRom = () => {
     ejsRef.current = null
@@ -539,11 +592,27 @@ function EmulatorHost() {
 
               </div>
             ) : (
-              <div ref={screenRef} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-black">
+              <div
+                ref={screenRef}
+                // EmulatorJS renders its own always-dark control skin — it
+                // isn't aware of the app's light/dark toggle, so force this
+                // subtree back to a dark color-scheme regardless of the
+                // page theme (otherwise light mode can flip default
+                // colors inside its menu/buttons to something unreadable).
+                style={{ colorScheme: 'dark' }}
+                className={`group flex flex-col overflow-hidden rounded-xl border border-border bg-black ${
+                  fakeFullscreen ? 'fixed inset-0 z-[9999] rounded-none border-0' : ''
+                }`}
+              >
                 <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-2">
                   <span className="font-mono text-xs text-muted truncate max-w-xs">{romName}</span>
                   <div className="flex shrink-0 items-center gap-3">
-                    {gameReady ? (
+                    {runtimeError ? (
+                      <span className="flex items-center gap-1.5 font-mono text-xs text-red-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                        Lỗi tải EmulatorJS runtime
+                      </span>
+                    ) : gameReady ? (
                       <span className="flex items-center gap-1.5 font-mono text-xs text-green-400">
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />
                         Running
@@ -554,7 +623,23 @@ function EmulatorHost() {
                         Loading...
                       </span>
                     )}
-                    {gameReady && (
+                    {runtimeError && (
+                      <button
+                        onClick={retryLoad}
+                        className="text-xs text-accent-soft transition-colors hover:text-fg"
+                      >
+                        ↻ Thử lại
+                      </button>
+                    )}
+                    {fakeFullscreen ? (
+                      <button
+                        onClick={exitFakeFullscreen}
+                        title="Thoát toàn màn hình"
+                        className="text-xs text-muted transition-colors hover:text-fg"
+                      >
+                        ✕ Thoát toàn màn hình
+                      </button>
+                    ) : gameReady && (
                       <button
                         onClick={requestFullscreen}
                         title="Toàn màn hình"
@@ -609,8 +694,24 @@ function EmulatorHost() {
                   </div>
                 )}
 
+                {runtimeError && (
+                  <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+                    <span className="text-3xl">⚠️</span>
+                    <p className="text-sm text-fg">Không tải được EmulatorJS runtime.</p>
+                    <p className="max-w-sm text-xs text-muted">
+                      Thường do CDN emulatorjs.org chập chờn, trình chặn quảng cáo (ad blocker)
+                      chặn script, hoặc mạng chặn. Thử tắt ad blocker rồi bấm &quot;↻ Thử lại&quot;,
+                      hoặc đổi mạng/wifi khác.
+                    </p>
+                  </div>
+                )}
                 {/* EJS mounts here — do NOT conditionally render this div */}
-                <div id="ejs-mount" className="w-full min-h-[400px] group-[:fullscreen]:min-h-0 group-[:fullscreen]:flex-1" />
+                <div
+                  id="ejs-mount"
+                  className={`w-full min-h-[400px] group-[:fullscreen]:min-h-0 group-[:fullscreen]:flex-1 ${
+                    fakeFullscreen ? 'min-h-0 flex-1' : ''
+                  } ${runtimeError ? 'hidden' : ''}`}
+                />
               </div>
             )}
           </div>
