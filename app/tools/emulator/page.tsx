@@ -360,16 +360,13 @@ function EmulatorHost() {
     window.EJS_gameName      = romName ?? undefined
     window.EJS_core          = SYSTEMS.find((s) => s.value === system)?.core ?? 'fceumm'
     window.EJS_pathtodata    = EJS_DATA
-    // Forcing auto-start here (instead of leaving EmulatorJS's own "click to
-    // play" start screen in place) skips the real user-gesture tap right
-    // before the core boots. Chrome/Android's autoplay policy is lenient
-    // enough to paper over that, but WebKit (iOS Safari, and the WebKit-based
-    // browser on LG TVs) enforces it strictly — audio/WASM init can silently
-    // stall with no game ever appearing. Let EmulatorJS show its own start
-    // button instead so every platform gets a real gesture right before boot
-    // (this also makes the fullscreen-on-start attempt below far more likely
-    // to actually succeed, for the same reason).
-    window.EJS_startOnLoaded = false
+    // REVERTED: setting this false to force EmulatorJS's own "click to play"
+    // start screen (instead of auto-starting) was meant to fix iOS/TV
+    // gesture-policy stalls, but it broke loading on every platform,
+    // including Android — confirmed by testing, so back to true. The
+    // iPhone/LG TV "won't load" bug needs a different root cause; don't
+    // touch this flag again without reproducing the actual failure first.
+    window.EJS_startOnLoaded = true
     if (biosUrl) window.EJS_biosUrl = biosUrl
     else delete window.EJS_biosUrl
     window.EJS_onGameStart   = () => {
