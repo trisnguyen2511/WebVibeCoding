@@ -164,6 +164,11 @@ function EmulatorHost() {
   // real API is missing or fails.
   const [fakeFullscreen, setFakeFullscreen] = useState(false)
   const [runtimeError,   setRuntimeError]   = useState(false)
+  // Captured from a window error/unhandledrejection during boot, or from the
+  // stall-timeout classification — shown in the error banner so a report
+  // like "stuck on iPhone/LG TV" comes with an actual message next time
+  // instead of just "still loading, no idea why".
+  const [runtimeErrorMsg, setRuntimeErrorMsg] = useState<string | null>(null)
   const [loadAttempt,    setLoadAttempt]    = useState(0)
 
   const ejsRef     = useRef<EJSManager | null>(null)
@@ -172,6 +177,11 @@ function EmulatorHost() {
   const biosBlobRef = useRef<string | null>(null)
   const scriptRef  = useRef<HTMLScriptElement | null>(null)
   const screenRef  = useRef<HTMLDivElement | null>(null)
+  // Mirrors gameReady for the stall-timeout closure below, which is set up
+  // once per ROM load and would otherwise only ever see the stale value
+  // gameReady had at that time.
+  const gameReadyRef = useRef(false)
+  useEffect(() => { gameReadyRef.current = gameReady }, [gameReady])
 
   // Best-effort, silent — used right when the game finishes loading
   // (EJS_onGameStart), which isn't a real user gesture so the browser is
@@ -346,6 +356,7 @@ function EmulatorHost() {
       scriptRef.current = null
     }
     setRuntimeError(false)
+    setRuntimeErrorMsg(null)
 
     // blob: URLs carry no filename at all (just an opaque id) — FBNeo needs
     // the real filename (its MAME/FBNeo "short name", e.g. "dino.zip") to
@@ -381,6 +392,7 @@ function EmulatorHost() {
       }
       setGameReady(true)
       setRuntimeError(false)
+      setRuntimeErrorMsg(null)
       tryAutoFullscreen()
     }
 
@@ -389,20 +401,42 @@ function EmulatorHost() {
     // instead of reusing whatever just failed.
     s.src    = loadAttempt > 0 ? `${EJS_LOADER}?retry=${loadAttempt}` : EJS_LOADER
     s.async  = true
-    s.onerror = () => setRuntimeError(true)
+    s.onerror = () => { setRuntimeError(true); setRuntimeErrorMsg('Không tải được loader.js từ CDN.') }
     document.body.appendChild(s)
     scriptRef.current = s
 
-    // EmulatorJS gives no explicit "failed to init" callback — if the core
-    // hasn't reported ready after a generous timeout, treat it as failed
-    // (CDN hiccup, ad blocker, or a WASM/asset fetch that silently stalled)
-    // instead of leaving the "Loading..." badge spinning forever.
+    // EmulatorJS itself never reports a specific "failed to init" reason —
+    // catch whatever error/rejection happens on the page while it's booting
+    // (a WASM instantiation failure, an AudioContext/autoplay rejection,
+    // an out-of-memory abort, etc.) so a report from an affected device
+    // comes back with an actual message instead of just "still loading".
+    let capturedDetail: string | null = null
+    const onWinError = (e: ErrorEvent) => { capturedDetail = e.message || String(e.error ?? 'unknown error') }
+    const onRejection = (e: PromiseRejectionEvent) => { capturedDetail = String(e.reason?.message ?? e.reason ?? 'unhandled rejection') }
+    window.addEventListener('error', onWinError)
+    window.addEventListener('unhandledrejection', onRejection)
+
+    // EmulatorJS gives no explicit "failed to init" callback — if the game
+    // hasn't actually started after a generous timeout (long enough for a
+    // big core like FBNeo/N64 to compile WASM even on slow/old hardware),
+    // treat it as stalled instead of leaving the "Loading..." badge
+    // spinning forever with no feedback.
     const timeout = setTimeout(() => {
-      if (!window.EJS_emulator) setRuntimeError(true)
-    }, 20000)
+      if (!gameReadyRef.current) {
+        setRuntimeError(true)
+        setRuntimeErrorMsg(
+          capturedDetail ??
+          (window.EJS_emulator
+            ? 'Core đã khởi tạo nhưng game không bao giờ báo sẵn sàng (có thể do trình duyệt chặn tự phát âm thanh, hoặc thiết bị quá yếu để biên dịch core kịp thời).'
+            : 'EmulatorJS chưa từng khởi tạo được (window.EJS_emulator không tồn tại) sau 45 giây.')
+        )
+      }
+    }, 45000)
 
     return () => {
       clearTimeout(timeout)
+      window.removeEventListener('error', onWinError)
+      window.removeEventListener('unhandledrejection', onRejection)
       if (scriptRef.current && document.body.contains(scriptRef.current)) {
         document.body.removeChild(scriptRef.current)
         scriptRef.current = null
@@ -412,6 +446,7 @@ function EmulatorHost() {
 
   const retryLoad = useCallback(() => {
     setRuntimeError(false)
+    setRuntimeErrorMsg(null)
     setGameReady(false)
     setLoadAttempt((n) => n + 1)
   }, [])
@@ -450,6 +485,8 @@ function EmulatorHost() {
     setBiosUrl(null)
     setBiosName(null)
     setGameReady(false)
+    setRuntimeError(false)
+    setRuntimeErrorMsg(null)
   }
 
   return (
@@ -709,6 +746,11 @@ function EmulatorHost() {
                       chặn script, hoặc mạng chặn. Thử tắt ad blocker rồi bấm &quot;↻ Thử lại&quot;,
                       hoặc đổi mạng/wifi khác.
                     </p>
+                    {runtimeErrorMsg && (
+                      <p className="max-w-sm break-words rounded-lg border border-border bg-background px-3 py-2 font-mono text-[11px] text-muted">
+                        {runtimeErrorMsg}
+                      </p>
+                    )}
                   </div>
                 )}
                 {/* EJS mounts here — do NOT conditionally render this div */}
