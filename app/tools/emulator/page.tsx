@@ -141,6 +141,18 @@ function generateRoomId() {
   return Math.random().toString(36).slice(2, 8).toUpperCase()
 }
 
+// iOS Safari (and any WKWebView-based browser there) caps a single tab at
+// roughly ~265MB of RAM — confirmed by testing: NES loads fine on iPhone,
+// but a heavier Arcade/CPS2 core (FBNeo) renders a black screen despite
+// EmulatorJS reporting "Running". This is a documented platform limit of
+// EmulatorJS itself on iOS (see github.com/EmulatorJS/EmulatorJS issues
+// #82/#131/#233), not something fixable from our own bootstrap code.
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
 // ── Host page ────────────────────────────────────────────────────
 function EmulatorHost() {
   const [roomId]  = useState(generateRoomId)
@@ -517,6 +529,15 @@ function EmulatorHost() {
                       </button>
                     ))}
                   </div>
+                  {(system === 'arcade' || system === 'n64') && isIOS() && (
+                    <p className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-300">
+                      ⚠️ Safari trên iPhone/iPad giới hạn RAM mỗi tab rất thấp — core{' '}
+                      {system === 'arcade' ? 'Arcade (FBNeo)' : 'N64'} thường chỉ hiện màn hình
+                      đen dù báo &quot;Running&quot;. Trên iPhone nên dùng NES/SNES/GBA/Game Boy
+                      thay thế, hoặc thử &quot;Thêm vào Màn hình chính&quot; từ Safari rồi mở lại
+                      từ đó để có thêm bộ nhớ.
+                    </p>
+                  )}
                 </div>
 
                 {/* ROM upload */}
@@ -705,6 +726,14 @@ function EmulatorHost() {
                     </button>
                   </div>
                 </div>
+
+                {gameReady && (system === 'arcade' || system === 'n64') && isIOS() && (
+                  <p className="border-b border-border bg-amber-500/5 px-4 py-2 text-xs text-amber-300">
+                    ⚠️ Nếu màn hình đen dù báo &quot;Running&quot;: Safari trên iPhone/iPad
+                    giới hạn RAM quá thấp cho core {system === 'arcade' ? 'Arcade' : 'N64'} này.
+                    Đổi ROM sang NES/SNES/GBA/Game Boy để chơi được trên iPhone.
+                  </p>
+                )}
 
                 {/* ── Inline ROM swap panel (Player 1) ─────────────── */}
                 {showRomSwap && (
