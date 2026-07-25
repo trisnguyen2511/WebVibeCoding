@@ -57,3 +57,50 @@ export async function getCloudinaryUsageBytes(): Promise<number> {
   const usage = await client.api.usage()
   return usage.storage?.usage ?? 0
 }
+
+const ROM_FOLDER = 'emulator_rom'
+
+function sanitizeRomFileName(fileName: string): string {
+  const base = fileName.replace(/\.[^./]+$/, '')
+  return base.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 60) || 'rom'
+}
+
+// Signature for a direct browser→Cloudinary chunked upload of a large ROM
+// file (up to ~2GB) — chunked upload bypasses Vercel's serverless body-size
+// limit since the file never passes through our API. resource_type is
+// always 'raw' for ROM binaries and isn't part of the signed params (same
+// reasoning as createChatUploadSignature).
+export function createRomUploadSignature(
+  system: string,
+  fileName: string
+): { signature: string; timestamp: number; apiKey: string; cloudName: string; folder: string; publicId: string } {
+  const client = getClient()
+  const timestamp = Math.floor(Date.now() / 1000)
+  const publicId = `${system}-${sanitizeRomFileName(fileName)}-${timestamp}`
+  const signature = client.utils.api_sign_request(
+    { folder: ROM_FOLDER, public_id: publicId, timestamp },
+    process.env.CLOUDINARY_API_SECRET!
+  )
+  return {
+    signature,
+    timestamp,
+    apiKey: process.env.CLOUDINARY_API_KEY!,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME!,
+    folder: ROM_FOLDER,
+    publicId,
+  }
+}
+
+// Small cover-art thumbnail for a ROM, uploaded server-side as a base64
+// data URL (same pattern as uploadChatImage) — kept in a covers/ subfolder
+// under the ROM library folder so the two resource types stay organized.
+export async function uploadRomCover(
+  dataUrl: string
+): Promise<{ url: string; publicId: string }> {
+  const client = getClient()
+  const result = await client.uploader.upload(dataUrl, {
+    folder: `${ROM_FOLDER}/covers`,
+    resource_type: 'image',
+  })
+  return { url: result.secure_url, publicId: result.public_id }
+}
