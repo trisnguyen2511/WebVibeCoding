@@ -3,10 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
 import { SettingsMenu } from '@/components/settings-menu'
-
-// Read by the home page to jump straight back into whichever tool was last
-// open, instead of always landing on the tool picker.
-export const LAST_TOOL_KEY = 'wv-last-tool'
+import { recordToolVisit } from '@/lib/tool-history'
 
 interface ToolShellProps {
   name: string
@@ -60,7 +57,7 @@ export function ToolShell({
   const pathname = usePathname()
 
   useEffect(() => {
-    if (pathname) localStorage.setItem(LAST_TOOL_KEY, pathname)
+    if (pathname) recordToolVisit(pathname)
   }, [pathname])
 
   return (
