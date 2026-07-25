@@ -29,3 +29,25 @@ export function recordToolVisit(path: string): void {
 export function getMostRecentTool(): ToolHistoryEntry | null {
   return getToolHistory()[0] ?? null
 }
+
+function pathToSlug(path: string): string | null {
+  const match = path.match(/^\/tools\/([^/]+)/)
+  return match ? match[1] : null
+}
+
+// MRU order of tool *slugs* (deduped — a tool visited via several of its own
+// sub-pages, e.g. /tools/emulator then /tools/emulator/admin, still counts
+// as one entry at its most recent position) — used to sort the home page's
+// tool grid so the most recently used tool leads.
+export function getSlugVisitOrder(): string[] {
+  const seen = new Set<string>()
+  const order: string[] = []
+  for (const entry of getToolHistory()) {
+    const slug = pathToSlug(entry.path)
+    if (slug && !seen.has(slug)) {
+      seen.add(slug)
+      order.push(slug)
+    }
+  }
+  return order
+}
