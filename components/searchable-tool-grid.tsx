@@ -1,7 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Tool, ToolCategory } from '@/lib/tools-registry'
+import { getSlugVisitOrder } from '@/lib/tool-history'
 
 const CATEGORIES: { label: string; value: ToolCategory | 'all'; icon: string }[] = [
   { label: 'All', value: 'all', icon: '◈' },
@@ -28,15 +29,31 @@ const CAT_STYLES: Record<ToolCategory | 'all', { pill: string; icon: string; glo
 export function SearchableToolGrid({ tools }: { tools: Tool[] }) {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<ToolCategory | 'all'>('all')
+  // Starts empty (server-rendered order) and fills in after mount — history
+  // only lives in localStorage, so this can't be read during SSR without
+  // causing a hydration mismatch.
+  const [visitOrder, setVisitOrder] = useState<string[]>([])
 
-  const filtered = tools.filter((t) => {
-    const matchesQuery =
-      query === '' ||
-      t.name.toLowerCase().includes(query.toLowerCase()) ||
-      t.description.toLowerCase().includes(query.toLowerCase())
-    const matchesCategory = category === 'all' || t.category === category
-    return matchesQuery && matchesCategory
-  })
+  useEffect(() => { setVisitOrder(getSlugVisitOrder()) }, [])
+
+  const filtered = tools
+    .filter((t) => {
+      const matchesQuery =
+        query === '' ||
+        t.name.toLowerCase().includes(query.toLowerCase()) ||
+        t.description.toLowerCase().includes(query.toLowerCase())
+      const matchesCategory = category === 'all' || t.category === category
+      return matchesQuery && matchesCategory
+    })
+    .slice()
+    .sort((a, b) => {
+      const rankA = visitOrder.indexOf(a.slug)
+      const rankB = visitOrder.indexOf(b.slug)
+      if (rankA === -1 && rankB === -1) return 0
+      if (rankA === -1) return 1
+      if (rankB === -1) return -1
+      return rankA - rankB
+    })
 
   return (
     <div className="space-y-5">
