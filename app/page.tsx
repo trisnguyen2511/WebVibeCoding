@@ -30,6 +30,10 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+              All systems live
+            </span>
+            <span className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
               Press{' '}
               <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[11px] text-fg/60">
                 /
@@ -68,18 +72,6 @@ export default function HomePage() {
 
       {/* ── Tool grid ────────────────────────────────────────── */}
       <main className="mx-auto max-w-5xl px-6 pb-24 pt-6">
-        <div className="mb-7 flex items-end justify-between">
-          <div>
-            <h2 className="font-display text-xl font-semibold text-fg">Browse tools</h2>
-            <p className="mt-0.5 text-sm text-muted">
-              {tools.length} tools · search or filter by category
-            </p>
-          </div>
-          <span className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-            All systems live
-          </span>
-        </div>
         <SearchableToolGrid tools={tools} />
       </main>
 
