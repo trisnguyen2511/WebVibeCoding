@@ -5,13 +5,12 @@ import { LastToolRedirect } from '@/components/last-tool-redirect'
 import { SettingsMenu } from '@/components/settings-menu'
 
 const STATS = [
-  { value: String(tools.length), label: 'Tools', sub: 'and growing' },
   { value: '7',    label: 'Categories',   sub: 'utility to game'  },
   { value: '100%', label: 'Client-side',  sub: 'no server calls'  },
   { value: '0',    label: 'Sign-ups',     sub: 'just open & use'  },
 ]
 
-const CHIPS = ['No account needed', 'Runs locally', 'Zero tracking']
+const CHIPS = ['Runs locally', 'Zero tracking']
 
 export default function HomePage() {
   return (
@@ -51,7 +50,7 @@ export default function HomePage() {
       </header>
 
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="relative border-b border-overlay/[0.05] pb-14 pt-16 sm:pb-16 sm:pt-20">
+      <section className="relative border-b border-overlay/[0.05] pb-14 pt-8 sm:pb-16 sm:pt-10">
         <div className="mx-auto max-w-5xl px-6">
 
           {/* Badge */}
@@ -91,14 +90,14 @@ export default function HomePage() {
       {/* ── Stats bento ──────────────────────────────────────── */}
       <section className="border-b border-overlay/[0.05]">
         <div className="mx-auto max-w-5xl px-6 py-8">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {STATS.map((s) => (
               <div
                 key={s.label}
-                className="group relative overflow-hidden rounded-2xl border border-overlay/[0.07] bg-overlay/[0.03] p-5 backdrop-blur-sm transition-all duration-300 hover:border-accent/25 hover:bg-overlay/[0.05] hover:shadow-[0_0_24px_rgba(124,58,237,0.08)]"
+                className="group relative overflow-hidden rounded-2xl border border-overlay/[0.07] bg-overlay/[0.03] p-3.5 backdrop-blur-sm transition-all duration-300 hover:border-accent/25 hover:bg-overlay/[0.05] hover:shadow-[0_0_24px_rgba(124,58,237,0.08)] sm:p-5"
               >
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/[0.05] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                <p className="font-display text-3xl font-bold tracking-tight text-fg sm:text-[2.25rem]">
+                <p className="font-display text-xl font-bold tracking-tight text-fg sm:text-[2.25rem]">
                   {s.value}
                 </p>
                 <p className="mt-1 text-sm font-semibold text-fg/80">{s.label}</p>
