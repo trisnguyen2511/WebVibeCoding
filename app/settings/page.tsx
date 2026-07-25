@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useTheme } from 'next-themes'
-import { Settings as SettingsIcon, Moon, Sun, Trash2 } from 'lucide-react'
+import { Settings as SettingsIcon, Moon, Sun, Monitor, Trash2 } from 'lucide-react'
 import { CLEARABLE_CACHES, clearToolCache } from '@/lib/clear-cache-registry'
 
 // App-wide settings — deliberately its own page (not a tool, doesn't use
@@ -50,11 +50,21 @@ export default function SettingsPage() {
       <main className="mx-auto max-w-2xl space-y-6 px-4 py-6">
         <section className="rounded-2xl border border-border bg-surface p-5">
           <h2 className="font-display text-sm font-semibold text-fg">Giao diện</h2>
-          <p className="mt-0.5 text-xs text-muted">Chọn giao diện sáng hoặc tối cho toàn bộ app</p>
-          <div className="mt-4 flex gap-3">
+          <p className="mt-0.5 text-xs text-muted">Chọn giao diện sáng, tối, hoặc theo hệ thống cho toàn bộ app</p>
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            <button
+              onClick={() => setTheme('system')}
+              className={`flex flex-col items-center justify-center gap-2 rounded-xl border py-3 text-sm font-medium transition-all ${
+                mounted && theme === 'system'
+                  ? 'border-accent bg-accent/[0.12] text-accent-soft'
+                  : 'border-border bg-background text-muted hover:text-fg'
+              }`}
+            >
+              <Monitor size={16} /> Hệ thống
+            </button>
             <button
               onClick={() => setTheme('dark')}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-xl border py-3 text-sm font-medium transition-all ${
+              className={`flex flex-col items-center justify-center gap-2 rounded-xl border py-3 text-sm font-medium transition-all ${
                 mounted && theme === 'dark'
                   ? 'border-accent bg-accent/[0.12] text-accent-soft'
                   : 'border-border bg-background text-muted hover:text-fg'
@@ -64,7 +74,7 @@ export default function SettingsPage() {
             </button>
             <button
               onClick={() => setTheme('light')}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-xl border py-3 text-sm font-medium transition-all ${
+              className={`flex flex-col items-center justify-center gap-2 rounded-xl border py-3 text-sm font-medium transition-all ${
                 mounted && theme === 'light'
                   ? 'border-accent bg-accent/[0.12] text-accent-soft'
                   : 'border-border bg-background text-muted hover:text-fg'
