@@ -81,9 +81,21 @@ export async function createRoom(
   })
 
   const handlePhoneReady = async (peerId: string) => {
-    if (peers.has(peerId) || peers.size >= 8) return
+    if (peers.has(peerId) || peers.size >= 4) return
 
-    const playerIndex = peers.size
+    // Assign the lowest free slot in 0..3, not peers.size — peers.size only
+    // reflects who's *currently* connected, so a player who joined and left
+    // (freeing their slot) would otherwise cause the next joiner to collide
+    // with whoever took the size-based index in between, permanently
+    // orphaning the freed slot. This is the root cause of players getting
+    // "stuck" unable to claim P1-P4.
+    const used = new Set(Array.from(peers.values()).map((p) => p.playerIndex))
+    let playerIndex = -1
+    for (let i = 0; i < 4; i++) {
+      if (!used.has(i)) { playerIndex = i; break }
+    }
+    if (playerIndex === -1) return // room full
+
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
     const dc = pc.createDataChannel('input')
 
