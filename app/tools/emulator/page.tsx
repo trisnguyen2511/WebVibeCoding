@@ -1,9 +1,11 @@
 'use client'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
 import JSZip from 'jszip'
 import { ToolShell } from '@/components/tool-shell'
 import { useGameController } from '@/hooks/use-game-controller'
+import { SYSTEMS, type System } from '@/lib/emulator-systems'
 
 // ── EmulatorJS CDN ───────────────────────────────────────────────
 const EJS_LOADER = 'https://cdn.emulatorjs.org/stable/data/loader.js'
@@ -106,18 +108,6 @@ function keyToButton(key: string): number | null {
   return !isNaN(n) && n >= 0 && n <= 11 ? n : null
 }
 
-// ── Supported systems ────────────────────────────────────────────
-type System = 'nes' | 'snes' | 'gba' | 'gbc' | 'n64' | 'arcade'
-
-const SYSTEMS: { value: System; label: string; exts: string; core: string }[] = [
-  { value: 'nes',    label: 'NES',                     exts: '.nes',      core: 'fceumm'           },
-  { value: 'snes',   label: 'SNES',                    exts: '.sfc .smc', core: 'snes9x'           },
-  { value: 'gba',    label: 'GBA',                     exts: '.gba',      core: 'mgba'             },
-  { value: 'gbc',    label: 'Game Boy',                exts: '.gbc .gb',  core: 'gambatte'         },
-  { value: 'n64',    label: 'N64',                     exts: '.n64 .z64', core: 'mupen64plus_next' },
-  { value: 'arcade', label: 'Arcade (CP1/CP2/NeoGeo)', exts: '.zip',      core: 'fbneo'            },
-]
-
 // ── Free legal homebrew ROMs ─────────────────────────────────────
 const FREE_ROMS = [
   { name: 'Blade Buster',  system: 'nes',  desc: 'Shoot-em-up — freeware by High Level Challenge', url: 'https://www.romhacking.net/homebrew/105/' },
@@ -153,6 +143,15 @@ function isIOS(): boolean {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 }
 
+// ── ROM library (admin-uploaded, see /tools/emulator/admin) ──────
+type LibraryRom = { id: string; name: string; url: string; bytes: number; cover_url: string | null }
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(2)} GB`
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  return `${(bytes / 1024).toFixed(0)} KB`
+}
+
 // ── Host page ────────────────────────────────────────────────────
 function EmulatorHost() {
   const [roomId]  = useState(generateRoomId)
@@ -182,6 +181,15 @@ function EmulatorHost() {
   // instead of just "still loading, no idea why".
   const [runtimeErrorMsg, setRuntimeErrorMsg] = useState<string | null>(null)
   const [loadAttempt,    setLoadAttempt]    = useState(0)
+
+  // ROM library — admin-uploaded ROMs (see /tools/emulator/admin), filtered
+  // to the currently selected system.
+  const [libraryRoms,    setLibraryRoms]    = useState<LibraryRom[]>([])
+  const [libraryLoading, setLibraryLoading] = useState(false)
+  const [libraryError,   setLibraryError]   = useState<string | null>(null)
+  const [copiedRomId,    setCopiedRomId]    = useState<string | null>(null)
+  const [showLibrary,    setShowLibrary]    = useState(false)
+  const [librarySearch,  setLibrarySearch]  = useState('')
 
   const ejsRef     = useRef<EJSManager | null>(null)
   const prevRef    = useRef<Record<string, Record<string, boolean>>>({})
@@ -272,6 +280,60 @@ function EmulatorHost() {
       setRomUrl(blobUrl)
     } catch { /* silent fail — phone user sees no error UI on host */ }
   }, [system])
+
+  // Fetch the admin-uploaded ROM library only once the picker popup is
+  // opened (and again if the system changes while it's open) — no point
+  // loading it eagerly before the user has asked to browse it.
+  useEffect(() => {
+    if (!showLibrary) return
+    let cancelled = false
+    setLibraryLoading(true)
+    setLibraryError(null)
+    fetch(`/api/emulator/roms?system=${system}`)
+      .then((res) => res.json())
+      .then((data) => { if (!cancelled) setLibraryRoms(data.roms ?? []) })
+      .catch(() => { if (!cancelled) setLibraryError('Không tải được danh sách ROM.') })
+      .finally(() => { if (!cancelled) setLibraryLoading(false) })
+    return () => { cancelled = true }
+  }, [system, showLibrary])
+
+  // Escape closes the popup, matching the app's command-palette convention.
+  useEffect(() => {
+    if (!showLibrary) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowLibrary(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [showLibrary])
+
+  // "▶ Chơi" on a library ROM — same fetch+blob approach as loadRomFromUrl,
+  // but keeps the library's own display name instead of parsing one from
+  // the Cloudinary URL, and surfaces an error since this is a direct user
+  // action (unlike the phone-initiated path, which fails silently).
+  const loadRomFromLibrary = useCallback(async (rom: LibraryRom) => {
+    setLibraryError(null)
+    try {
+      const res = await fetch(rom.url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      if (blobRef.current) URL.revokeObjectURL(blobRef.current)
+      setRomName(rom.name)
+      setGameReady(false)
+      ejsRef.current = null
+      const blobUrl = URL.createObjectURL(blob)
+      blobRef.current = blobUrl
+      setRomUrl(blobUrl)
+      setShowLibrary(false)
+    } catch {
+      setLibraryError('Không tải được ROM này — thử lại sau.')
+    }
+  }, [])
+
+  const copyRomUrl = useCallback((rom: LibraryRom) => {
+    navigator.clipboard.writeText(rom.url).then(() => {
+      setCopiedRomId(rom.id)
+      setTimeout(() => setCopiedRomId((id) => (id === rom.id ? null : id)), 1500)
+    }).catch(() => {})
+  }, [])
 
   const { players, playerInputs, kickPlayer } = useGameController(roomId, loadRomFromUrl)
 
@@ -501,6 +563,10 @@ function EmulatorHost() {
     setRuntimeErrorMsg(null)
   }
 
+  const filteredLibraryRoms = librarySearch.trim()
+    ? libraryRoms.filter((rom) => rom.name.toLowerCase().includes(librarySearch.trim().toLowerCase()))
+    : libraryRoms
+
   return (
     <ToolShell
       name="Emulator"
@@ -508,6 +574,7 @@ function EmulatorHost() {
       description="Nintendo emulator trực tiếp trên web — điện thoại làm controller, multiplayer"
       wide
     >
+      <>
       <div className="mx-auto max-w-5xl">
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_270px]">
 
@@ -538,6 +605,17 @@ function EmulatorHost() {
                       từ đó để có thêm bộ nhớ.
                     </p>
                   )}
+                </div>
+
+                {/* ROM library — admin-uploaded ROMs for the selected system */}
+                <div>
+                  <p className="mb-2 font-mono text-xs uppercase tracking-widest text-muted">Thư viện ROM</p>
+                  <button
+                    onClick={() => { setLibrarySearch(''); setShowLibrary(true) }}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-background px-4 py-3 text-sm text-muted transition-colors hover:border-accent/40 hover:text-fg"
+                  >
+                    🎮 Chọn game có sẵn — {SYSTEMS.find((s) => s.value === system)?.label}
+                  </button>
                 </div>
 
                 {/* ROM upload */}
@@ -842,8 +920,8 @@ function EmulatorHost() {
                       {player && (
                         <button
                           onClick={() => kickPlayer(player.peerId)}
-                          title="Ngắt kết nối"
-                          className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-xs text-muted hover:border-red-500 hover:text-red-400 group-hover:flex"
+                          title="Kick — ngắt kết nối player này"
+                          className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-xs text-muted hover:border-red-500 hover:text-red-400"
                         >
                           ✕
                         </button>
@@ -896,9 +974,89 @@ function EmulatorHost() {
                 </button>
               </div>
             </div>
+
+            {/* Admin */}
+            <Link
+              href="/tools/emulator/admin"
+              className="flex items-center justify-center gap-2 rounded-xl border border-border/50 bg-surface/60 px-3 py-2 text-xs text-muted transition-colors hover:border-accent/40 hover:text-fg"
+            >
+              🛠️ Quản lý ROM (Admin)
+            </Link>
           </div>
         </div>
       </div>
+
+      {/* ── ROM library popup — opens on demand, loads/searches on open ── */}
+      {showLibrary && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 pt-[10vh] backdrop-blur-sm"
+          onClick={() => setShowLibrary(false)}
+        >
+          <div
+            className="flex max-h-[75vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-surface/95 shadow-2xl shadow-black/60 backdrop-blur-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 border-b border-border px-4 py-3.5">
+              <svg className="shrink-0 text-muted" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+              </svg>
+              <input
+                autoFocus
+                value={librarySearch}
+                onChange={(e) => setLibrarySearch(e.target.value)}
+                placeholder={`Tìm game — ${SYSTEMS.find((s) => s.value === system)?.label}`}
+                className="flex-1 bg-transparent font-sans text-sm text-fg placeholder-muted outline-none"
+              />
+              <kbd className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-muted">esc</kbd>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2">
+              {libraryLoading ? (
+                <p className="px-2 py-8 text-center text-xs text-muted">Đang tải danh sách...</p>
+              ) : libraryError ? (
+                <p className="px-2 py-8 text-center text-xs text-red-400">{libraryError}</p>
+              ) : filteredLibraryRoms.length === 0 ? (
+                <p className="px-2 py-8 text-center text-xs text-muted">
+                  {libraryRoms.length === 0 ? 'Chưa có ROM nào cho hệ máy này.' : 'Không tìm thấy game phù hợp.'}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {filteredLibraryRoms.map((rom) => (
+                    <div key={rom.id} className="flex items-center gap-3 rounded-lg border border-border bg-background p-2.5">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-surface text-muted">
+                        {rom.cover_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={rom.cover_url} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-sm">🕹️</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm text-fg">{rom.name}</p>
+                        <p className="font-mono text-xs text-muted">{formatBytes(rom.bytes)}</p>
+                      </div>
+                      <button
+                        onClick={() => void loadRomFromLibrary(rom)}
+                        className="shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent-soft transition-colors hover:bg-accent/20"
+                      >
+                        ▶ Chơi
+                      </button>
+                      <button
+                        onClick={() => copyRomUrl(rom)}
+                        title="Copy link ROM để dán vào điện thoại controller"
+                        className="shrink-0 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-muted transition-colors hover:text-fg"
+                      >
+                        {copiedRomId === rom.id ? '✓ Đã copy' : '🔗 Copy'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      </>
     </ToolShell>
   )
 }
