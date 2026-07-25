@@ -4,15 +4,6 @@ import { SearchableToolGrid } from '@/components/searchable-tool-grid'
 import { LastToolRedirect } from '@/components/last-tool-redirect'
 import { SettingsMenu } from '@/components/settings-menu'
 
-const STATS = [
-  { value: String(tools.length), label: 'Tools', sub: 'and growing' },
-  { value: '7',    label: 'Categories',   sub: 'utility to game'  },
-  { value: '100%', label: 'Client-side',  sub: 'no server calls'  },
-  { value: '0',    label: 'Sign-ups',     sub: 'just open & use'  },
-]
-
-const CHIPS = ['No account needed', 'Runs locally', 'Zero tracking']
-
 export default function HomePage() {
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background">
@@ -39,6 +30,10 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+              All systems live
+            </span>
+            <span className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
               Press{' '}
               <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[11px] text-fg/60">
                 /
@@ -51,7 +46,7 @@ export default function HomePage() {
       </header>
 
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="relative border-b border-overlay/[0.05] pb-14 pt-16 sm:pb-16 sm:pt-20">
+      <section className="relative border-b border-overlay/[0.05] pb-8 pt-8 sm:pb-10 sm:pt-10">
         <div className="mx-auto max-w-5xl px-6">
 
           {/* Badge */}
@@ -69,60 +64,14 @@ export default function HomePage() {
           </h1>
 
           {/* Subline */}
-          <p className="mb-8 max-w-[480px] text-base leading-relaxed text-muted sm:text-[1.05rem]">
+          <p className="max-w-[480px] text-base leading-relaxed text-muted sm:text-[1.05rem]">
             Developer utilities, crypto tools, media & productivity — all running in your browser. No setup, no tracking.
           </p>
-
-          {/* Feature chips */}
-          <div className="flex flex-wrap gap-2">
-            {CHIPS.map((chip) => (
-              <span
-                key={chip}
-                className="flex items-center gap-2 rounded-full border border-overlay/[0.08] bg-overlay/[0.04] px-3.5 py-1.5 text-xs text-fg/60 backdrop-blur-sm"
-              >
-                <span className="h-[5px] w-[5px] rounded-full bg-accent-soft/70" />
-                {chip}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Stats bento ──────────────────────────────────────── */}
-      <section className="border-b border-overlay/[0.05]">
-        <div className="mx-auto max-w-5xl px-6 py-8">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {STATS.map((s) => (
-              <div
-                key={s.label}
-                className="group relative overflow-hidden rounded-2xl border border-overlay/[0.07] bg-overlay/[0.03] p-5 backdrop-blur-sm transition-all duration-300 hover:border-accent/25 hover:bg-overlay/[0.05] hover:shadow-[0_0_24px_rgba(124,58,237,0.08)]"
-              >
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/[0.05] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                <p className="font-display text-3xl font-bold tracking-tight text-fg sm:text-[2.25rem]">
-                  {s.value}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-fg/80">{s.label}</p>
-                <p className="mt-0.5 text-xs leading-snug text-muted">{s.sub}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
       {/* ── Tool grid ────────────────────────────────────────── */}
-      <main className="mx-auto max-w-5xl px-6 pb-24 pt-10">
-        <div className="mb-7 flex items-end justify-between">
-          <div>
-            <h2 className="font-display text-xl font-semibold text-fg">Browse tools</h2>
-            <p className="mt-0.5 text-sm text-muted">
-              {tools.length} tools · search or filter by category
-            </p>
-          </div>
-          <span className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-            All systems live
-          </span>
-        </div>
+      <main className="mx-auto max-w-5xl px-6 pb-24 pt-6">
         <SearchableToolGrid tools={tools} />
       </main>
 
