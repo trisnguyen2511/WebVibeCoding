@@ -141,6 +141,18 @@ function generateRoomId() {
   return Math.random().toString(36).slice(2, 8).toUpperCase()
 }
 
+// iOS Safari (and any WKWebView-based browser there) caps a single tab at
+// roughly ~265MB of RAM — confirmed by testing: NES loads fine on iPhone,
+// but a heavier Arcade/CPS2 core (FBNeo) renders a black screen despite
+// EmulatorJS reporting "Running". This is a documented platform limit of
+// EmulatorJS itself on iOS (see github.com/EmulatorJS/EmulatorJS issues
+// #82/#131/#233), not something fixable from our own bootstrap code.
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
 // ── Host page ────────────────────────────────────────────────────
 function EmulatorHost() {
   const [roomId]  = useState(generateRoomId)
@@ -164,6 +176,11 @@ function EmulatorHost() {
   // real API is missing or fails.
   const [fakeFullscreen, setFakeFullscreen] = useState(false)
   const [runtimeError,   setRuntimeError]   = useState(false)
+  // Captured from a window error/unhandledrejection during boot, or from the
+  // stall-timeout classification — shown in the error banner so a report
+  // like "stuck on iPhone/LG TV" comes with an actual message next time
+  // instead of just "still loading, no idea why".
+  const [runtimeErrorMsg, setRuntimeErrorMsg] = useState<string | null>(null)
   const [loadAttempt,    setLoadAttempt]    = useState(0)
 
   const ejsRef     = useRef<EJSManager | null>(null)
@@ -172,6 +189,11 @@ function EmulatorHost() {
   const biosBlobRef = useRef<string | null>(null)
   const scriptRef  = useRef<HTMLScriptElement | null>(null)
   const screenRef  = useRef<HTMLDivElement | null>(null)
+  // Mirrors gameReady for the stall-timeout closure below, which is set up
+  // once per ROM load and would otherwise only ever see the stale value
+  // gameReady had at that time.
+  const gameReadyRef = useRef(false)
+  useEffect(() => { gameReadyRef.current = gameReady }, [gameReady])
 
   // Best-effort, silent — used right when the game finishes loading
   // (EJS_onGameStart), which isn't a real user gesture so the browser is
@@ -346,6 +368,7 @@ function EmulatorHost() {
       scriptRef.current = null
     }
     setRuntimeError(false)
+    setRuntimeErrorMsg(null)
 
     // blob: URLs carry no filename at all (just an opaque id) — FBNeo needs
     // the real filename (its MAME/FBNeo "short name", e.g. "dino.zip") to
@@ -360,6 +383,12 @@ function EmulatorHost() {
     window.EJS_gameName      = romName ?? undefined
     window.EJS_core          = SYSTEMS.find((s) => s.value === system)?.core ?? 'fceumm'
     window.EJS_pathtodata    = EJS_DATA
+    // REVERTED: setting this false to force EmulatorJS's own "click to play"
+    // start screen (instead of auto-starting) was meant to fix iOS/TV
+    // gesture-policy stalls, but it broke loading on every platform,
+    // including Android — confirmed by testing, so back to true. The
+    // iPhone/LG TV "won't load" bug needs a different root cause; don't
+    // touch this flag again without reproducing the actual failure first.
     window.EJS_startOnLoaded = true
     if (biosUrl) window.EJS_biosUrl = biosUrl
     else delete window.EJS_biosUrl
@@ -375,6 +404,7 @@ function EmulatorHost() {
       }
       setGameReady(true)
       setRuntimeError(false)
+      setRuntimeErrorMsg(null)
       tryAutoFullscreen()
     }
 
@@ -383,20 +413,42 @@ function EmulatorHost() {
     // instead of reusing whatever just failed.
     s.src    = loadAttempt > 0 ? `${EJS_LOADER}?retry=${loadAttempt}` : EJS_LOADER
     s.async  = true
-    s.onerror = () => setRuntimeError(true)
+    s.onerror = () => { setRuntimeError(true); setRuntimeErrorMsg('Không tải được loader.js từ CDN.') }
     document.body.appendChild(s)
     scriptRef.current = s
 
-    // EmulatorJS gives no explicit "failed to init" callback — if the core
-    // hasn't reported ready after a generous timeout, treat it as failed
-    // (CDN hiccup, ad blocker, or a WASM/asset fetch that silently stalled)
-    // instead of leaving the "Loading..." badge spinning forever.
+    // EmulatorJS itself never reports a specific "failed to init" reason —
+    // catch whatever error/rejection happens on the page while it's booting
+    // (a WASM instantiation failure, an AudioContext/autoplay rejection,
+    // an out-of-memory abort, etc.) so a report from an affected device
+    // comes back with an actual message instead of just "still loading".
+    let capturedDetail: string | null = null
+    const onWinError = (e: ErrorEvent) => { capturedDetail = e.message || String(e.error ?? 'unknown error') }
+    const onRejection = (e: PromiseRejectionEvent) => { capturedDetail = String(e.reason?.message ?? e.reason ?? 'unhandled rejection') }
+    window.addEventListener('error', onWinError)
+    window.addEventListener('unhandledrejection', onRejection)
+
+    // EmulatorJS gives no explicit "failed to init" callback — if the game
+    // hasn't actually started after a generous timeout (long enough for a
+    // big core like FBNeo/N64 to compile WASM even on slow/old hardware),
+    // treat it as stalled instead of leaving the "Loading..." badge
+    // spinning forever with no feedback.
     const timeout = setTimeout(() => {
-      if (!window.EJS_emulator) setRuntimeError(true)
-    }, 20000)
+      if (!gameReadyRef.current) {
+        setRuntimeError(true)
+        setRuntimeErrorMsg(
+          capturedDetail ??
+          (window.EJS_emulator
+            ? 'Core đã khởi tạo nhưng game không bao giờ báo sẵn sàng (có thể do trình duyệt chặn tự phát âm thanh, hoặc thiết bị quá yếu để biên dịch core kịp thời).'
+            : 'EmulatorJS chưa từng khởi tạo được (window.EJS_emulator không tồn tại) sau 45 giây.')
+        )
+      }
+    }, 45000)
 
     return () => {
       clearTimeout(timeout)
+      window.removeEventListener('error', onWinError)
+      window.removeEventListener('unhandledrejection', onRejection)
       if (scriptRef.current && document.body.contains(scriptRef.current)) {
         document.body.removeChild(scriptRef.current)
         scriptRef.current = null
@@ -406,6 +458,7 @@ function EmulatorHost() {
 
   const retryLoad = useCallback(() => {
     setRuntimeError(false)
+    setRuntimeErrorMsg(null)
     setGameReady(false)
     setLoadAttempt((n) => n + 1)
   }, [])
@@ -444,6 +497,8 @@ function EmulatorHost() {
     setBiosUrl(null)
     setBiosName(null)
     setGameReady(false)
+    setRuntimeError(false)
+    setRuntimeErrorMsg(null)
   }
 
   return (
@@ -474,6 +529,15 @@ function EmulatorHost() {
                       </button>
                     ))}
                   </div>
+                  {(system === 'arcade' || system === 'n64') && isIOS() && (
+                    <p className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-300">
+                      ⚠️ Safari trên iPhone/iPad giới hạn RAM mỗi tab rất thấp — core{' '}
+                      {system === 'arcade' ? 'Arcade (FBNeo)' : 'N64'} thường chỉ hiện màn hình
+                      đen dù báo &quot;Running&quot;. Trên iPhone nên dùng NES/SNES/GBA/Game Boy
+                      thay thế, hoặc thử &quot;Thêm vào Màn hình chính&quot; từ Safari rồi mở lại
+                      từ đó để có thêm bộ nhớ.
+                    </p>
+                  )}
                 </div>
 
                 {/* ROM upload */}
@@ -663,6 +727,14 @@ function EmulatorHost() {
                   </div>
                 </div>
 
+                {gameReady && (system === 'arcade' || system === 'n64') && isIOS() && (
+                  <p className="border-b border-border bg-amber-500/5 px-4 py-2 text-xs text-amber-300">
+                    ⚠️ Nếu màn hình đen dù báo &quot;Running&quot;: Safari trên iPhone/iPad
+                    giới hạn RAM quá thấp cho core {system === 'arcade' ? 'Arcade' : 'N64'} này.
+                    Đổi ROM sang NES/SNES/GBA/Game Boy để chơi được trên iPhone.
+                  </p>
+                )}
+
                 {/* ── Inline ROM swap panel (Player 1) ─────────────── */}
                 {showRomSwap && (
                   <div className="border-b border-border bg-surface/80 px-4 py-3 space-y-2">
@@ -703,6 +775,11 @@ function EmulatorHost() {
                       chặn script, hoặc mạng chặn. Thử tắt ad blocker rồi bấm &quot;↻ Thử lại&quot;,
                       hoặc đổi mạng/wifi khác.
                     </p>
+                    {runtimeErrorMsg && (
+                      <p className="max-w-sm break-words rounded-lg border border-border bg-background px-3 py-2 font-mono text-[11px] text-muted">
+                        {runtimeErrorMsg}
+                      </p>
+                    )}
                   </div>
                 )}
                 {/* EJS mounts here — do NOT conditionally render this div */}
