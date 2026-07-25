@@ -4,14 +4,6 @@ import { SearchableToolGrid } from '@/components/searchable-tool-grid'
 import { LastToolRedirect } from '@/components/last-tool-redirect'
 import { SettingsMenu } from '@/components/settings-menu'
 
-const STATS = [
-  { value: '7',    label: 'Categories',   sub: 'utility to game'  },
-  { value: '100%', label: 'Client-side',  sub: 'no server calls'  },
-  { value: '0',    label: 'Sign-ups',     sub: 'just open & use'  },
-]
-
-const CHIPS = ['Runs locally', 'Zero tracking']
-
 export default function HomePage() {
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-background">
@@ -68,43 +60,9 @@ export default function HomePage() {
           </h1>
 
           {/* Subline */}
-          <p className="mb-8 max-w-[480px] text-base leading-relaxed text-muted sm:text-[1.05rem]">
+          <p className="max-w-[480px] text-base leading-relaxed text-muted sm:text-[1.05rem]">
             Developer utilities, crypto tools, media & productivity — all running in your browser. No setup, no tracking.
           </p>
-
-          {/* Feature chips */}
-          <div className="flex flex-wrap gap-2">
-            {CHIPS.map((chip) => (
-              <span
-                key={chip}
-                className="flex items-center gap-2 rounded-full border border-overlay/[0.08] bg-overlay/[0.04] px-3.5 py-1.5 text-xs text-fg/60 backdrop-blur-sm"
-              >
-                <span className="h-[5px] w-[5px] rounded-full bg-accent-soft/70" />
-                {chip}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Stats bento ──────────────────────────────────────── */}
-      <section className="border-b border-overlay/[0.05]">
-        <div className="mx-auto max-w-5xl px-6 py-8">
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            {STATS.map((s) => (
-              <div
-                key={s.label}
-                className="group relative overflow-hidden rounded-2xl border border-overlay/[0.07] bg-overlay/[0.03] p-3.5 backdrop-blur-sm transition-all duration-300 hover:border-accent/25 hover:bg-overlay/[0.05] hover:shadow-[0_0_24px_rgba(124,58,237,0.08)] sm:p-5"
-              >
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent/[0.05] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                <p className="font-display text-xl font-bold tracking-tight text-fg sm:text-[2.25rem]">
-                  {s.value}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-fg/80">{s.label}</p>
-                <p className="mt-0.5 text-xs leading-snug text-muted">{s.sub}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
