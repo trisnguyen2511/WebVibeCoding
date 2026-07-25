@@ -42,7 +42,7 @@ export default function HomePage() {
       </header>
 
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="relative border-b border-overlay/[0.05] pb-14 pt-8 sm:pb-16 sm:pt-10">
+      <section className="relative border-b border-overlay/[0.05] pb-8 pt-8 sm:pb-10 sm:pt-10">
         <div className="mx-auto max-w-5xl px-6">
 
           {/* Badge */}
@@ -67,7 +67,7 @@ export default function HomePage() {
       </section>
 
       {/* ── Tool grid ────────────────────────────────────────── */}
-      <main className="mx-auto max-w-5xl px-6 pb-24 pt-10">
+      <main className="mx-auto max-w-5xl px-6 pb-24 pt-6">
         <div className="mb-7 flex items-end justify-between">
           <div>
             <h2 className="font-display text-xl font-semibold text-fg">Browse tools</h2>
