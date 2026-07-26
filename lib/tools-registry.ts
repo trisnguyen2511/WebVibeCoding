@@ -121,4 +121,11 @@ export const tools: Tool[] = [
     description: 'Danh sách game tự code, chơi trực tiếp trên web — PC host phòng, điện thoại làm tay cầm cảm biến',
     category: 'game',
   },
+  {
+    name: 'AI Media Studio',
+    slug: 'ai-media-studio',
+    icon: '🎬',
+    description: 'Generate images and videos via the Agnes AI API — multi-model, reference image support',
+    category: 'media',
+  },
 ]

@@ -188,29 +188,29 @@ function DpadControl({
       onPointerUp={handleUp}
       onPointerCancel={handleUp}
       onContextMenu={(e) => e.preventDefault()}
-      className="no-callout select-none border border-[#1A1A2E] bg-[#0F0F1A]/90"
+      className="no-callout select-none border border-border bg-surface/90"
     >
       {/* Cross groove lines */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="h-px w-[70%] bg-[#1A1A2E]" />
+        <div className="h-px w-[70%] bg-border" />
       </div>
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="h-[70%] w-px bg-[#1A1A2E]" />
+        <div className="h-[70%] w-px bg-border" />
       </div>
 
       {/* Arrow labels */}
-      <span className={`absolute left-1/2 top-[8%] -translate-x-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.up) ? 'text-fg' : 'text-[#52525B]'}`}>↑</span>
-      <span className={`absolute bottom-[8%] left-1/2 -translate-x-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.down) ? 'text-fg' : 'text-[#52525B]'}`}>↓</span>
-      <span className={`absolute left-[8%] top-1/2 -translate-y-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.left) ? 'text-fg' : 'text-[#52525B]'}`}>←</span>
-      <span className={`absolute right-[8%] top-1/2 -translate-y-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.right) ? 'text-fg' : 'text-[#52525B]'}`}>→</span>
+      <span className={`absolute left-1/2 top-[8%] -translate-x-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.up) ? 'text-fg' : 'text-muted'}`}>↑</span>
+      <span className={`absolute bottom-[8%] left-1/2 -translate-x-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.down) ? 'text-fg' : 'text-muted'}`}>↓</span>
+      <span className={`absolute left-[8%] top-1/2 -translate-y-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.left) ? 'text-fg' : 'text-muted'}`}>←</span>
+      <span className={`absolute right-[8%] top-1/2 -translate-y-1/2 text-[11px] font-bold pointer-events-none transition-colors ${isActive(config.right) ? 'text-fg' : 'text-muted'}`}>→</span>
 
       {/* Diagonal labels (only when diagonal=true) */}
       {config.diagonal && (
         <>
-          <span className={`absolute left-[14%] top-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.up) && isActive(config.left) ? 'text-fg' : 'text-[#1A1A2E]'}`}>↖</span>
-          <span className={`absolute right-[14%] top-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.up) && isActive(config.right) ? 'text-fg' : 'text-[#1A1A2E]'}`}>↗</span>
-          <span className={`absolute bottom-[14%] left-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.down) && isActive(config.left) ? 'text-fg' : 'text-[#1A1A2E]'}`}>↙</span>
-          <span className={`absolute bottom-[14%] right-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.down) && isActive(config.right) ? 'text-fg' : 'text-[#1A1A2E]'}`}>↘</span>
+          <span className={`absolute left-[14%] top-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.up) && isActive(config.left) ? 'text-fg' : 'text-border'}`}>↖</span>
+          <span className={`absolute right-[14%] top-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.up) && isActive(config.right) ? 'text-fg' : 'text-border'}`}>↗</span>
+          <span className={`absolute bottom-[14%] left-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.down) && isActive(config.left) ? 'text-fg' : 'text-border'}`}>↙</span>
+          <span className={`absolute bottom-[14%] right-[14%] text-[9px] pointer-events-none transition-colors ${isActive(config.down) && isActive(config.right) ? 'text-fg' : 'text-border'}`}>↘</span>
         </>
       )}
 
@@ -227,7 +227,7 @@ function DpadControl({
             borderRadius: '50%',
             pointerEvents: 'none',
           }}
-          className="bg-[#7C3AED]/70 border border-[#7C3AED] shadow-[0_0_12px_#7C3AED88]"
+          className="bg-accent/70 border border-accent shadow-[0_0_12px_#7C3AED88]"
         />
       )}
 
@@ -244,7 +244,7 @@ function DpadControl({
             borderRadius: '50%',
             pointerEvents: 'none',
           }}
-          className="bg-[#1A1A2E] border border-[#2A2A3E]"
+          className="bg-border border border-border"
         />
       )}
     </div>
@@ -344,7 +344,7 @@ function HostView({ roomId }: { roomId: string }) {
         <div className="flex gap-3">
           <button
             onClick={() => setMode('browser')}
-            className={`flex-1 rounded-xl border px-4 py-3 text-sm font-bold transition-colors ${mode === 'browser' ? 'border-[#7C3AED] bg-[#7C3AED]/20 text-[#A78BFA]' : 'border-border bg-[#08080E] text-muted hover:text-fg'}`}
+            className={`flex-1 rounded-xl border px-4 py-3 text-sm font-bold transition-colors ${mode === 'browser' ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-background text-muted hover:text-fg'}`}
           >
             <span className="block text-base">🌐</span>
             Browser Mode
@@ -352,7 +352,7 @@ function HostView({ roomId }: { roomId: string }) {
           </button>
           <button
             onClick={() => setMode('agent')}
-            className={`flex-1 rounded-xl border px-4 py-3 text-sm font-bold transition-colors ${mode === 'agent' ? 'border-[#7C3AED] bg-[#7C3AED]/20 text-[#A78BFA]' : 'border-border bg-[#08080E] text-muted hover:text-fg'}`}
+            className={`flex-1 rounded-xl border px-4 py-3 text-sm font-bold transition-colors ${mode === 'agent' ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border bg-background text-muted hover:text-fg'}`}
           >
             <span className="block text-base">🖥️</span>
             Local Agent
@@ -368,11 +368,11 @@ function HostView({ roomId }: { roomId: string }) {
               </span>
             </div>
             {agentStatus !== 'connected' && (
-              <div className="rounded-lg border border-border bg-[#08080E] p-3 font-mono text-xs text-muted space-y-1">
+              <div className="rounded-lg border border-border bg-background p-3 font-mono text-xs text-muted space-y-1">
                 <p className="text-fg">Start the local agent:</p>
-                <p className="text-[#A78BFA]">cd local-agent</p>
-                <p className="text-[#A78BFA]">npm install</p>
-                <p className="text-[#A78BFA]">npm start</p>
+                <p className="text-accent-soft">cd local-agent</p>
+                <p className="text-accent-soft">npm install</p>
+                <p className="text-accent-soft">npm start</p>
               </div>
             )}
           </div>
@@ -390,7 +390,7 @@ function HostView({ roomId }: { roomId: string }) {
             return (
               <div key={i} className={`group relative rounded-xl border p-3 text-center transition-all duration-200 ${player ? color.badge : 'border-border bg-surface opacity-40'}`}>
                 {player && (
-                  <button onClick={() => kickPlayer(player.peerId)} title="Remove player" className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 items-center justify-center rounded-full border border-border bg-[#08080E] text-xs text-muted hover:border-red-500 hover:text-red-400 group-hover:flex">
+                  <button onClick={() => kickPlayer(player.peerId)} title="Remove player" className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-xs text-muted hover:border-red-500 hover:text-red-400 group-hover:flex">
                     ✕
                   </button>
                 )}
@@ -461,20 +461,20 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-[#08080E] p-6">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background p-6">
       <div className="w-full max-w-xs space-y-4">
         <div className="text-center">
           <p className="font-display text-2xl font-bold text-fg">Choose Layout</p>
-          <p className="mt-1 text-sm text-[#52525B]">Pick a preset or import your own .inf</p>
+          <p className="mt-1 text-sm text-muted">Pick a preset or import your own .inf</p>
         </div>
 
         {!customName && (
           <div className="space-y-1">
-            <p className="text-xs text-[#52525B]">Preset</p>
+            <p className="text-xs text-muted">Preset</p>
             <select
               value={preset}
               onChange={(e) => setPreset(e.target.value as Preset)}
-              className="w-full rounded-xl border border-[#1A1A2E] bg-[#0F0F1A] px-4 py-3 font-mono text-sm text-fg outline-none focus:border-[#7C3AED]"
+              className="w-full rounded-xl border border-border bg-surface px-4 py-3 font-mono text-sm text-fg outline-none focus:border-accent"
             >
               <optgroup label="── Classic ──">
                 <option value="nes">NES — Player 1</option>
@@ -502,16 +502,16 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
         )}
 
         {customName && (
-          <div className="flex items-center justify-between rounded-xl border border-[#1A1A2E] bg-[#0F0F1A] px-4 py-3">
+          <div className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3">
             <div>
-              <p className="text-xs text-[#52525B]">Custom layout</p>
+              <p className="text-xs text-muted">Custom layout</p>
               <p className="font-mono text-sm text-fg">{config?.name ?? customName}</p>
             </div>
-            <button onClick={() => { setCustomName(null); setConfig(null) }} className="text-xs text-[#52525B] hover:text-fg">✕</button>
+            <button onClick={() => { setCustomName(null); setConfig(null) }} className="text-xs text-muted hover:text-fg">✕</button>
           </div>
         )}
 
-        <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-[#1A1A2E] bg-[#0F0F1A] px-4 py-3 text-sm text-[#52525B] transition-colors hover:text-fg">
+        <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface px-4 py-3 text-sm text-muted transition-colors hover:text-fg">
           Import custom .inf
           <input type="file" accept=".inf" onChange={handleImport} className="hidden" />
         </label>
@@ -523,7 +523,7 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
         <button
           disabled={!config}
           onClick={() => config && onReady(config)}
-          className="w-full rounded-xl bg-[#7C3AED] px-4 py-3 font-bold text-fg transition-colors hover:bg-[#7C3AED]/80 disabled:opacity-40"
+          className="w-full rounded-xl bg-accent px-4 py-3 font-bold text-fg transition-colors hover:bg-accent/80 disabled:opacity-40"
         >
           Join as Controller
         </button>
@@ -689,7 +689,7 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
 
   return (
     <div
-      className="no-callout relative h-[100dvh] w-full overflow-hidden bg-[#08080E]"
+      className="no-callout relative h-[100dvh] w-full overflow-hidden bg-background"
       style={{ touchAction: 'none' }}
       onContextMenu={(e) => e.preventDefault()}
     >
@@ -701,7 +701,7 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
       {/* ROM panel button */}
       <button
         onClick={() => setShowRomPanel((v) => !v)}
-        className="absolute left-2 top-[42px] z-10 flex h-8 w-8 items-center justify-center rounded-full border border-[#1A1A2E] bg-[#0F0F1A]/90 text-sm"
+        className="absolute left-2 top-[42px] z-10 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface/90 text-sm"
         title="Đổi game"
       >
         📁
@@ -710,7 +710,7 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
       {/* Fullscreen toggle */}
       <button
         onClick={toggleFullscreen}
-        className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[#1A1A2E] bg-[#0F0F1A]/90 text-base text-fg"
+        className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface/90 text-base text-fg"
       >
         {isFullscreen ? '⤡' : '⛶'}
       </button>
@@ -729,17 +729,17 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
             className="absolute inset-0 bg-black/60"
             onClick={() => setShowRomPanel(false)}
           />
-          <div className="relative w-full space-y-3 rounded-t-2xl border-t border-[#1A1A2E] bg-[#08080E] p-4">
+          <div className="relative w-full space-y-3 rounded-t-2xl border-t border-border bg-background p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm font-bold text-fg">Đổi game từ điện thoại</p>
-              <button onClick={() => setShowRomPanel(false)} className="text-[#52525B] hover:text-fg">✕</button>
+              <button onClick={() => setShowRomPanel(false)} className="text-muted hover:text-fg">✕</button>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {CONTROLLER_SYSTEMS.map((s) => (
                 <button
                   key={s.value}
                   onClick={() => setRomPanelSystem(s.value)}
-                  className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${romPanelSystem === s.value ? 'border-[#7C3AED] bg-[#7C3AED]/20 text-[#A78BFA]' : 'border-[#1A1A2E] text-[#52525B] hover:text-fg'}`}
+                  className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${romPanelSystem === s.value ? 'border-accent bg-accent/20 text-accent-soft' : 'border-border text-muted hover:text-fg'}`}
                 >
                   {s.label}
                 </button>
@@ -782,24 +782,24 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
                 onChange={(e) => setRomPanelUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendRomUrl()}
                 placeholder="https://example.com/game.nes"
-                className="min-w-0 flex-1 rounded-lg border border-[#1A1A2E] bg-[#0F0F1A] px-3 py-2.5 font-mono text-xs text-fg outline-none placeholder:text-[#52525B] focus:border-[#7C3AED]"
+                className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2.5 font-mono text-xs text-fg outline-none placeholder:text-muted focus:border-accent"
               />
               <button
                 onClick={sendRomUrl}
                 disabled={!romPanelUrl.trim()}
-                className="shrink-0 rounded-lg border border-[#7C3AED]/40 bg-[#7C3AED]/10 px-4 py-2.5 text-xs font-medium text-[#A78BFA] transition-colors hover:bg-[#7C3AED]/20 disabled:cursor-not-allowed disabled:opacity-40"
+                className="shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5 text-xs font-medium text-accent-soft transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Tải
               </button>
             </div>
-            <p className="text-xs text-[#52525B]">PC sẽ tải ROM này về và bắt đầu ngay (cần server cho phép CORS).</p>
+            <p className="text-xs text-muted">PC sẽ tải ROM này về và bắt đầu ngay (cần server cho phép CORS).</p>
           </div>
         </div>
       )}
 
       {/* Combo flash */}
       {activeCombo && (
-        <div className="absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full border border-[#7C3AED] bg-[#7C3AED]/30 px-4 py-1.5 font-mono text-sm font-bold text-[#A78BFA] animate-pulse pointer-events-none">
+        <div className="absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full border border-accent bg-accent/30 px-4 py-1.5 font-mono text-sm font-bold text-accent-soft animate-pulse pointer-events-none">
           ✦ {activeCombo}
         </div>
       )}
@@ -808,7 +808,7 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
       {hasCombo && (
         <div className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 gap-2 pointer-events-none">
           {Object.entries(config.combos).map(([cid, combo]) => (
-            <span key={cid} className="rounded-full border border-[#7C3AED]/40 bg-[#0F0F1A]/80 px-2 py-0.5 font-mono text-xs text-[#A78BFA]">
+            <span key={cid} className="rounded-full border border-accent/40 bg-surface/80 px-2 py-0.5 font-mono text-xs text-accent-soft">
               {combo.label}: {combo.chord.join('+')}
             </span>
           ))}
@@ -828,10 +828,10 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
           onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); onDown(id) }}
           onPointerUp={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); onUp(id) }}
           onPointerCancel={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); onUp(id) }}
-          className="relative flex flex-col items-center justify-center rounded-xl border border-[#1A1A2E] bg-[#0F0F1A] font-display text-sm font-bold text-fg select-none touch-none active:bg-[#7C3AED]/30 active:border-[#7C3AED]"
+          className="relative flex flex-col items-center justify-center rounded-xl border border-border bg-surface font-display text-sm font-bold text-fg select-none touch-none active:bg-accent/30 active:border-accent"
         >
           {btn.label}
-          {btn.hold && <span className="absolute bottom-0.5 right-1 text-[8px] text-[#52525B]">↻</span>}
+          {btn.hold && <span className="absolute bottom-0.5 right-1 text-[8px] text-muted">↻</span>}
         </button>
       ))}
 
@@ -843,10 +843,10 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
           onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); onComboDown(cid) }}
           onPointerUp={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); onComboUp(cid) }}
           onPointerCancel={(e) => { e.currentTarget.releasePointerCapture(e.pointerId); onComboUp(cid) }}
-          className="relative flex flex-col items-center justify-center rounded-xl border border-[#7C3AED]/60 bg-[#7C3AED]/10 font-display text-xs font-bold text-[#A78BFA] select-none touch-none active:bg-[#7C3AED]/40 active:border-[#7C3AED]"
+          className="relative flex flex-col items-center justify-center rounded-xl border border-accent/60 bg-accent/10 font-display text-xs font-bold text-accent-soft select-none touch-none active:bg-accent/40 active:border-accent"
         >
           {combo.label}
-          <span className="absolute bottom-0.5 text-[7px] text-[#7C3AED]/70">✦</span>
+          <span className="absolute bottom-0.5 text-[7px] text-accent/70">✦</span>
         </button>
       ))}
     </div>
@@ -879,7 +879,7 @@ function GameControllerInner() {
 
 export default function GameControllerPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#08080E]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
       <GameControllerInner />
     </Suspense>
   )
