@@ -10,10 +10,26 @@ const MAX_ROM_BYTES = 2 * 1024 ** 3 // 2GB
 function downloadCSVTemplate() {
   const headers = ['name', 'system', 'romLocalPath', 'coverLocalPath']
   const sample = [
+    // NES
     ['Super Mario Bros', 'nes', '/data/roms/smb.nes', '/data/covers/smb.jpg'],
     ['The Legend of Zelda', 'nes', '/home/user/games/zelda.nes', '/home/user/covers/zelda.jpg'],
-    ['Donkey Kong', 'nes', 'C:\\Games\\donkey_kong.nes', 'C:\\Covers\\donkey_kong.jpg'],
-    ['Pokemon Red', 'gbc', 'C:\\Users\\Admin\\Games\\pokemon_red.gbc', ''],
+    ['Metroid', 'nes', 'C:\\Games\\metroid.nes', ''],
+    // SNES
+    ['Super Metroid', 'snes', '/data/roms/super_metroid.sfc', '/data/covers/super_metroid.jpg'],
+    ['Final Fantasy III', 'snes', 'C:\\Games\\ff3.smc', 'C:\\Covers\\ff3.jpg'],
+    ['Chrono Trigger', 'snes', '\\\\server\\share\\roms\\chrono_trigger.sfc', ''],
+    // GBA
+    ['Pokemon Emerald', 'gba', '/data/roms/pokemon_emerald.gba', '/data/covers/pokemon_emerald.jpg'],
+    ['Fire Emblem', 'gba', 'C:\\Users\\Admin\\Games\\fire_emblem.gba', ''],
+    // GBC/GB
+    ['Pokemon Red', 'gbc', '/data/roms/pokemon_red.gbc', '/data/covers/pokemon_red.jpg'],
+    ['Tetris', 'gbc', 'D:\\Emulation\\tetris.gbc', ''],
+    // N64
+    ['Super Mario 64', 'n64', '/data/roms/super_mario_64.z64', '/data/covers/mario64.jpg'],
+    ['The Legend of Zelda: Ocarina of Time', 'n64', 'C:\\Games\\zelda_oot.n64', 'C:\\Covers\\zelda_oot.jpg'],
+    // Arcade
+    ['Street Fighter II', 'arcade', '/data/roms/sf2.zip', '/data/covers/sf2_arcade.jpg'],
+    ['Metal Slug', 'arcade', 'C:\\Games\\metal_slug.zip', ''],
   ]
   const csv = [headers, ...sample].map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })

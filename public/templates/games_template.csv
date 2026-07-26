@@ -3,6 +3,24 @@ Super Mario Bros,nes,/data/roms/smb.nes,/data/covers/smb.jpg
 The Legend of Zelda,nes,/home/user/games/zelda.nes,/home/user/covers/zelda.jpg
 Donkey Kong,nes,C:\Games\donkey_kong.nes,C:\Covers\donkey_kong.jpg
 Metroid,nes,D:\Roms\metroid.nes,
-Street Fighter II,snes,/data/roms/sf2.sfc,/data/covers/sf2.jpg
-Pokemon Red,gbc,C:\Users\Admin\Games\pokemon_red.gbc,C:\Users\Admin\Covers\pokemon_red.jpg
+Super Metroid,snes,/data/roms/super_metroid.sfc,/data/covers/super_metroid.jpg
+Final Fantasy III,snes,C:\Games\ff3.smc,C:\Covers\ff3.jpg
+Street Fighter II,snes,/home/user/roms/sf2.sfc,
+Chrono Trigger,snes,\\server\share\roms\chrono_trigger.sfc,
+The Legend of Zelda: Link to the Past,snes,/data/roms/zelda_ltp.sfc,/data/covers/zelda_ltp.jpg
+Pokemon Emerald,gba,/data/roms/pokemon_emerald.gba,/data/covers/pokemon_emerald.jpg
+Fire Emblem,gba,C:\Users\Admin\Games\fire_emblem.gba,C:\Users\Admin\Covers\fire_emblem.jpg
+Kirby: Nightmare in Dream Land,gba,/home/user/games/kirby.gba,
+The Legend of Zelda: The Minish Cap,gba,D:\Emulation\zelda_minish.gba,D:\Emulation\Covers\zelda_minish.jpg
+Pokemon Red,gbc,/data/roms/pokemon_red.gbc,/data/covers/pokemon_red.jpg
+Tetris,gbc,C:\Games\tetris.gbc,
 The Legend of Zelda: Link's Awakening,gbc,\\server\share\roms\zelda_la.gbc,
+Pokemon Gold,gbc,/home/user/roms/pokemon_gold.gbc,/home/user/covers/pokemon_gold.jpg
+Super Mario 64,n64,/data/roms/super_mario_64.z64,/data/covers/mario64.jpg
+The Legend of Zelda: Ocarina of Time,n64,C:\Games\zelda_oot.n64,C:\Covers\zelda_oot.jpg
+Goldeneye 007,n64,D:\Roms\goldeneye.z64,
+Mario Kart 64,n64,/home/user/games/mario_kart_64.n64,/home/user/covers/mk64.jpg
+Street Fighter II,arcade,/data/roms/sf2.zip,/data/covers/sf2_arcade.jpg
+Metal Slug,arcade,C:\Games\metal_slug.zip,C:\Covers\metal_slug.jpg
+The King of Fighters,arcade,\\server\share\roms\kof.zip,
+Pac-Man,arcade,/home/user/roms/pacman.zip,
