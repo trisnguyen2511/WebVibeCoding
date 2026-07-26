@@ -452,13 +452,77 @@ function RomRow({ rom, onChanged }: { rom: Rom; onChanged: () => void }) {
   )
 }
 
+const FOLDER_ROM_EXTENSIONS: Record<string, string[]> = {
+  nes: ['.nes'],
+  snes: ['.sfc', '.smc'],
+  gba: ['.gba'],
+  gbc: ['.gbc', '.gb'],
+  n64: ['.n64', '.z64', '.v64'],
+  arcade: ['.zip'],
+}
+const FOLDER_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp'])
+const VALID_FOLDER_SYSTEMS = new Set(Object.keys(FOLDER_ROM_EXTENSIONS))
+
+type DetectedGame = {
+  system: System
+  name: string
+  romFile: File
+  coverFile: File | null
+  status: 'pending' | 'uploading' | 'done' | 'error'
+  errorMsg?: string
+}
+
+function parseFolderStructure(allFiles: File[]): DetectedGame[] {
+  const map: Record<string, { romFile?: File; coverFile?: File; system?: string; name?: string }> = {}
+
+  for (const file of allFiles) {
+    const rel = file.webkitRelativePath || file.name
+    const parts = rel.split('/')
+    if (parts.length < 3) continue
+
+    const system = parts[parts.length - 3].toLowerCase()
+    const gameName = parts[parts.length - 2]
+    const key = `${system}/${gameName}`
+
+    if (!VALID_FOLDER_SYSTEMS.has(system)) continue
+
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
+    const romExts = FOLDER_ROM_EXTENSIONS[system] || []
+
+    if (!map[key]) map[key] = { system, name: gameName }
+
+    if (romExts.includes(ext)) {
+      map[key].romFile = file
+    } else if (FOLDER_IMAGE_EXTENSIONS.has(ext)) {
+      map[key].coverFile = file
+    }
+  }
+
+  return Object.values(map)
+    .filter((g) => g.romFile && g.system && g.name)
+    .map((g) => ({
+      system: g.system as System,
+      name: g.name!,
+      romFile: g.romFile!,
+      coverFile: g.coverFile ?? null,
+      status: 'pending',
+    }))
+}
+
 function FolderImportForm({ onImported }: { onImported: () => void }) {
-  const [files, setFiles] = useState<File[]>([])
+  const [games, setGames] = useState<DetectedGame[]>([])
   const [dragOver, setDragOver] = useState(false)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [progress, setProgress] = useState<number | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [doneCount, setDoneCount] = useState(0)
   const folderInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const parsed = parseFolderStructure(Array.from(e.target.files))
+      setGames(parsed)
+      setDoneCount(0)
+    }
+  }
 
   const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -469,90 +533,174 @@ function FolderImportForm({ onImported }: { onImported: () => void }) {
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setDragOver(false)
-    const droppedFiles = e.dataTransfer.files
-    setFiles(Array.from(droppedFiles))
-  }
-
-  const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) setFiles(Array.from(e.target.files))
-  }
-
-  const importFolder = async () => {
-    if (files.length === 0) return
-    setLoading(true)
-    setError('')
-    setProgress(0)
-    try {
-      const formData = new FormData()
-      for (const file of files) {
-        formData.append('files', file, file.webkitRelativePath || file.name)
+    const items = e.dataTransfer.items
+    const files: File[] = []
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (item.kind === 'file') {
+        const f = item.getAsFile()
+        if (f) files.push(f)
       }
-
-      const res = await fetch('/api/emulator/admin/import-folder', {
-        method: 'POST',
-        body: formData,
-      })
-      const data = await res.json()
-      if (data.error) {
-        setError(data.error)
-        return
-      }
-
-      if (data.created === 0 && data.skipped > 0) {
-        setError(`Không import được game nào. ${data.errors?.join(', ') || 'Kiểm tra cấu trúc folder'}`)
-        return
-      }
-
-      setFiles([])
-      if (folderInputRef.current) folderInputRef.current.value = ''
-      onImported()
-    } catch {
-      setError('Lỗi import folder — kiểm tra cấu trúc thư mục.')
-    } finally {
-      setLoading(false)
-      setProgress(null)
+    }
+    if (files.length > 0) {
+      const parsed = parseFolderStructure(files)
+      setGames(parsed)
+      setDoneCount(0)
     }
   }
 
-  const folderCount = files.length > 0 ? files[0].webkitRelativePath?.split('/')[0] || 'folder' : 'folder'
+  const importAll = async () => {
+    if (games.length === 0 || importing) return
+    setImporting(true)
+    setDoneCount(0)
+
+    const updated = games.map((g) => ({ ...g, status: 'pending' as const }))
+    setGames(updated)
+
+    for (let i = 0; i < updated.length; i++) {
+      const game = updated[i]
+      setGames((prev) => prev.map((g, idx) => idx === i ? { ...g, status: 'uploading' } : g))
+
+      try {
+        const signRes = await fetch('/api/emulator/admin/upload-sign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: game.romFile.name, sizeBytes: game.romFile.size, system: game.system }),
+        })
+        const signData = await signRes.json()
+        if (signData.error) throw new Error(signData.error)
+
+        const uploaded = await uploadRomToCloudinary(game.romFile, signData, () => {})
+
+        const coverDataUrl = game.coverFile
+          ? await compressImageToDataUrl(game.coverFile, 400, 0.85)
+          : undefined
+
+        const createRes = await fetch('/api/emulator/admin/roms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: game.name,
+            system: game.system,
+            url: uploaded.secure_url,
+            publicId: uploaded.public_id,
+            bytes: uploaded.bytes,
+            coverDataUrl,
+          }),
+        })
+        const createData = await createRes.json()
+        if (createData.error) throw new Error(createData.error)
+
+        setGames((prev) => prev.map((g, idx) => idx === i ? { ...g, status: 'done' } : g))
+        setDoneCount((c) => c + 1)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Upload thất bại'
+        setGames((prev) => prev.map((g, idx) => idx === i ? { ...g, status: 'error', errorMsg: msg } : g))
+      }
+    }
+
+    setImporting(false)
+    onImported()
+  }
+
+  const reset = () => {
+    setGames([])
+    setDoneCount(0)
+    if (folderInputRef.current) folderInputRef.current.value = ''
+  }
+
+  const systemLabel = (s: System) => SYSTEMS.find((x) => x.value === s)?.label ?? s
 
   return (
     <div className="space-y-3 rounded-xl border border-border bg-surface p-4">
       <p className="text-xs uppercase tracking-widest text-muted">Import từ Folder</p>
-      <div
-        onDragOver={handleDrag}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDrop={handleDrop}
-        className={`rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors ${
-          dragOver ? 'border-accent bg-accent/5' : 'border-border bg-background'
-        }`}
-      >
-        <label className="flex cursor-pointer flex-col items-center gap-2">
-          📁 {files.length > 0 ? `${folderCount} (${files.length} file)` : 'Kéo folder hoặc nhấp để chọn'}
-          <span className="text-[11px] text-muted">Cấu trúc: nes/dino/[dino.zip, dino.png]</span>
-          <input
-            ref={folderInputRef}
-            type="file"
-            onChange={handleFolderSelect}
-            className="hidden"
-            {...({ webkitdirectory: '' } as any)}
-          />
-        </label>
-      </div>
-      {error && <p className="text-xs text-red-400">{error}</p>}
-      {progress !== null && (
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-background">
-          <div className="h-full bg-accent transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
+
+      {games.length === 0 ? (
+        <div
+          onDragOver={handleDrag}
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDrop={handleDrop}
+          className={`rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors ${
+            dragOver ? 'border-accent bg-accent/5 text-accent' : 'border-border bg-background text-muted'
+          }`}
+        >
+          <label className="flex cursor-pointer flex-col items-center gap-1.5">
+            <span className="text-2xl">📁</span>
+            <span className="text-sm">Kéo folder hoặc nhấp để chọn</span>
+            <span className="text-[11px] opacity-60">Cấu trúc: nes/dino/[dino.zip, dino.png]</span>
+            <input
+              ref={folderInputRef}
+              type="file"
+              onChange={handleFolderSelect}
+              className="hidden"
+              {...({ webkitdirectory: '' } as React.InputHTMLAttributes<HTMLInputElement>)}
+            />
+          </label>
         </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted">
+              Tìm thấy <span className="font-semibold text-fg">{games.length}</span> games
+              {importing && <span> — đã xong {doneCount}/{games.length}</span>}
+            </p>
+            {!importing && (
+              <button onClick={reset} className="text-xs text-muted hover:text-fg">Chọn lại</button>
+            )}
+          </div>
+
+          <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+            {games.map((game, i) => (
+              <div key={i} className="flex items-center gap-2.5 rounded-lg border border-border bg-background px-3 py-2">
+                <span className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] ${
+                  game.status === 'done' ? 'bg-green-500/10 text-green-400' :
+                  game.status === 'error' ? 'bg-red-500/10 text-red-400' :
+                  game.status === 'uploading' ? 'bg-accent/10 text-accent-soft' :
+                  'bg-border text-muted'
+                }`}>
+                  {systemLabel(game.system)}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-xs text-fg">{game.name}</span>
+                {game.coverFile && <span className="shrink-0 text-[10px] text-muted">🖼️</span>}
+                <span className="shrink-0 text-[11px]">
+                  {game.status === 'done' && '✅'}
+                  {game.status === 'error' && <span title={game.errorMsg}>❌</span>}
+                  {game.status === 'uploading' && <span className="animate-pulse text-accent-soft">⏫</span>}
+                  {game.status === 'pending' && <span className="text-muted">⏳</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {!importing && games.some((g) => g.status === 'error') && (
+            <p className="text-xs text-red-400">
+              {games.filter((g) => g.status === 'error').length} game lỗi — hover vào ❌ để xem chi tiết
+            </p>
+          )}
+
+          {importing && (
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-background">
+              <div
+                className="h-full bg-accent transition-all duration-300"
+                style={{ width: `${Math.round((doneCount / games.length) * 100)}%` }}
+              />
+            </div>
+          )}
+
+          <button
+            onClick={importAll}
+            disabled={importing || games.every((g) => g.status === 'done')}
+            className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
+          >
+            {importing
+              ? `Đang upload ${doneCount + 1}/${games.length}...`
+              : games.every((g) => g.status === 'done')
+              ? `Hoàn tất ${games.length} games ✅`
+              : `Import ${games.length} games`}
+          </button>
+        </>
       )}
-      <button
-        onClick={importFolder}
-        disabled={loading || files.length === 0}
-        className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
-      >
-        {loading ? `Đang import... ${progress !== null ? Math.round(progress * 100) + '%' : ''}` : 'Import'}
-      </button>
     </div>
   )
 }
