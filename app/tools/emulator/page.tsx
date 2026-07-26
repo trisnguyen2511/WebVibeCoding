@@ -155,6 +155,10 @@ function formatBytes(bytes: number): string {
 // ── Host page ────────────────────────────────────────────────────
 function EmulatorHost() {
   const [roomId]  = useState(generateRoomId)
+  // Lets you jump straight to the controller for any room code by typing
+  // it (defaults to this session's own code) — handy for testing controller
+  // in a second tab on the same PC without needing a phone to scan the QR.
+  const [manualRoomCode, setManualRoomCode] = useState(roomId)
 
   const [system,    setSystem]    = useState<System>('nes')
   const [romUrl,    setRomUrl]    = useState<string | null>(null)
@@ -897,6 +901,32 @@ function EmulatorHost() {
                   </a>
                 </div>
               )}
+
+              {/* Manual code entry — jump into the controller without scanning */}
+              <div className="flex items-center gap-2 pt-1">
+                <div className="h-px flex-1 bg-border" />
+                <span className="font-mono text-xs text-muted">hoặc nhập mã</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={manualRoomCode}
+                  onChange={(e) => setManualRoomCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && manualRoomCode.length >= 4)
+                      window.open(`${window.location.origin}/tools/game-controller?room=${manualRoomCode}`, '_blank')
+                  }}
+                  placeholder="Mã phòng"
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-center font-mono text-sm tracking-widest text-fg outline-none placeholder:text-muted focus:border-accent"
+                />
+                <button
+                  onClick={() => manualRoomCode.length >= 4 && window.open(`${window.location.origin}/tools/game-controller?room=${manualRoomCode}`, '_blank')}
+                  disabled={manualRoomCode.length < 4}
+                  className="shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs font-medium text-accent-soft transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Vào controller
+                </button>
+              </div>
             </div>
 
             {/* Player slots */}
