@@ -71,6 +71,12 @@ const withPWA = require('next-pwa')({
   ],
 })
 
-const nextConfig = {}
+const nextConfig = {
+  api: {
+    bodyParser: {
+      sizeLimit: '500mb', // Allow large folder uploads
+    },
+  },
+}
 
 module.exports = withPWA(nextConfig)
