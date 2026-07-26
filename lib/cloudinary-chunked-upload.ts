@@ -4,7 +4,7 @@
 // because Vercel serverless functions cap request bodies far below that —
 // the file must go straight from the browser to Cloudinary, never through
 // our own API.
-const CHUNK_SIZE = 20 * 1024 * 1024 // 20MB — Cloudinary's recommended slice size
+const CHUNK_SIZE = 6 * 1024 * 1024 // 6MB per chunk — Cloudinary's max is 10MB
 
 export type RomUploadSignedParams = {
   signature: string
