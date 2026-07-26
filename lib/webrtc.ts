@@ -10,7 +10,15 @@ function getSupabase() {
   return _supabase
 }
 
-const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }]
+// Multiple STUN servers improve reliability on iOS cellular (symmetric NAT)
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+]
 
 export type ButtonInput = {
   type: 'button'
@@ -65,7 +73,17 @@ export async function createRoom(
   onInput: (msg: InputMessage) => void,
   onPlayersChange: (players: PlayerInfo[]) => void
 ): Promise<RoomHandle> {
-  const peers = new Map<string, { pc: RTCPeerConnection; dc: RTCDataChannel; playerIndex: number; connected: boolean }>()
+  const peers = new Map<string, {
+    pc: RTCPeerConnection
+    dc: RTCDataChannel
+    playerIndex: number
+    connected: boolean
+    // ICE candidates that arrived before the phone's answer was processed
+    // (i.e. before setRemoteDescription completed on the host side).
+    // Flushed immediately after setRemoteDescription succeeds.
+    pendingCandidates: RTCIceCandidateInit[]
+    remoteDescSet: boolean
+  }>()
 
   const notify = () =>
     onPlayersChange(
@@ -99,7 +117,7 @@ export async function createRoom(
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
     const dc = pc.createDataChannel('input')
 
-    peers.set(peerId, { pc, dc, playerIndex, connected: false })
+    peers.set(peerId, { pc, dc, playerIndex, connected: false, pendingCandidates: [], remoteDescSet: false })
 
     dc.onopen = () => {
       const peer = peers.get(peerId)
@@ -138,14 +156,33 @@ export async function createRoom(
       const { from, type, sdp } = payload as { from: string; type: string; sdp: string }
       const peer = peers.get(from)
       if (!peer) return
-      await peer.pc.setRemoteDescription(
-        new RTCSessionDescription({ type: type as RTCSdpType, sdp })
-      )
+      try {
+        await peer.pc.setRemoteDescription(
+          new RTCSessionDescription({ type: type as RTCSdpType, sdp })
+        )
+        peer.remoteDescSet = true
+        // Drain any ICE candidates that arrived while setRemoteDescription
+        // was in-flight — addIceCandidate fails silently if called before
+        // setRemoteDescription, which kills the connection on iOS Safari
+        // where async operations take longer than on Android/Chrome.
+        for (const c of peer.pendingCandidates) {
+          try { await peer.pc.addIceCandidate(new RTCIceCandidate(c)) } catch {}
+        }
+        peer.pendingCandidates.length = 0
+      } catch (err) {
+        console.error('[webrtc] setRemoteDescription failed (host):', err)
+      }
     })
     .on('broadcast', { event: 'ice-phone' }, async ({ payload }) => {
       const { from, candidate } = payload as { from: string; candidate: RTCIceCandidateInit }
       const peer = peers.get(from)
       if (!peer) return
+      if (!peer.remoteDescSet) {
+        // Queue instead of dropping — iOS Safari's slower async path means
+        // phone ICE candidates can outrace the answer processing on host.
+        peer.pendingCandidates.push(candidate)
+        return
+      }
       try {
         await peer.pc.addIceCandidate(new RTCIceCandidate(candidate))
       } catch {}
@@ -193,6 +230,13 @@ export async function joinRoom(
     config: { broadcast: { self: false } },
   })
   let dataChannel: RTCDataChannel | null = null
+  // Guard for ICE candidate race condition on iOS Safari:
+  // the host sends ICE candidates almost immediately after the offer, but
+  // setRemoteDescription on iOS takes longer than on Android/Chrome.
+  // Candidates that arrive while setRemoteDescription is in-flight are
+  // queued here and flushed right after it completes.
+  let remoteDescSet = false
+  const pendingCandidates: RTCIceCandidateInit[] = []
 
   pc.ondatachannel = (e) => {
     dataChannel = e.channel
@@ -222,6 +266,13 @@ export async function joinRoom(
         await pc.setRemoteDescription(
           new RTCSessionDescription({ type: type as RTCSdpType, sdp })
         )
+        remoteDescSet = true
+        // Flush any ICE candidates that arrived while we were awaiting
+        // setRemoteDescription — this is the primary iOS Safari fix.
+        for (const c of pendingCandidates) {
+          try { await pc.addIceCandidate(new RTCIceCandidate(c)) } catch {}
+        }
+        pendingCandidates.length = 0
         const answer = await pc.createAnswer()
         await pc.setLocalDescription(answer)
         onAssigned(playerIndex)
@@ -232,11 +283,19 @@ export async function joinRoom(
         })
       } catch (err) {
         console.error('[webrtc] offer handling failed:', err)
+        // Surface the failure so phone shows "Mất kết nối — reload lại"
+        // instead of being stuck at "Đang kết nối..." forever.
+        onDisconnected()
       }
     })
     .on('broadcast', { event: 'ice-host' }, async ({ payload }) => {
       const { to, candidate } = payload as { to: string; candidate: RTCIceCandidateInit }
       if (to !== peerId) return
+      if (!remoteDescSet) {
+        // Queue — don't drop. Dropping kills the connection on iOS Safari.
+        pendingCandidates.push(candidate)
+        return
+      }
       try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate))
       } catch {}
