@@ -717,7 +717,7 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
 
       {/* iOS has no Fullscreen API for a plain page — explain instead of failing silently */}
       {showFullscreenHint && (
-        <div className="absolute left-1/2 top-14 z-20 w-[88%] max-w-xs -translate-x-1/2 rounded-xl border border-[#7C3AED]/40 bg-[#0F0F1A] px-4 py-3 text-center text-xs text-fg shadow-lg">
+        <div className="absolute left-1/2 top-14 z-20 w-[88%] max-w-xs -translate-x-1/2 rounded-xl border border-accent/40 bg-surface px-4 py-3 text-center text-xs text-fg shadow-lg">
           iPhone không hỗ trợ ẩn thanh Safari cho trang web thường. Bấm nút Share → &quot;Thêm vào MH chính&quot; để mở app này full màn hình thật.
         </div>
       )}
@@ -747,21 +747,21 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
             </div>
             {/* Same public ROM library the PC host's picker shows */}
             <div>
-              <p className="mb-1.5 text-xs text-[#52525B]">Chọn game có sẵn</p>
+              <p className="mb-1.5 text-xs text-muted">Chọn game có sẵn</p>
               {libraryLoading ? (
-                <p className="py-2 text-center text-xs text-[#52525B]">Đang tải...</p>
+                <p className="py-2 text-center text-xs text-muted">Đang tải...</p>
               ) : libraryRoms.length === 0 ? (
-                <p className="py-2 text-center text-xs text-[#52525B]">Chưa có ROM nào cho hệ máy này.</p>
+                <p className="py-2 text-center text-xs text-muted">Chưa có ROM nào cho hệ máy này.</p>
               ) : (
                 <div className="max-h-32 space-y-1.5 overflow-y-auto pr-1">
                   {libraryRoms.map((rom) => (
                     <button
                       key={rom.id}
                       onClick={() => sendLibraryRom(rom)}
-                      className="flex w-full items-center justify-between gap-2 rounded-lg border border-[#1A1A2E] bg-[#0F0F1A] px-3 py-2 text-left transition-colors hover:border-[#7C3AED]/40"
+                      className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-left transition-colors hover:border-accent/40"
                     >
                       <span className="truncate text-xs text-fg">{rom.name}</span>
-                      <span className="shrink-0 font-mono text-[10px] text-[#52525B]">
+                      <span className="shrink-0 font-mono text-[10px] text-muted">
                         {rom.bytes >= 1024 ** 3 ? `${(rom.bytes / 1024 ** 3).toFixed(1)}GB` : `${(rom.bytes / 1024 ** 2).toFixed(0)}MB`}
                       </span>
                     </button>
@@ -771,9 +771,9 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-[#1A1A2E]" />
-              <span className="font-mono text-[10px] text-[#52525B]">hoặc dán link</span>
-              <div className="h-px flex-1 bg-[#1A1A2E]" />
+              <div className="h-px flex-1 bg-border" />
+              <span className="font-mono text-[10px] text-muted">hoặc dán link</span>
+              <div className="h-px flex-1 bg-border" />
             </div>
             <div className="flex gap-2">
               <input
