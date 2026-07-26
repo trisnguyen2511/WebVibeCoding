@@ -498,6 +498,11 @@ function FolderImportForm({ onImported }: { onImported: () => void }) {
         return
       }
 
+      if (data.created === 0 && data.skipped > 0) {
+        setError(`Không import được game nào. ${data.errors?.join(', ') || 'Kiểm tra cấu trúc folder'}`)
+        return
+      }
+
       setFiles([])
       if (folderInputRef.current) folderInputRef.current.value = ''
       onImported()

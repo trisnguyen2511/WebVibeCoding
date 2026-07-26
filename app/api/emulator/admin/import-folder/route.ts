@@ -61,6 +61,9 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData()
     const allFiles = formData.getAll('files') as File[]
 
+    console.log('[IMPORT] Received files:', allFiles.length)
+    allFiles.forEach((f) => console.log(`  - ${f.webkitRelativePath || f.name} (${f.size} bytes)`))
+
     if (allFiles.length === 0) {
       return NextResponse.json({ error: 'No files provided' }, { status: 400 })
     }
@@ -72,15 +75,21 @@ export async function POST(req: NextRequest) {
       const relativePath = file.webkitRelativePath || file.name
       const parts = relativePath.split('/')
 
-      if (parts.length < 3) continue // Need at least system/game/file
+      if (parts.length < 3) {
+        console.log(`[SKIP] ${relativePath} - not enough path parts`)
+        continue
+      }
 
       const system = parts[0].toLowerCase()
       const gameName = parts[1]
 
-      if (!VALID_SYSTEMS.has(system)) continue
+      if (!VALID_SYSTEMS.has(system)) {
+        console.log(`[SKIP] ${relativePath} - invalid system "${system}"`)
+        continue
+      }
 
       const fileName = file.name.toLowerCase()
-      const fileExt = fileName.slice(fileName.lastIndexOf('.'))
+      const fileExt = fileName.slice(fileName.lastIndexOf('.')).toLowerCase()
 
       if (!gamesBySystemAndName[system]) gamesBySystemAndName[system] = {}
       if (!gamesBySystemAndName[system][gameName]) {
@@ -91,10 +100,14 @@ export async function POST(req: NextRequest) {
       const romExts = ROM_EXTENSIONS[system as keyof typeof ROM_EXTENSIONS] || []
       if (romExts.some((ext) => fileExt === ext)) {
         gamesBySystemAndName[system][gameName].romFile = file
+        console.log(`[ROM] ${system}/${gameName}/${file.name}`)
       }
       // Check if cover image
       else if (IMAGE_EXTENSIONS.includes(fileExt)) {
         gamesBySystemAndName[system][gameName].coverFile = file
+        console.log(`[COVER] ${system}/${gameName}/${file.name}`)
+      } else {
+        console.log(`[SKIP] ${system}/${gameName}/${file.name} - unknown extension`)
       }
     }
 
@@ -102,19 +115,30 @@ export async function POST(req: NextRequest) {
     const supabase = getSupabaseAdmin()
     let created = 0
     let skipped = 0
+    const errors: string[] = []
+
+    console.log(`[PARSE] Found ${Object.keys(gamesBySystemAndName).length} systems`)
+    for (const system of Object.keys(gamesBySystemAndName)) {
+      console.log(`[PARSE] ${system}: ${Object.keys(gamesBySystemAndName[system]).length} games`)
+    }
 
     for (const system of Object.keys(gamesBySystemAndName)) {
       for (const gameName of Object.keys(gamesBySystemAndName[system])) {
         const game = gamesBySystemAndName[system][gameName]
 
         if (!game.romFile) {
+          console.log(`[SKIP] ${system}/${gameName} - no ROM file`)
+          errors.push(`${system}/${gameName}: no ROM file found`)
           skipped++
           continue
         }
 
         // Upload ROM
+        console.log(`[UPLOAD] ${system}/${gameName}/${game.romFile.name}`)
         const romData = await uploadRomFile(game.romFile)
         if (!romData) {
+          console.log(`[ERROR] ${system}/${gameName} - ROM upload failed`)
+          errors.push(`${system}/${gameName}: ROM upload failed`)
           skipped++
           continue
         }
@@ -147,12 +171,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    console.log(`[DONE] Created: ${created}, Skipped: ${skipped}`)
+    if (errors.length > 0) console.log('[ERRORS]', errors)
+
     return NextResponse.json({
       created,
       skipped,
+      errors: errors.length > 0 ? errors : undefined,
       message: `Created ${created} games, skipped ${skipped}`,
     })
-  } catch {
-    return NextResponse.json({ error: 'Failed to process folder' }, { status: 500 })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[FATAL]', message)
+    return NextResponse.json({ error: `Failed to process folder: ${message}` }, { status: 500 })
   }
 }
