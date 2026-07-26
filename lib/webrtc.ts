@@ -94,6 +94,8 @@ export async function createRoom(
     playerIndex: number
     connected: boolean
     connectTimer: ReturnType<typeof setTimeout>
+    pendingCandidates: RTCIceCandidateInit[]
+    remoteDescSet: boolean
   }>()
 
   const notify = () =>
@@ -153,7 +155,7 @@ export async function createRoom(
       if (peer && !peer.connected) removePeer(peerId)
     }, CONNECT_TIMEOUT_MS)
 
-    peers.set(peerId, { pc, dc, playerIndex, connected: false, connectTimer })
+    peers.set(peerId, { pc, dc, playerIndex, connected: false, connectTimer, pendingCandidates: [], remoteDescSet: false })
 
     dc.onopen = () => {
       const peer = peers.get(peerId)
@@ -197,14 +199,27 @@ export async function createRoom(
       const { from, type, sdp } = payload as { from: string; type: string; sdp: string }
       const peer = peers.get(from)
       if (!peer) return
-      await peer.pc.setRemoteDescription(
-        new RTCSessionDescription({ type: type as RTCSdpType, sdp })
-      )
+      try {
+        await peer.pc.setRemoteDescription(
+          new RTCSessionDescription({ type: type as RTCSdpType, sdp })
+        )
+        peer.remoteDescSet = true
+        for (const c of peer.pendingCandidates) {
+          try { await peer.pc.addIceCandidate(new RTCIceCandidate(c)) } catch {}
+        }
+        peer.pendingCandidates.length = 0
+      } catch (err) {
+        console.error('[webrtc] setRemoteDescription failed (host):', err)
+      }
     })
     .on('broadcast', { event: 'ice-phone' }, async ({ payload }) => {
       const { from, candidate } = payload as { from: string; candidate: RTCIceCandidateInit }
       const peer = peers.get(from)
       if (!peer) return
+      if (!peer.remoteDescSet) {
+        peer.pendingCandidates.push(candidate)
+        return
+      }
       try {
         await peer.pc.addIceCandidate(new RTCIceCandidate(candidate))
       } catch {}
@@ -266,6 +281,8 @@ export async function joinRoom(
   let attempt = 0
   let connectTimer: ReturnType<typeof setTimeout> | null = null
   let stopped = false
+  let remoteDescSet = false
+  let pendingCandidates: RTCIceCandidateInit[] = []
 
   const clearConnectTimer = () => {
     if (connectTimer) { clearTimeout(connectTimer); connectTimer = null }
@@ -274,6 +291,8 @@ export async function joinRoom(
   const startAttempt = () => {
     if (stopped) return
     attempt += 1
+    remoteDescSet = false
+    pendingCandidates = []
     const peerId = Math.random().toString(36).slice(2, 10).toUpperCase()
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
     current = { peerId, pc, dataChannel: null }
@@ -327,6 +346,15 @@ export async function joinRoom(
         await pc.setRemoteDescription(
           new RTCSessionDescription({ type: type as RTCSdpType, sdp })
         )
+        remoteDescSet = true
+        // Flush ICE candidates that arrived while setRemoteDescription was in-flight.
+        // iOS Safari's async path is slower than Chrome/Android — host candidates
+        // sent via Supabase Realtime outrace it, and the old silent-drop left zero
+        // remote candidates, so ICE never completed → phone stuck at "connecting".
+        for (const c of pendingCandidates) {
+          try { await pc.addIceCandidate(new RTCIceCandidate(c)) } catch {}
+        }
+        pendingCandidates = []
         const answer = await pc.createAnswer()
         await pc.setLocalDescription(answer)
         onAssigned(playerIndex)
@@ -342,6 +370,10 @@ export async function joinRoom(
     .on('broadcast', { event: 'ice-host' }, async ({ payload }) => {
       const { to, candidate } = payload as { to: string; candidate: RTCIceCandidateInit }
       if (!current || to !== current.peerId) return
+      if (!remoteDescSet) {
+        pendingCandidates.push(candidate)
+        return
+      }
       try {
         await current.pc.addIceCandidate(new RTCIceCandidate(candidate))
       } catch {}
