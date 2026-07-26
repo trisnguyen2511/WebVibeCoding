@@ -4,6 +4,8 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { deleteChatImages, uploadRomCover } from '@/lib/cloudinary'
 
 const VALID_SYSTEMS = new Set(['nes', 'snes', 'gba', 'gbc', 'n64', 'arcade'])
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+const ROM_BUCKET = 'emulator-roms'
 
 export async function GET(req: NextRequest) {
   if (!isAdminRequest(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
@@ -18,9 +20,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ roms: roms ?? [] })
 }
 
-// Called right after a successful direct-to-Cloudinary chunked upload
-// (see /api/emulator/admin/upload-sign) finishes on the client — persists
-// the resulting resource as a row, optionally with a cover thumbnail.
 export async function POST(req: NextRequest) {
   if (!isAdminRequest(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
@@ -45,8 +44,8 @@ export async function POST(req: NextRequest) {
   if (!system || !VALID_SYSTEMS.has(system)) {
     return NextResponse.json({ error: 'hệ máy không hợp lệ' }, { status: 400 })
   }
-  if (!url || !publicId || typeof bytes !== 'number') {
-    return NextResponse.json({ error: 'url, publicId and bytes are required' }, { status: 400 })
+  if (!url || typeof bytes !== 'number') {
+    return NextResponse.json({ error: 'url and bytes are required' }, { status: 400 })
   }
 
   let coverUrl: string | null = null
@@ -68,7 +67,7 @@ export async function POST(req: NextRequest) {
       name: name.trim(),
       system,
       url,
-      public_id: publicId,
+      public_id: publicId ?? '',
       bytes,
       cover_url: coverUrl,
       cover_public_id: coverPublicId,
@@ -92,15 +91,22 @@ export async function PATCH(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'invalid request body' }, { status: 400 })
   }
-  const { name, system, coverDataUrl, removeCover } = body as {
+  const { name, system, url, coverDataUrl, removeCover } = body as {
     name?: string
     system?: string
+    url?: string
     coverDataUrl?: string
     removeCover?: boolean
   }
 
   const supabase = getSupabaseAdmin()
-  const update: { name?: string; system?: string; cover_url?: string | null; cover_public_id?: string | null } = {}
+  const update: {
+    name?: string
+    system?: string
+    url?: string
+    cover_url?: string | null
+    cover_public_id?: string | null
+  } = {}
 
   if (name !== undefined) {
     if (!name.trim()) return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 })
@@ -109,6 +115,10 @@ export async function PATCH(req: NextRequest) {
   if (system !== undefined) {
     if (!VALID_SYSTEMS.has(system)) return NextResponse.json({ error: 'hệ máy không hợp lệ' }, { status: 400 })
     update.system = system
+  }
+  if (url !== undefined) {
+    if (!url.trim()) return NextResponse.json({ error: 'url cannot be empty' }, { status: 400 })
+    update.url = url.trim()
   }
 
   if (coverDataUrl || removeCover) {
@@ -137,10 +147,6 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ ok: true })
 }
 
-// Deletes both the DB row and the underlying Cloudinary resources (ROM file
-// + cover, if any) — the cloud files are removed first, and only once that
-// succeeds do we drop the row, so a failed cloud delete never leaves a
-// "deleted" row pointing at storage that's still actually there.
 export async function DELETE(req: NextRequest) {
   if (!isAdminRequest(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
@@ -150,17 +156,24 @@ export async function DELETE(req: NextRequest) {
   const supabase = getSupabaseAdmin()
   const { data: rom, error: fetchError } = await supabase
     .from('emulator_roms')
-    .select('public_id, cover_public_id')
+    .select('url, public_id, cover_public_id')
     .eq('id', id)
     .maybeSingle()
   if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 })
   if (!rom) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
-  try {
-    await deleteChatImages([rom.public_id], 'raw')
-    if (rom.cover_public_id) await deleteChatImages([rom.cover_public_id], 'image')
-  } catch {
-    return NextResponse.json({ error: 'Xoá file trên cloud thất bại — thử lại.' }, { status: 502 })
+  // Delete ROM file from storage
+  if (rom.public_id) {
+    if (SUPABASE_URL && rom.url?.startsWith(SUPABASE_URL)) {
+      await supabase.storage.from(ROM_BUCKET).remove([rom.public_id]).catch(() => {})
+    } else {
+      await deleteChatImages([rom.public_id], 'raw').catch(() => {})
+    }
+  }
+
+  // Delete cover from Cloudinary (covers still use Cloudinary)
+  if (rom.cover_public_id) {
+    await deleteChatImages([rom.cover_public_id], 'image').catch(() => {})
   }
 
   const { error } = await supabase.from('emulator_roms').delete().eq('id', id)

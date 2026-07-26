@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ToolShell } from '@/components/tool-shell'
 import { compressImageToDataUrl } from '@/lib/compress-image'
-import { uploadRomToCloudinary } from '@/lib/cloudinary-chunked-upload'
+import { uploadRomToSupabase } from '@/lib/supabase-storage-upload'
 import { SYSTEMS, type System } from '@/lib/emulator-systems'
 
 const MAX_ROM_BYTES = 2 * 1024 ** 3 // 2GB
@@ -173,15 +173,15 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
     setError('')
     setProgress(0)
     try {
-      const signRes = await fetch('/api/emulator/admin/upload-sign', {
+      const signRes = await fetch('/api/emulator/admin/upload-sign-supabase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: romFile.name, sizeBytes: romFile.size, system }),
+        body: JSON.stringify({ fileName: romFile.name, system }),
       })
       const signData = await signRes.json()
       if (signData.error) { setError(signData.error); setProgress(null); return }
 
-      const uploaded = await uploadRomToCloudinary(romFile, signData, (fraction) => setProgress(fraction))
+      await uploadRomToSupabase(romFile, signData.signedUrl, (fraction) => setProgress(fraction))
 
       const coverDataUrl = coverFile ? await compressImageToDataUrl(coverFile, 400, 0.85) : undefined
 
@@ -191,9 +191,9 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
         body: JSON.stringify({
           name: name.trim(),
           system,
-          url: uploaded.secure_url,
-          publicId: uploaded.public_id,
-          bytes: uploaded.bytes,
+          url: signData.publicUrl,
+          publicId: signData.path,
+          bytes: romFile.size,
           coverDataUrl,
         }),
       })
@@ -302,8 +302,20 @@ function RomRow({ rom, onChanged }: { rom: Rom; onChanged: () => void }) {
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
   const [dragOverCover, setDragOverCover] = useState(false)
+  const [showUrl, setShowUrl] = useState(false)
+  const [urlDraft, setUrlDraft] = useState(rom.url)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const coverButtonRef = useRef<HTMLButtonElement>(null)
+
+  const saveUrl = async (value: string) => {
+    if (!value.trim() || value.trim() === rom.url) return
+    await fetch(`/api/emulator/admin/roms?id=${rom.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: value.trim() }),
+    })
+    onChanged()
+  }
 
   const rename = async (value: string) => {
     if (!value.trim() || value.trim() === rom.name) return
@@ -437,7 +449,24 @@ function RomRow({ rom, onChanged }: { rom: Rom; onChanged: () => void }) {
             {SYSTEMS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
           <span className="font-mono text-xs text-muted">{formatBytes(rom.bytes)}</span>
+          <button
+            onClick={() => setShowUrl((v) => !v)}
+            title="Chỉnh sửa URL"
+            className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${showUrl ? 'bg-accent/10 text-accent-soft' : 'text-muted hover:text-fg'}`}
+          >
+            🔗 URL
+          </button>
         </div>
+        {showUrl && (
+          <input
+            value={urlDraft}
+            onChange={(e) => setUrlDraft(e.target.value)}
+            onBlur={(e) => void saveUrl(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+            placeholder="https://..."
+            className="w-full rounded-lg border border-border bg-background px-2 py-1.5 font-mono text-xs text-fg outline-none focus:border-accent"
+          />
+        )}
         {error && <p className="text-xs text-red-400">{error}</p>}
       </div>
 
@@ -562,15 +591,15 @@ function FolderImportForm({ onImported }: { onImported: () => void }) {
       setGames((prev) => prev.map((g, idx) => idx === i ? { ...g, status: 'uploading' } : g))
 
       try {
-        const signRes = await fetch('/api/emulator/admin/upload-sign', {
+        const signRes = await fetch('/api/emulator/admin/upload-sign-supabase', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileName: game.romFile.name, sizeBytes: game.romFile.size, system: game.system }),
+          body: JSON.stringify({ fileName: game.romFile.name, system: game.system }),
         })
         const signData = await signRes.json()
         if (signData.error) throw new Error(signData.error)
 
-        const uploaded = await uploadRomToCloudinary(game.romFile, signData, () => {})
+        await uploadRomToSupabase(game.romFile, signData.signedUrl, () => {})
 
         const coverDataUrl = game.coverFile
           ? await compressImageToDataUrl(game.coverFile, 400, 0.85)
@@ -582,9 +611,9 @@ function FolderImportForm({ onImported }: { onImported: () => void }) {
           body: JSON.stringify({
             name: game.name,
             system: game.system,
-            url: uploaded.secure_url,
-            publicId: uploaded.public_id,
-            bytes: uploaded.bytes,
+            url: signData.publicUrl,
+            publicId: signData.path,
+            bytes: game.romFile.size,
             coverDataUrl,
           }),
         })
