@@ -158,7 +158,8 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
   const handleCoverPaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
     e.preventDefault()
     const items = e.clipboardData.items
-    for (const item of items) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
       if (item.type.startsWith('image/')) {
         const file = item.getAsFile()
         if (file) setCoverFile(file)
@@ -359,7 +360,8 @@ function RomRow({ rom, onChanged }: { rom: Rom; onChanged: () => void }) {
   const handleCoverPaste = async (e: React.ClipboardEvent<HTMLButtonElement>) => {
     e.preventDefault()
     const items = e.clipboardData.items
-    for (const item of items) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
       if (item.type.startsWith('image/')) {
         const file = item.getAsFile()
         if (file) void uploadCover(file)
