@@ -7,14 +7,13 @@ const VALID_SIZES = ['512x512', '1024x1024', '1024x1792', '1792x1024'] as const
 type AgnesSize = typeof VALID_SIZES[number]
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.AGNES_AI_API_KEY
-  if (!apiKey) {
-    return NextResponse.json({ result: null, error: 'AGNES_AI_API_KEY is not configured' }, { status: 500 })
-  }
-
   const body = await req.json()
-  const { prompt, model = 'agnes-image-2.0-flash', size = '1024x1024' } = body
+  const { prompt, model = 'agnes-image-2.0-flash', size = '1024x1024', apiKey, referenceImage } = body
 
+  const key = (typeof apiKey === 'string' && apiKey.trim()) || process.env.AGNES_AI_API_KEY
+  if (!key) {
+    return NextResponse.json({ result: null, error: 'No Agnes AI API key configured' }, { status: 500 })
+  }
   if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
     return NextResponse.json({ result: null, error: 'prompt is required' }, { status: 400 })
   }
@@ -25,15 +24,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ result: null, error: 'invalid size' }, { status: 400 })
   }
 
+  const requestBody: Record<string, unknown> = { model, prompt, n: 1, size }
+  if (typeof referenceImage === 'string' && referenceImage.trim()) {
+    requestBody.extra_body = { image: referenceImage.trim() }
+  }
+
   let upstream: Response
   try {
     upstream = await fetch(AGNES_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${key}`,
       },
-      body: JSON.stringify({ model, prompt, n: 1, size }),
+      body: JSON.stringify(requestBody),
     })
   } catch {
     return NextResponse.json({ result: null, error: 'Failed to reach Agnes AI' }, { status: 502 })

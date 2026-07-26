@@ -122,10 +122,10 @@ export const tools: Tool[] = [
     category: 'game',
   },
   {
-    name: 'Agnes Image Gen',
-    slug: 'agnes-image-gen',
-    icon: '🖼️',
-    description: 'Test image generation via the Agnes AI API',
+    name: 'AI Media Studio',
+    slug: 'ai-media-studio',
+    icon: '🎬',
+    description: 'Generate images and videos via the Agnes AI API — multi-model, reference image support',
     category: 'media',
   },
 ]
