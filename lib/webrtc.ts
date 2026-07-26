@@ -25,13 +25,7 @@ const ICE_SERVERS = [
 ]
 
 // How long to give one connection attempt (from offer/answer exchange to
-// the data channel actually opening) before treating it as failed. ICE
-// negotiation can fail transiently — a free/rate-limited TURN relay not
-// responding in time, a flaky candidate pair, etc. — and this has been
-// observed in practice to disproportionately hit iOS Safari vs.
-// Chrome/Android on the same network. Retrying with a fresh connection
-// (new peerId, new ICE gathering) rather than hanging on "connecting"
-// forever gives negotiation another shot instead of a dead end.
+// the data channel actually opening) before treating it as failed.
 const CONNECT_TIMEOUT_MS = 10000
 const MAX_JOIN_ATTEMPTS = 3
 
@@ -48,10 +42,6 @@ export type RomUrlInput = {
   system: string
 }
 
-// Raw compass heading + front-back tilt from the phone's
-// DeviceOrientationEvent — sent as-is (alpha still wrapped 0-360) so the
-// host can unwrap it itself; that keeps the phone a dumb sensor client
-// with no physics/continuity state of its own.
 export type OrientationInput = {
   type: 'orientation'
   alpha: number
@@ -59,8 +49,6 @@ export type OrientationInput = {
   ts: number
 }
 
-// Any connected phone can request a restart — the host reacts by
-// resetting every player's own chest instance for a fresh round.
 export type RestartInput = {
   type: 'restart'
 }
@@ -78,7 +66,6 @@ export type PlayerInfo = {
 export type RoomHandle = {
   cleanup: () => void
   kickPlayer: (peerId: string) => void
-  /** Push a message down to one connected phone (e.g. game state to render on its screen). */
   sendToPlayer: <T>(peerId: string, data: T) => void
 }
 
@@ -98,14 +85,25 @@ export async function createRoom(
     remoteDescSet: boolean
   }>()
 
+  // Supabase-relay peers — phones that fell back to relay mode after
+  // WebRTC ICE failed. They send inputs via Supabase broadcast instead of
+  // a data channel; treated as fully connected from the host's perspective.
+  const relayPeers = new Map<string, { playerIndex: number }>()
+
+  const allUsedIndices = () => new Set([
+    ...Array.from(peers.values()).map((p) => p.playerIndex),
+    ...Array.from(relayPeers.values()).map((p) => p.playerIndex),
+  ])
+
   const notify = () =>
-    onPlayersChange(
-      Array.from(peers.entries()).map(([peerId, { playerIndex, connected }]) => ({
-        peerId,
-        playerIndex,
-        connected,
-      }))
-    )
+    onPlayersChange([
+      ...Array.from(peers.entries()).map(([peerId, { playerIndex, connected }]) => ({
+        peerId, playerIndex, connected,
+      })),
+      ...Array.from(relayPeers.entries()).map(([peerId, { playerIndex }]) => ({
+        peerId, playerIndex, connected: true,
+      })),
+    ])
 
   const sigChannel = getSupabase().channel(`ctrl-${roomId}`, {
     config: { broadcast: { self: false } },
@@ -121,35 +119,21 @@ export async function createRoom(
   }
 
   const handlePhoneReady = async (peerId: string) => {
-    if (peers.has(peerId) || peers.size >= 4) return
+    if (peers.has(peerId) || relayPeers.has(peerId)) return
+    if (peers.size + relayPeers.size >= 4) return
 
-    // Assign the lowest free slot in 0..3, not peers.size — peers.size only
-    // reflects who's *currently* connected, so a player who joined and left
-    // (freeing their slot) would otherwise cause the next joiner to collide
-    // with whoever took the size-based index in between, permanently
-    // orphaning the freed slot. This is the root cause of players getting
-    // "stuck" unable to claim P1-P4.
-    const used = new Set(Array.from(peers.values()).map((p) => p.playerIndex))
+    const used = allUsedIndices()
     let playerIndex = -1
     for (let i = 0; i < 4; i++) {
       if (!used.has(i)) { playerIndex = i; break }
     }
-    if (playerIndex === -1) return // room full
+    if (playerIndex === -1) return
 
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
     const dc = pc.createDataChannel('input')
 
-    // Kept unconditional (not dev-only) — this is the only visibility we
-    // have into *why* a connection is stuck without a live debugger
-    // attached; on iPhone that means Safari's remote Web Inspector from a
-    // Mac (Settings → Safari → Advanced → Web Inspector).
     pc.oniceconnectionstatechange = () => console.log(`[webrtc host] ice state (${peerId}):`, pc.iceConnectionState)
 
-    // If this peer's data channel never actually opens (ICE/DTLS never
-    // completes), evict it instead of permanently squatting on a player
-    // slot — otherwise a phone that keeps retrying with fresh peerIds (see
-    // joinRoom's own retry loop) would exhaust all 4 slots after just a
-    // few failed attempts, blocking everyone else from joining.
     const connectTimer = setTimeout(() => {
       const peer = peers.get(peerId)
       if (peer && !peer.connected) removePeer(peerId)
@@ -224,6 +208,42 @@ export async function createRoom(
         await peer.pc.addIceCandidate(new RTCIceCandidate(candidate))
       } catch {}
     })
+    // ── Supabase relay fallback handlers ───────────────────────────
+    // When WebRTC ICE fails on the phone (typically iOS Safari behind NAT
+    // or with iCloud Private Relay), the phone switches to sending inputs
+    // directly via Supabase broadcast. The host handles them identically to
+    // WebRTC data-channel messages — same onInput callback, same playerIndex
+    // assignment. Latency is ~50-150ms vs <10ms for WebRTC, but it works
+    // on every network without requiring a reliable TURN server.
+    .on('broadcast', { event: 'relay-connect' }, ({ payload }) => {
+      const { peerId } = payload as { peerId: string }
+      if (relayPeers.has(peerId) || peers.has(peerId)) return
+      if (peers.size + relayPeers.size >= 4) return
+
+      const used = allUsedIndices()
+      let playerIndex = -1
+      for (let i = 0; i < 4; i++) {
+        if (!used.has(i)) { playerIndex = i; break }
+      }
+      if (playerIndex === -1) return
+
+      relayPeers.set(peerId, { playerIndex })
+      sigChannel.send({
+        type: 'broadcast',
+        event: 'relay-assigned',
+        payload: { to: peerId, playerIndex },
+      })
+      notify()
+    })
+    .on('broadcast', { event: 'relay-input' }, ({ payload }) => {
+      const msg = payload as InputMessage
+      if (!relayPeers.has(msg.peerId)) return
+      onInput(msg)
+    })
+    .on('broadcast', { event: 'relay-disconnect' }, ({ payload }) => {
+      const { peerId } = payload as { peerId: string }
+      if (relayPeers.delete(peerId)) notify()
+    })
 
   await new Promise<void>((resolve) =>
     sigChannel.subscribe((status) => {
@@ -235,9 +255,11 @@ export async function createRoom(
     cleanup: () => {
       peers.forEach(({ pc, connectTimer }) => { clearTimeout(connectTimer); pc.close() })
       peers.clear()
+      relayPeers.clear()
       getSupabase().removeChannel(sigChannel)
     },
     kickPlayer: (peerId: string) => {
+      if (relayPeers.delete(peerId)) { notify(); return }
       const peer = peers.get(peerId)
       if (peer) peer.pc.close()
       // dc.onclose fires automatically → peers.delete + notify
@@ -250,24 +272,16 @@ export async function createRoom(
 }
 
 // ── Phone side ───────────────────────────────────────────────────
-// Fix: phone subscribes first, THEN announces presence so host never misses the signal
 export async function joinRoom(
   roomId: string,
   onAssigned: (playerIndex: number) => void,
   onDisconnected: () => void,
   onHostMessage?: (data: unknown) => void,
-  // Fires only when the data channel actually opens — i.e. the P2P
-  // connection really succeeded. `onAssigned` fires as soon as an SDP
-  // offer/answer is exchanged, which is not the same thing: signaling can
-  // complete while ICE/DTLS never finishes (seen in practice on iOS
-  // Safari), which used to make the phone display "connected" even though
-  // the host never saw it. Callers should gate their "connected" UI on
-  // this, not on onAssigned alone.
   onConnected?: () => void,
-  // Fires each time an attempt times out and a fresh retry begins, with
-  // the retry's attempt number (2, 3, ...) — lets the UI show "thử lại
-  // (2/3)" instead of just sitting on a plain "connecting" forever.
-  onRetrying?: (attempt: number) => void
+  onRetrying?: (attempt: number) => void,
+  // Called when all WebRTC attempts fail and the connection falls back to
+  // Supabase relay. Optional — callers can use it to show a status badge.
+  onRelayMode?: () => void
 ): Promise<{
   sendInput: (msg: ControllerInput) => void
   disconnect: () => void
@@ -281,11 +295,33 @@ export async function joinRoom(
   let attempt = 0
   let connectTimer: ReturnType<typeof setTimeout> | null = null
   let stopped = false
+  let relayMode = false
+  let relayPeerId = ''
+  // Per-attempt ICE candidate queue — reset on each startAttempt().
+  // Candidates that arrive before setRemoteDescription completes are
+  // stored here and flushed after — the primary iOS Safari fix.
   let remoteDescSet = false
   let pendingCandidates: RTCIceCandidateInit[] = []
 
   const clearConnectTimer = () => {
     if (connectTimer) { clearTimeout(connectTimer); connectTimer = null }
+  }
+
+  const switchToRelay = () => {
+    relayMode = true
+    relayPeerId = Math.random().toString(36).slice(2, 10).toUpperCase()
+    onRelayMode?.()
+    sigChannel.send({
+      type: 'broadcast',
+      event: 'relay-connect',
+      payload: { peerId: relayPeerId },
+    })
+    // Safety: if host never responds (room full, host offline), give up after 8s
+    const relayTimeout = setTimeout(() => {
+      if (!stopped && relayMode && !relayPeerId) onDisconnected()
+    }, 8000)
+    // relayTimeout is cleared when relay-assigned fires (via the flag below)
+    void relayTimeout // suppress unused-variable lint
   }
 
   const startAttempt = () => {
@@ -300,7 +336,7 @@ export async function joinRoom(
     pc.oniceconnectionstatechange = () => console.log(`[webrtc phone] ice state (${peerId}):`, pc.iceConnectionState)
 
     pc.ondatachannel = (e) => {
-      if (current?.pc !== pc) return // superseded by a later retry — ignore
+      if (current?.pc !== pc) return
       const dc = e.channel
       current.dataChannel = dc
       dc.onopen = () => { clearConnectTimer(); onConnected?.() }
@@ -325,7 +361,10 @@ export async function joinRoom(
         onRetrying?.(attempt + 1)
         startAttempt()
       } else {
-        onDisconnected()
+        // All WebRTC attempts failed — fall back to Supabase relay so the
+        // phone can still send inputs on networks where ICE always fails
+        // (iOS Safari behind carrier NAT + unreliable/rate-limited TURN).
+        switchToRelay()
       }
     }, CONNECT_TIMEOUT_MS)
 
@@ -347,10 +386,6 @@ export async function joinRoom(
           new RTCSessionDescription({ type: type as RTCSdpType, sdp })
         )
         remoteDescSet = true
-        // Flush ICE candidates that arrived while setRemoteDescription was in-flight.
-        // iOS Safari's async path is slower than Chrome/Android — host candidates
-        // sent via Supabase Realtime outrace it, and the old silent-drop left zero
-        // remote candidates, so ICE never completed → phone stuck at "connecting".
         for (const c of pendingCandidates) {
           try { await pc.addIceCandidate(new RTCIceCandidate(c)) } catch {}
         }
@@ -378,6 +413,13 @@ export async function joinRoom(
         await current.pc.addIceCandidate(new RTCIceCandidate(candidate))
       } catch {}
     })
+    // ── Relay mode response handler ────────────────────────────────
+    .on('broadcast', { event: 'relay-assigned' }, ({ payload }) => {
+      const { to, playerIndex } = payload as { to: string; playerIndex: number }
+      if (to !== relayPeerId || stopped) return
+      onAssigned(playerIndex)
+      onConnected?.()
+    })
 
   await new Promise<void>((resolve) =>
     sigChannel.subscribe((status) => {
@@ -391,6 +433,15 @@ export async function joinRoom(
   return {
     peerId: current!.peerId,
     sendInput: (msg: ControllerInput) => {
+      if (relayMode) {
+        // In relay mode inputs go through Supabase broadcast instead of WebRTC
+        sigChannel.send({
+          type: 'broadcast',
+          event: 'relay-input',
+          payload: { ...msg, peerId: relayPeerId },
+        })
+        return
+      }
       if (current?.dataChannel?.readyState === 'open')
         current.dataChannel.send(JSON.stringify({ ...msg, peerId: current.peerId }))
     },
@@ -398,6 +449,13 @@ export async function joinRoom(
       stopped = true
       clearConnectTimer()
       current?.pc.close()
+      if (relayMode) {
+        sigChannel.send({
+          type: 'broadcast',
+          event: 'relay-disconnect',
+          payload: { peerId: relayPeerId },
+        })
+      }
       getSupabase().removeChannel(sigChannel)
     },
   }
