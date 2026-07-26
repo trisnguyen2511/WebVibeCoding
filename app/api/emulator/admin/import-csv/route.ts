@@ -3,7 +3,7 @@ import { isAdminRequest } from '@/lib/emulator-admin-auth'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { uploadRomCover } from '@/lib/cloudinary'
 import { readFileSync } from 'fs'
-import { extname } from 'path'
+import { extname, basename } from 'path'
 import { v2 as cloudinary } from 'cloudinary'
 
 const VALID_SYSTEMS = new Set(['nes', 'snes', 'gba', 'gbc', 'n64', 'arcade'])
@@ -11,7 +11,7 @@ const VALID_SYSTEMS = new Set(['nes', 'snes', 'gba', 'gbc', 'n64', 'arcade'])
 async function uploadRomFromPath(filePath: string): Promise<{ url: string; publicId: string; bytes: number } | null> {
   try {
     const fileBuffer = readFileSync(filePath)
-    const fileName = filePath.split('/').pop() || 'rom'
+    const fileName = basename(filePath)
 
     const result = await new Promise<{ secure_url: string; public_id: string; bytes: number }>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(

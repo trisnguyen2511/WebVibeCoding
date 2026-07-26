@@ -11,7 +11,9 @@ function downloadCSVTemplate() {
   const headers = ['name', 'system', 'romLocalPath', 'coverLocalPath']
   const sample = [
     ['Super Mario Bros', 'nes', '/data/roms/smb.nes', '/data/covers/smb.jpg'],
-    ['The Legend of Zelda', 'nes', '/data/roms/zelda.nes', ''],
+    ['The Legend of Zelda', 'nes', '/home/user/games/zelda.nes', '/home/user/covers/zelda.jpg'],
+    ['Donkey Kong', 'nes', 'C:\\Games\\donkey_kong.nes', 'C:\\Covers\\donkey_kong.jpg'],
+    ['Pokemon Red', 'gbc', 'C:\\Users\\Admin\\Games\\pokemon_red.gbc', ''],
   ]
   const csv = [headers, ...sample].map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })
