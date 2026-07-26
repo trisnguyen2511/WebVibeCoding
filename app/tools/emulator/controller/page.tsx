@@ -356,6 +356,34 @@ function ControllerView({ roomId }: { roomId: string }) {
         <div />
       </div>
 
+      {/* ── Rotate button — bottom center, always visible ── */}
+      <button
+        onClick={forceLandscape}
+        style={{
+          position: 'absolute',
+          bottom: '2vmin',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 25,
+          padding: '2vmin 4vmin',
+          borderRadius: 999,
+          border: '1px solid #1A1A2E',
+          background: '#0F0F1A',
+          color: '#52525B',
+          fontFamily: 'system-ui',
+          fontSize: '3vmin',
+          fontWeight: 600,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1.5vmin',
+          touchAction: 'manipulation',
+        }}
+      >
+        <span style={{ fontSize: '4vmin' }}>⟳</span>
+        <span>Xoay ngang</span>
+      </button>
+
       {/* ── SELECT / START — center of screen ── */}
       <PillBtn btnIdx={BTN.SELECT} label="SELECT" press={press} release={release}
         style={{
