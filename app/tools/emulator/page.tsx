@@ -152,6 +152,20 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024).toFixed(0)} KB`
 }
 
+// Extract the original ROM filename from a storage URL.
+// Supabase paths are stored as "{system}/{timestamp}-{filename}" so we strip
+// the numeric timestamp prefix to recover "avsp.zip", "kovplus.zip", etc.
+// For other URL formats (Cloudinary, direct links) the last path segment is
+// used as-is since it already contains the real filename.
+function extractRomFilename(url: string): string {
+  try {
+    const last = decodeURIComponent(new URL(url).pathname.split('/').pop() ?? '')
+    return last.replace(/^\d{10,}-/, '') || last
+  } catch {
+    return ''
+  }
+}
+
 // ── Host page ────────────────────────────────────────────────────
 function EmulatorHost() {
   const [roomId]  = useState(generateRoomId)
@@ -161,8 +175,12 @@ function EmulatorHost() {
   const [manualRoomCode, setManualRoomCode] = useState(roomId)
 
   const [system,    setSystem]    = useState<System>('nes')
-  const [romUrl,    setRomUrl]    = useState<string | null>(null)
-  const [romName,   setRomName]   = useState<string | null>(null)
+  const [romUrl,      setRomUrl]      = useState<string | null>(null)
+  const [romName,     setRomName]     = useState<string | null>(null)
+  // The actual ROM filename (e.g. "avsp.zip") passed to EJS_gameName so
+  // FBNeo can look it up by short name — differs from romName when loading
+  // from the library, where romName is a human display name.
+  const [romFileName, setRomFileName] = useState<string | null>(null)
   const [biosUrl,   setBiosUrl]   = useState<string | null>(null)
   const [biosName,  setBiosName]  = useState<string | null>(null)
   const [wrapZip,   setWrapZip]   = useState(false)
@@ -277,6 +295,7 @@ function EmulatorHost() {
       const name = nameFromUrl || 'rom' + (SYSTEMS.find((s) => s.value === targetSys)?.exts.split(' ')[0] ?? '')
       if (blobRef.current) URL.revokeObjectURL(blobRef.current)
       setRomName(name)
+      setRomFileName(name)
       setGameReady(false)
       ejsRef.current = null
       const blobUrl = URL.createObjectURL(blob)
@@ -321,6 +340,7 @@ function EmulatorHost() {
       const blob = await res.blob()
       if (blobRef.current) URL.revokeObjectURL(blobRef.current)
       setRomName(rom.name)
+      setRomFileName(extractRomFilename(rom.url))
       setGameReady(false)
       ejsRef.current = null
       const blobUrl = URL.createObjectURL(blob)
@@ -370,6 +390,7 @@ function EmulatorHost() {
   const handleRomFile = async (file: File) => {
     if (blobRef.current) URL.revokeObjectURL(blobRef.current)
     setRomName(file.name)
+    setRomFileName(file.name)
     setGameReady(false)
     ejsRef.current = null
 
@@ -446,7 +467,7 @@ function EmulatorHost() {
     // specifically, not the extension-less name.
     window.EJS_player        = '#ejs-mount'
     window.EJS_gameUrl       = romUrl
-    window.EJS_gameName      = romName ?? undefined
+    window.EJS_gameName      = romFileName ?? romName ?? undefined
     window.EJS_core          = SYSTEMS.find((s) => s.value === system)?.core ?? 'fceumm'
     window.EJS_pathtodata    = EJS_DATA
     // REVERTED: setting this false to force EmulatorJS's own "click to play"
@@ -520,7 +541,7 @@ function EmulatorHost() {
         scriptRef.current = null
       }
     }
-  }, [romUrl, romName, system, biosUrl, tryAutoFullscreen, loadAttempt])
+  }, [romUrl, romName, romFileName, system, biosUrl, tryAutoFullscreen, loadAttempt])
 
   const retryLoad = useCallback(() => {
     setRuntimeError(false)
@@ -560,6 +581,7 @@ function EmulatorHost() {
     delete window.EJS_biosUrl
     setRomUrl(null)
     setRomName(null)
+    setRomFileName(null)
     setBiosUrl(null)
     setBiosName(null)
     setGameReady(false)
