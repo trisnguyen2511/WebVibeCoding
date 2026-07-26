@@ -10,6 +10,14 @@ type ImageSize = typeof IMAGE_SIZES[number]
 const VIDEO_SIZES = ['1280x720', '720x1280', '1024x1024'] as const
 type VideoSize = typeof VIDEO_SIZES[number]
 
+const PROMPT_TEMPLATES: Record<string, string> = {
+  Logo: 'A minimalist logo for [brand name], [industry], featuring [key symbol/idea], [style: flat/geometric/abstract] style, color palette: [colors], centered on a plain white background, vector style, no text, no letters',
+  Icon: 'A single [style: flat/outlined/duotone] icon representing [concept], simple and clean, centered composition, plain background, primary color: [color], no text, no shadows, app-icon style',
+  Illustration: 'A [style] illustration of [subject], [mood/atmosphere], color palette: [colors], detailed, high quality',
+  'Product Photo': 'A professional product photo of [product], studio lighting, plain white background, high resolution, commercial photography style',
+  Banner: 'A [style] banner design for [purpose], featuring [visual elements], color palette: [colors], no text, no letters (text added separately), high resolution',
+}
+
 const API_KEY_STORAGE_KEY = 'ai-media-studio:agnes-api-key'
 const POLL_INTERVAL_MS = 3000
 const MAX_POLL_ATTEMPTS = 60
@@ -172,6 +180,21 @@ export default function AiMediaStudioPage() {
           rows={3}
           className="w-full resize-none rounded-xl border border-border bg-surface p-4 text-sm text-fg outline-none placeholder-muted focus:border-accent"
         />
+
+        <div className="space-y-2">
+          <p className="text-xs text-muted">Prompt helper — fill in a template for a common purpose, then edit the [blanks]</p>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(PROMPT_TEMPLATES).map(([label, template]) => (
+              <button
+                key={label}
+                onClick={() => setPrompt(prev => (prev.trim() ? `${prev.trim()}\n\n${template}` : template))}
+                className="rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted hover:border-accent/40 hover:text-fg"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {mode === 'image' && (
           <div className="flex flex-wrap gap-2">
