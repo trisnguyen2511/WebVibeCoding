@@ -155,6 +155,18 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
     if (files.length > 0) setCoverFile(files[0])
   }
 
+  const handleCoverPaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const items = e.clipboardData.items
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile()
+        if (file) setCoverFile(file)
+        break
+      }
+    }
+  }
+
   const upload = async () => {
     if (!romFile || !name.trim()) return
     setError('')
@@ -250,12 +262,14 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
           onDragEnter={handleCoverDrag}
           onDragLeave={handleCoverDrag}
           onDrop={handleCoverDrop}
-          className={`flex flex-1 cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed px-4 py-3 text-xs transition-colors ${
+          onPaste={handleCoverPaste}
+          tabIndex={0}
+          className={`flex flex-1 cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed px-4 py-3 text-xs transition-colors outline-none focus:border-accent ${
             dragOverCover ? 'border-accent bg-accent/5 text-accent' : 'border-border bg-background text-muted hover:border-accent/40 hover:text-fg'
           }`}
         >
           <label className="flex flex-1 cursor-pointer items-center gap-2">
-            🖼️ {coverFile ? coverFile.name : 'Kéo hoặc chọn ảnh cover (tùy chọn)'}
+            🖼️ {coverFile ? coverFile.name : 'Kéo/dán/chọn ảnh cover (tùy chọn)'}
             <input
               ref={coverInputRef}
               type="file"
@@ -342,6 +356,18 @@ function RomRow({ rom, onChanged }: { rom: Rom; onChanged: () => void }) {
     if (files.length > 0) void uploadCover(files[0])
   }
 
+  const handleCoverPaste = async (e: React.ClipboardEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    const items = e.clipboardData.items
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile()
+        if (file) void uploadCover(file)
+        break
+      }
+    }
+  }
+
   const remove = async () => {
     setDeleting(true)
     setError('')
@@ -372,10 +398,12 @@ function RomRow({ rom, onChanged }: { rom: Rom; onChanged: () => void }) {
           onDragEnter={handleCoverDrag}
           onDragLeave={handleCoverDrag}
           onDrop={handleCoverDrop}
-          title="Kéo hoặc nhấp để đổi ảnh cover"
-          className={`flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border transition-colors ${
+          onPaste={handleCoverPaste}
+          title="Kéo/dán/nhấp để đổi ảnh cover"
+          className={`flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border transition-colors outline-none focus:border-accent ${
             dragOverCover ? 'border-accent bg-accent/10' : 'border-border bg-background hover:border-accent/50'
           } text-muted hover:text-fg`}
+          tabIndex={0}
         >
           {rom.cover_url ? (
             // eslint-disable-next-line @next/next/no-img-element
