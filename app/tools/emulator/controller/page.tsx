@@ -276,6 +276,21 @@ function ControllerView({ roomId }: { roomId: string }) {
   const release = (btn: BtnIdx) =>
     connRef.current?.sendInput({ type: 'button', key: String(btn), state: 'released', ts: Date.now() })
 
+  // Android fullscreen locks orientation at entry — unlock it then re-lock to landscape
+  async function forceLandscape() {
+    try {
+      const el = document.documentElement
+      if (el.requestFullscreen && !document.fullscreenElement) {
+        await el.requestFullscreen()
+      }
+    } catch { /* ignore — may already be fullscreen or not supported */ }
+    try {
+      await screen.orientation.lock('landscape')
+    } catch { /* not supported on all browsers */ }
+    // Recheck in case orientationchange didn't fire
+    setIsLandscape(window.innerWidth > window.innerHeight)
+  }
+
   const color = P_COLOR[playerIdx % 4]
 
   return (
@@ -362,14 +377,30 @@ function ControllerView({ roomId }: { roomId: string }) {
           position: 'absolute', inset: 0, zIndex: 30,
           background: '#08080EEE',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: 12,
+          gap: 16,
         }}>
           <span style={{ fontSize: 48 }}>📱</span>
-          <p style={{ color: '#FAFAFA', fontFamily: 'system-ui', fontWeight: 700, fontSize: 16 }}>
+          <p style={{ color: '#FAFAFA', fontFamily: 'system-ui', fontWeight: 700, fontSize: 16, margin: 0 }}>
             Xoay ngang điện thoại
           </p>
-          <p style={{ color: '#52525B', fontFamily: 'monospace', fontSize: 12 }}>
+          <p style={{ color: '#52525B', fontFamily: 'monospace', fontSize: 12, margin: 0 }}>
             Controller cần chế độ landscape
+          </p>
+          <button
+            onClick={forceLandscape}
+            style={{
+              marginTop: 4,
+              padding: '12px 24px',
+              borderRadius: 12, border: 'none',
+              background: '#7C3AED',
+              color: '#fff', fontFamily: 'system-ui', fontSize: 14, fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Bật màn hình ngang
+          </button>
+          <p style={{ color: '#52525B', fontFamily: 'monospace', fontSize: 11, margin: 0 }}>
+            (Cho phép xoay ngang trên Android fullscreen)
           </p>
         </div>
       )}
