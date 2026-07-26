@@ -10,7 +10,19 @@ function getSupabase() {
   return _supabase
 }
 
-const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }]
+// STUN alone can fail to find a working candidate pair on some networks —
+// notably iOS Safari's WebRTC stack is more prone to this than
+// Chrome/Android on the same Wi-Fi (mDNS-obfuscated local candidates that
+// some routers don't resolve, stricter NAT traversal, etc.), which shows up
+// as "phone thinks it joined but the host never sees it connect". The free
+// Open Relay TURN servers give ICE a relay fallback path so the connection
+// can still complete when direct/STUN candidates don't work.
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+]
 
 export type ButtonInput = {
   type: 'button'
@@ -181,7 +193,15 @@ export async function joinRoom(
   roomId: string,
   onAssigned: (playerIndex: number) => void,
   onDisconnected: () => void,
-  onHostMessage?: (data: unknown) => void
+  onHostMessage?: (data: unknown) => void,
+  // Fires only when the data channel actually opens — i.e. the P2P
+  // connection really succeeded. `onAssigned` fires as soon as an SDP
+  // offer/answer is exchanged, which is not the same thing: signaling can
+  // complete while ICE/DTLS never finishes (seen in practice on iOS
+  // Safari), which used to make the phone display "connected" even though
+  // the host never saw it. Callers should gate their "connected" UI on
+  // this, not on onAssigned alone.
+  onConnected?: () => void
 ): Promise<{
   sendInput: (msg: ControllerInput) => void
   disconnect: () => void
@@ -196,6 +216,7 @@ export async function joinRoom(
 
   pc.ondatachannel = (e) => {
     dataChannel = e.channel
+    dataChannel.onopen = () => onConnected?.()
     dataChannel.onclose = onDisconnected
     dataChannel.onmessage = (msg) => onHostMessage?.(JSON.parse(msg.data as string))
   }

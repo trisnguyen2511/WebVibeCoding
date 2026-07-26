@@ -105,8 +105,10 @@ function ControllerView({ roomId }: { roomId: string }) {
     let cancelled = false
     joinRoom(
       roomId,
-      (idx) => { if (!cancelled) { setPlayerIdx(idx); setState('connected') } },
-      ()    => { if (!cancelled) setState('disconnected') }
+      (idx) => { if (!cancelled) setPlayerIdx(idx) },
+      ()    => { if (!cancelled) setState('disconnected') },
+      undefined,
+      ()    => { if (!cancelled) setState('connected') }
     )
       .then((conn) => { if (cancelled) conn.disconnect(); else connRef.current = conn })
       .catch(console.error)

@@ -57,6 +57,18 @@ function generateRoomId() {
   return Math.random().toString(36).slice(2, 8).toUpperCase()
 }
 
+// iOS Safari never implements the Fullscreen API for a plain element (only
+// <video> gets native fullscreen there), so requestFullscreen() silently
+// does nothing on iPhone — the button used to just look broken. There's no
+// script-only fix for that (Safari's own chrome can only truly disappear
+// via "Add to Home Screen" standalone mode), so the best we can do is tell
+// the user why instead of failing silently.
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
 // ── D-Pad / Joystick Control ─────────────────────────────────────
 function DpadControl({
   config,
@@ -526,9 +538,12 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
   const [status, setStatus] = useState<'connecting' | 'ready' | 'disconnected'>('connecting')
   const [activeCombo, setActiveCombo] = useState<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showFullscreenHint, setShowFullscreenHint] = useState(false)
   const [showRomPanel, setShowRomPanel] = useState(false)
   const [romPanelUrl, setRomPanelUrl] = useState('')
   const [romPanelSystem, setRomPanelSystem] = useState<ControllerSystem>('nes')
+  const [libraryRoms, setLibraryRoms] = useState<{ id: string; name: string; url: string; bytes: number }[]>([])
+  const [libraryLoading, setLibraryLoading] = useState(false)
   const connRef = useRef<{
     sendInput: (m: ControllerInput) => void
     disconnect: () => void
@@ -545,11 +560,21 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
     return () => events.forEach((ev) => document.removeEventListener(ev, onFsChange))
   }, [])
 
+  useEffect(() => {
+    if (!showFullscreenHint) return
+    const t = setTimeout(() => setShowFullscreenHint(false), 5000)
+    return () => clearTimeout(t)
+  }, [showFullscreenHint])
+
   const toggleFullscreen = () => {
     const el = document.documentElement as FullscreenElement
     if (!getFullscreenElement()) {
       const request = el.requestFullscreen ?? el.webkitRequestFullscreen ?? el.mozRequestFullScreen ?? el.msRequestFullscreen
-      request?.call(el)?.catch?.(() => {})
+      if (!request) {
+        if (isIOS()) setShowFullscreenHint(true)
+        return
+      }
+      request.call(el)?.catch?.(() => { if (isIOS()) setShowFullscreenHint(true) })
     } else {
       const doc = document as FullscreenDocument
       const exit = document.exitFullscreen ?? doc.webkitExitFullscreen ?? doc.mozCancelFullScreen ?? doc.msExitFullscreen
@@ -561,8 +586,14 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
     let cancelled = false
     joinRoom(
       roomId,
-      (idx) => { if (!cancelled) { setPlayerIndex(idx); setStatus('ready') } },
-      () => { if (!cancelled) setStatus('disconnected') }
+      // Assigning a player index only means signaling succeeded — the data
+      // channel (see onConnected below) might still fail to open, so don't
+      // flip to 'ready' here or the phone can show "connected" while the
+      // host never actually sees it.
+      (idx) => { if (!cancelled) setPlayerIndex(idx) },
+      () => { if (!cancelled) setStatus('disconnected') },
+      undefined,
+      () => { if (!cancelled) setStatus('ready') }
     )
       .then((conn) => {
         if (cancelled) conn.disconnect()
@@ -590,6 +621,26 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
     setShowRomPanel(false)
     setRomPanelUrl('')
   }
+
+  const sendLibraryRom = (rom: { url: string }) => {
+    connRef.current?.sendInput({ type: 'rom-url', url: rom.url, system: romPanelSystem })
+    setShowRomPanel(false)
+  }
+
+  // Same public ROM library the PC host's "Chọn game có sẵn" picker uses —
+  // only fetched while the panel is open, and refetched when the system
+  // filter changes.
+  useEffect(() => {
+    if (!showRomPanel) return
+    let cancelled = false
+    setLibraryLoading(true)
+    fetch(`/api/emulator/roms?system=${romPanelSystem}`)
+      .then((res) => res.json())
+      .then((data) => { if (!cancelled) setLibraryRoms(data.roms ?? []) })
+      .catch(() => { if (!cancelled) setLibraryRoms([]) })
+      .finally(() => { if (!cancelled) setLibraryLoading(false) })
+    return () => { cancelled = true }
+  }, [showRomPanel, romPanelSystem])
 
   const onDown = (id: string) => {
     const btn = config.buttons[id]
@@ -664,6 +715,13 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
         {isFullscreen ? '⤡' : '⛶'}
       </button>
 
+      {/* iOS has no Fullscreen API for a plain page — explain instead of failing silently */}
+      {showFullscreenHint && (
+        <div className="absolute left-1/2 top-14 z-20 w-[88%] max-w-xs -translate-x-1/2 rounded-xl border border-[#7C3AED]/40 bg-[#0F0F1A] px-4 py-3 text-center text-xs text-fg shadow-lg">
+          iPhone không hỗ trợ ẩn thanh Safari cho trang web thường. Bấm nút Share → &quot;Thêm vào MH chính&quot; để mở app này full màn hình thật.
+        </div>
+      )}
+
       {/* ROM panel */}
       {showRomPanel && (
         <div className="absolute inset-0 z-30 flex items-end">
@@ -686,6 +744,36 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
                   {s.label}
                 </button>
               ))}
+            </div>
+            {/* Same public ROM library the PC host's picker shows */}
+            <div>
+              <p className="mb-1.5 text-xs text-[#52525B]">Chọn game có sẵn</p>
+              {libraryLoading ? (
+                <p className="py-2 text-center text-xs text-[#52525B]">Đang tải...</p>
+              ) : libraryRoms.length === 0 ? (
+                <p className="py-2 text-center text-xs text-[#52525B]">Chưa có ROM nào cho hệ máy này.</p>
+              ) : (
+                <div className="max-h-32 space-y-1.5 overflow-y-auto pr-1">
+                  {libraryRoms.map((rom) => (
+                    <button
+                      key={rom.id}
+                      onClick={() => sendLibraryRom(rom)}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg border border-[#1A1A2E] bg-[#0F0F1A] px-3 py-2 text-left transition-colors hover:border-[#7C3AED]/40"
+                    >
+                      <span className="truncate text-xs text-fg">{rom.name}</span>
+                      <span className="shrink-0 font-mono text-[10px] text-[#52525B]">
+                        {rom.bytes >= 1024 ** 3 ? `${(rom.bytes / 1024 ** 3).toFixed(1)}GB` : `${(rom.bytes / 1024 ** 2).toFixed(0)}MB`}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-[#1A1A2E]" />
+              <span className="font-mono text-[10px] text-[#52525B]">hoặc dán link</span>
+              <div className="h-px flex-1 bg-[#1A1A2E]" />
             </div>
             <div className="flex gap-2">
               <input
