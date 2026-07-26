@@ -696,6 +696,13 @@ function EmulatorHost() {
                       <li><span className="font-mono text-fg">coh1002m.zip</span> — ZN1/ZN2 (Tekken, SF EX, ...)</li>
                     </ul>
                     <p className="text-xs text-muted">
+                      <span className="text-fg">Đã upload ROM cha nhưng vẫn còn thiếu vài file?</span>{' '}
+                      File .zip của bạn đúng nhưng là phiên bản cũ — FBNeo trên CDN này yêu cầu
+                      romset FBNeo mới nhất, không tương thích với bộ MAME cũ. Tìm lại{' '}
+                      <span className="font-mono">pgm.zip</span> /
+                      <span className="font-mono"> neogeo.zip</span> đúng phiên bản FBNeo hiện tại.
+                    </p>
+                    <p className="text-xs text-muted">
                       <span className="text-fg">Vẫn lỗi sau khi đúng tên?</span> — Thử bật/tắt tùy
                       chọn bọc zip bên dưới, cần thử cả 2 chiều.
                     </p>
