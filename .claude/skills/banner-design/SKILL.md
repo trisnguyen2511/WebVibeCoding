@@ -97,6 +97,18 @@ For each art direction option:
    - Include art direction: "minimalist flat design", "cyberpunk neon", "editorial photography"
    - Specify no-text: "no text, no letters, no words" (text overlaid in HTML step)
 
+   **d) Free alternative — Agnes AI** (no API cost, no established track record — treat as
+   experimental, verify output quality before relying on it for client work):
+   ```bash
+   python3 .claude/skills/banner-design/scripts/agnes-generate.py \
+     --prompt "<banner visual prompt>" --size 1024x1024 \
+     --output assets/banners/{campaign}/{variant}-raw.png
+   ```
+   Requires `AGNES_AI_API_KEY` in the environment (see `.env.example`). Sizes are
+   fixed presets (`512x512`, `1024x1024`, `1024x1792`, `1792x1024`) rather than
+   arbitrary aspect ratios — crop/pad to the exact platform size in the HTML/CSS
+   compose step.
+
 3. **Compose final banner** — overlay text, CTA, logo on generated visual in HTML/CSS
 
 ### Step 4: Export Banners to Images

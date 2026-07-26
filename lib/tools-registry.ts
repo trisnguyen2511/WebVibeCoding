@@ -121,4 +121,11 @@ export const tools: Tool[] = [
     description: 'Danh sách game tự code, chơi trực tiếp trên web — PC host phòng, điện thoại làm tay cầm cảm biến',
     category: 'game',
   },
+  {
+    name: 'Agnes Image Gen',
+    slug: 'agnes-image-gen',
+    icon: '🖼️',
+    description: 'Test image generation via the Agnes AI API',
+    category: 'media',
+  },
 ]
