@@ -452,12 +452,13 @@ function RomRow({ rom, onChanged }: { rom: Rom; onChanged: () => void }) {
   )
 }
 
-function CSVImportForm({ onImported }: { onImported: () => void }) {
-  const [csvFile, setCSVFile] = useState<File | null>(null)
+function FolderImportForm({ onImported }: { onImported: () => void }) {
+  const [files, setFiles] = useState<File[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const csvInputRef = useRef<HTMLInputElement>(null)
+  const [progress, setProgress] = useState<number | null>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
 
   const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -468,49 +469,28 @@ function CSVImportForm({ onImported }: { onImported: () => void }) {
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setDragOver(false)
-    const files = e.dataTransfer.files
-    if (files.length > 0) setCSVFile(files[0])
+    const droppedFiles = e.dataTransfer.files
+    setFiles(Array.from(droppedFiles))
   }
 
-  const importCSV = async () => {
-    if (!csvFile) return
+  const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) setFiles(Array.from(e.target.files))
+  }
+
+  const importFolder = async () => {
+    if (files.length === 0) return
     setLoading(true)
     setError('')
+    setProgress(0)
     try {
-      const text = await csvFile.text()
-      const lines = text.trim().split('\n')
-      if (lines.length < 2) {
-        setError('CSV phải có ít nhất 1 dòng dữ liệu')
-        return
+      const formData = new FormData()
+      for (const file of files) {
+        formData.append('files', file, file.webkitRelativePath || file.name)
       }
 
-      const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
-      const nameIdx = headers.indexOf('name')
-      const systemIdx = headers.indexOf('system')
-      const romPathIdx = headers.indexOf('romLocalPath')
-      const coverPathIdx = headers.indexOf('coverLocalPath')
-
-      if (nameIdx === -1 || systemIdx === -1) {
-        setError('CSV phải có cột "name" và "system"')
-        return
-      }
-
-      const games = []
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''))
-        if (!cols[nameIdx] || !cols[systemIdx]) continue
-        games.push({
-          name: cols[nameIdx],
-          system: cols[systemIdx],
-          romPath: romPathIdx >= 0 ? cols[romPathIdx] : '',
-          coverPath: coverPathIdx >= 0 ? cols[coverPathIdx] : '',
-        })
-      }
-
-      const res = await fetch('/api/emulator/admin/import-csv', {
+      const res = await fetch('/api/emulator/admin/import-folder', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ games }),
+        body: formData,
       })
       const data = await res.json()
       if (data.error) {
@@ -518,27 +498,22 @@ function CSVImportForm({ onImported }: { onImported: () => void }) {
         return
       }
 
-      setCSVFile(null)
-      if (csvInputRef.current) csvInputRef.current.value = ''
+      setFiles([])
+      if (folderInputRef.current) folderInputRef.current.value = ''
       onImported()
     } catch {
-      setError('Lỗi đọc CSV — kiểm tra định dạng file.')
+      setError('Lỗi import folder — kiểm tra cấu trúc thư mục.')
     } finally {
       setLoading(false)
+      setProgress(null)
     }
   }
 
+  const folderCount = files.length > 0 ? files[0].webkitRelativePath?.split('/')[0] || 'folder' : 'folder'
+
   return (
     <div className="space-y-3 rounded-xl border border-border bg-surface p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs uppercase tracking-widest text-muted">Import từ CSV</p>
-        <button
-          onClick={downloadCSVTemplate}
-          className="text-xs text-accent hover:text-accent-soft"
-        >
-          📥 Tải template
-        </button>
-      </div>
+      <p className="text-xs uppercase tracking-widest text-muted">Import từ Folder</p>
       <div
         onDragOver={handleDrag}
         onDragEnter={handleDrag}
@@ -549,23 +524,29 @@ function CSVImportForm({ onImported }: { onImported: () => void }) {
         }`}
       >
         <label className="flex cursor-pointer flex-col items-center gap-2">
-          📄 {csvFile ? csvFile.name : 'Kéo CSV hoặc nhấp để chọn'}
+          📁 {files.length > 0 ? `${folderCount} (${files.length} file)` : 'Kéo folder hoặc nhấp để chọn'}
+          <span className="text-[11px] text-muted">Cấu trúc: nes/dino/[dino.zip, dino.png]</span>
           <input
-            ref={csvInputRef}
+            ref={folderInputRef}
             type="file"
-            accept=".csv"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) setCSVFile(f) }}
+            webkitdirectory=""
+            onChange={handleFolderSelect}
             className="hidden"
           />
         </label>
       </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
+      {progress !== null && (
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-background">
+          <div className="h-full bg-accent transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
+        </div>
+      )}
       <button
-        onClick={importCSV}
-        disabled={loading || !csvFile}
+        onClick={importFolder}
+        disabled={loading || files.length === 0}
         className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
       >
-        {loading ? 'Đang import...' : 'Import'}
+        {loading ? `Đang import... ${progress !== null ? Math.round(progress * 100) + '%' : ''}` : 'Import'}
       </button>
     </div>
   )
@@ -599,7 +580,7 @@ function AdminPanel() {
 
       <UploadForm onUploaded={load} />
 
-      <CSVImportForm onImported={load} />
+      <FolderImportForm onImported={load} />
 
       <div className="flex flex-wrap gap-2">
         <button
