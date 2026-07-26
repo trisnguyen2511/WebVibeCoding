@@ -673,21 +673,31 @@ function EmulatorHost() {
                   </p>
                 </div>
 
-                {/* Arcade troubleshooting: "Romset is unknown" ────────── */}
+                {/* Arcade troubleshooting ────────── */}
                 {system === 'arcade' && (
                   <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
                     <p className="text-xs font-medium text-amber-300">
-                      Nếu báo &quot;Romset is unknown&quot;
+                      Xử lý lỗi Arcade (FBNeo)
                     </p>
                     <p className="text-xs text-muted">
-                      1. App tự truyền tên file thật cho FBNeo (kể cả khi upload qua blob) — chỉ cần
-                      đặt tên file .zip đúng mã ngắn nội bộ (vd &quot;dino.zip&quot; cho Cadillacs and
-                      Dinosaurs), không phải tên mô tả. Tra đúng mã (short name) trong danh sách
-                      romset FBNeo/MAME rồi đổi tên trước khi chọn file.
+                      <span className="text-fg">Romset is unknown</span> — Đặt tên file .zip đúng mã
+                      ngắn FBNeo/MAME (vd &quot;dino.zip&quot;, &quot;kovplus.zip&quot;). Tra mã
+                      chính xác trên trang romset FBNeo rồi đổi tên trước khi chọn file.
                     </p>
                     <p className="text-xs text-muted">
-                      2. Nếu đã đúng tên mà vẫn lỗi, thử bật/tắt tùy chọn bọc zip bên dưới — chưa chắc
-                      chiều nào đúng với bản FBNeo đang chạy, cần thử cả 2.
+                      <span className="text-fg">Missing romset files / thiếu file</span> — Game cần
+                      thêm ROM cha (parent/BIOS). Tải file đó về rồi upload vào ô &quot;ROM cha&quot;
+                      bên dưới. Ví dụ thường gặp:
+                    </p>
+                    <ul className="ml-3 space-y-0.5 text-xs text-muted list-none">
+                      <li><span className="font-mono text-fg">pgm.zip</span> — PGM platform (Knights of Valour, DoDonPachi, ...)</li>
+                      <li><span className="font-mono text-fg">neogeo.zip</span> — Neo Geo (KOF, Metal Slug, ...)</li>
+                      <li><span className="font-mono text-fg">skns.zip</span> — Super Kaneko Nova System</li>
+                      <li><span className="font-mono text-fg">coh1002m.zip</span> — ZN1/ZN2 (Tekken, SF EX, ...)</li>
+                    </ul>
+                    <p className="text-xs text-muted">
+                      <span className="text-fg">Vẫn lỗi sau khi đúng tên?</span> — Thử bật/tắt tùy
+                      chọn bọc zip bên dưới, cần thử cả 2 chiều.
                     </p>
                     <label className="flex items-center gap-2 pt-1 text-xs text-fg">
                       <input
@@ -701,11 +711,15 @@ function EmulatorHost() {
                   </div>
                 )}
 
-                {/* BIOS upload (arcade only — e.g. Neo Geo needs neogeo.zip) */}
+                {/* Parent/BIOS ROM upload (arcade only) */}
                 {system === 'arcade' && (
                   <div>
-                    <p className="mb-2 font-mono text-xs uppercase tracking-widest text-muted">
-                      BIOS (tùy chọn — Neo Geo cần neogeo.zip)
+                    <p className="mb-1 font-mono text-xs uppercase tracking-widest text-muted">
+                      ROM cha / BIOS (arcade)
+                    </p>
+                    <p className="mb-2 text-xs text-muted">
+                      Một số game cần file ROM cha riêng: PGM → <span className="font-mono text-fg">pgm.zip</span>,
+                      Neo Geo → <span className="font-mono text-fg">neogeo.zip</span>. Upload file đó vào đây trước khi chạy game.
                     </p>
                     {biosName ? (
                       <div className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3">
