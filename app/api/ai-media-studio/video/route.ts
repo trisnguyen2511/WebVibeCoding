@@ -26,9 +26,13 @@ export async function POST(req: NextRequest) {
 
   const [width, height] = (size as VideoSize).split('x').map(Number)
   const requestBody: Record<string, unknown> = { model: MODEL, prompt, width, height }
-  if (typeof referenceImage === 'string' && referenceImage.trim()) {
-    requestBody.extra_body = { image: referenceImage.trim() }
-  }
+  const images = Array.isArray(referenceImage)
+    ? referenceImage.filter((img): img is string => typeof img === 'string' && img.trim().length > 0)
+    : typeof referenceImage === 'string' && referenceImage.trim()
+      ? [referenceImage.trim()]
+      : []
+  if (images.length === 1) requestBody.extra_body = { image: images[0] }
+  else if (images.length > 1) requestBody.extra_body = { image: images }
 
   let upstream: Response
   try {

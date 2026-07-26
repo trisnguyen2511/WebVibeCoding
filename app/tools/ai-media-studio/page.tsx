@@ -4,7 +4,7 @@ import { ToolShell } from '@/components/tool-shell'
 
 const IMAGE_MODELS = ['agnes-image-2.0-flash', 'agnes-image-2.1-flash'] as const
 type ImageModel = typeof IMAGE_MODELS[number]
-const IMAGE_SIZES = ['512x512', '1024x1024', '1024x1792', '1792x1024'] as const
+const IMAGE_SIZES = ['auto', '512x512', '1024x1024', '1024x1792', '1792x1024'] as const
 type ImageSize = typeof IMAGE_SIZES[number]
 
 const VIDEO_SIZES = ['1280x720', '720x1280', '1024x1024'] as const
@@ -22,7 +22,7 @@ export default function AiMediaStudioPage() {
   const [imageModel, setImageModel] = useState<ImageModel>('agnes-image-2.0-flash')
   const [imageSize, setImageSize] = useState<ImageSize>('1024x1024')
   const [videoSize, setVideoSize] = useState<VideoSize>('1280x720')
-  const [referenceImage, setReferenceImage] = useState<string | null>(null)
+  const [referenceImages, setReferenceImages] = useState<string[]>([])
   const [apiKey, setApiKey] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
   const [resultImage, setResultImage] = useState<string | null>(null)
@@ -47,11 +47,13 @@ export default function AiMediaStudioPage() {
     else window.localStorage.removeItem(API_KEY_STORAGE_KEY)
   }
 
-  const onPickReferenceImage = (file: File | undefined) => {
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => setReferenceImage(reader.result as string)
-    reader.readAsDataURL(file)
+  const onPickReferenceImages = (files: FileList | null) => {
+    if (!files || !files.length) return
+    Array.from(files).forEach(file => {
+      const reader = new FileReader()
+      reader.onload = () => setReferenceImages(prev => [...prev, reader.result as string])
+      reader.readAsDataURL(file)
+    })
   }
 
   const pollVideo = async (taskId: string, attempt: number) => {
@@ -111,7 +113,7 @@ export default function AiMediaStudioPage() {
             model: imageModel,
             size: imageSize,
             apiKey: apiKey.trim() || undefined,
-            referenceImage: referenceImage || undefined,
+            referenceImage: referenceImages.length ? referenceImages : undefined,
           }),
         })
         const data = await res.json()
@@ -126,7 +128,7 @@ export default function AiMediaStudioPage() {
             prompt,
             size: videoSize,
             apiKey: apiKey.trim() || undefined,
-            referenceImage: referenceImage || undefined,
+            referenceImage: referenceImages.length ? referenceImages : undefined,
           }),
         })
         const data = await res.json()
@@ -200,36 +202,44 @@ export default function AiMediaStudioPage() {
                   : 'border-border bg-surface text-muted hover:border-accent/40 hover:text-fg'
               }`}
             >
-              {s}
+              {s === 'auto' ? 'Auto (from prompt)' : s}
             </button>
           ))}
         </div>
 
         <div className="space-y-2 rounded-xl border border-border bg-surface p-4">
-          <p className="text-xs text-muted">Reference image (optional) — helps generate a more accurate result</p>
-          <div className="flex items-center gap-3">
+          <p className="text-xs text-muted">Reference images (optional, multiple allowed) — helps generate a more accurate result</p>
+          <div className="flex flex-wrap items-center gap-3">
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              multiple
               className="hidden"
-              onChange={e => onPickReferenceImage(e.target.files?.[0])}
+              onChange={e => {
+                onPickReferenceImages(e.target.files)
+                e.target.value = ''
+              }}
             />
             <button
               onClick={() => fileInputRef.current?.click()}
               className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted hover:border-accent/40 hover:text-fg"
             >
-              Upload image
+              Upload images
             </button>
-            {referenceImage && (
-              <>
+            {referenceImages.map((img, i) => (
+              <div key={i} className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={referenceImage} alt="Reference" className="h-10 w-10 rounded-lg object-cover" />
-                <button onClick={() => setReferenceImage(null)} className="text-xs text-muted hover:text-fg">
-                  Remove
+                <img src={img} alt={`Reference ${i + 1}`} className="h-10 w-10 rounded-lg object-cover" />
+                <button
+                  onClick={() => setReferenceImages(prev => prev.filter((_, idx) => idx !== i))}
+                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] leading-none text-white"
+                  aria-label={`Remove reference ${i + 1}`}
+                >
+                  ×
                 </button>
-              </>
-            )}
+              </div>
+            ))}
           </div>
         </div>
 

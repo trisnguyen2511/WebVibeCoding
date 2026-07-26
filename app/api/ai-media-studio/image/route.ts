@@ -3,8 +3,16 @@ import { NextRequest, NextResponse } from 'next/server'
 const AGNES_ENDPOINT = 'https://apihub.agnes-ai.com/v1/images/generations'
 const VALID_MODELS = ['agnes-image-2.0-flash', 'agnes-image-2.1-flash'] as const
 type AgnesModel = typeof VALID_MODELS[number]
-const VALID_SIZES = ['512x512', '1024x1024', '1024x1792', '1792x1024'] as const
+const VALID_SIZES = ['auto', '512x512', '1024x1024', '1024x1792', '1792x1024'] as const
 type AgnesSize = typeof VALID_SIZES[number]
+
+function normalizeReferenceImages(referenceImage: unknown): string[] {
+  if (Array.isArray(referenceImage)) {
+    return referenceImage.filter((img): img is string => typeof img === 'string' && img.trim().length > 0)
+  }
+  if (typeof referenceImage === 'string' && referenceImage.trim()) return [referenceImage.trim()]
+  return []
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -24,10 +32,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ result: null, error: 'invalid size' }, { status: 400 })
   }
 
-  const requestBody: Record<string, unknown> = { model, prompt, n: 1, size }
-  if (typeof referenceImage === 'string' && referenceImage.trim()) {
-    requestBody.extra_body = { image: referenceImage.trim() }
-  }
+  const requestBody: Record<string, unknown> = { model, prompt, n: 1 }
+  if (size !== 'auto') requestBody.size = size
+
+  const images = normalizeReferenceImages(referenceImage)
+  if (images.length === 1) requestBody.extra_body = { image: images[0] }
+  else if (images.length > 1) requestBody.extra_body = { image: images }
 
   let upstream: Response
   try {
