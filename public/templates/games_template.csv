@@ -1,0 +1,8 @@
+name,system,romLocalPath,coverLocalPath
+Super Mario Bros,nes,/data/roms/smb.nes,/data/covers/smb.jpg
+The Legend of Zelda,nes,/data/roms/zelda.nes,/data/covers/zelda.jpg
+Donkey Kong,nes,/data/roms/donkey_kong.nes,
+Metroid,nes,/data/roms/metroid.nes,/data/covers/metroid.jpg
+Street Fighter II,snes,/data/roms/sf2.sfc,/data/covers/sf2.jpg
+Pokemon Red,gbc,/data/roms/pokemon_red.gbc,/data/covers/pokemon_red.jpg
+The Legend of Zelda: Link's Awakening,gbc,/data/roms/zelda_la.gbc,

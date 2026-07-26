@@ -7,6 +7,22 @@ import { SYSTEMS, type System } from '@/lib/emulator-systems'
 
 const MAX_ROM_BYTES = 2 * 1024 ** 3 // 2GB
 
+function downloadCSVTemplate() {
+  const headers = ['name', 'system', 'romLocalPath', 'coverLocalPath']
+  const sample = [
+    ['Super Mario Bros', 'nes', '/data/roms/smb.nes', '/data/covers/smb.jpg'],
+    ['The Legend of Zelda', 'nes', '/data/roms/zelda.nes', ''],
+  ]
+  const csv = [headers, ...sample].map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'games_template.csv'
+  link.click()
+  window.URL.revokeObjectURL(url)
+}
+
 type Rom = {
   id: string
   name: string
@@ -77,9 +93,13 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
   const [coverFile, setCoverFile] = useState<File | null>(null)
   const [error, setError] = useState('')
   const [progress, setProgress] = useState<number | null>(null)
+  const [dragOverRom, setDragOverRom] = useState(false)
+  const [dragOverCover, setDragOverCover] = useState(false)
 
   const romInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
+  const romDragRef = useRef<HTMLDivElement>(null)
+  const coverDragRef = useRef<HTMLDivElement>(null)
 
   const pickRomFile = (file: File) => {
     setError('')
@@ -89,6 +109,32 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
       return
     }
     setRomFile(file)
+  }
+
+  const handleRomDrag = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    if (e.type === 'dragover' || e.type === 'dragenter') setDragOverRom(true)
+    else setDragOverRom(false)
+  }
+
+  const handleRomDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setDragOverRom(false)
+    const files = e.dataTransfer.files
+    if (files.length > 0) pickRomFile(files[0])
+  }
+
+  const handleCoverDrag = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    if (e.type === 'dragover' || e.type === 'dragenter') setDragOverCover(true)
+    else setDragOverCover(false)
+  }
+
+  const handleCoverDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setDragOverCover(false)
+    const files = e.dataTransfer.files
+    if (files.length > 0) setCoverFile(files[0])
   }
 
   const upload = async () => {
@@ -159,26 +205,48 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
         className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base text-fg outline-none placeholder-muted focus:border-accent sm:text-sm"
       />
       <div className="flex flex-wrap gap-3">
-        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border bg-background px-3 py-2 text-xs text-muted transition-colors hover:border-accent/40 hover:text-fg">
-          📁 {romFile ? romFile.name : `Chọn file ROM (${SYSTEMS.find((s) => s.value === system)?.exts})`}
-          <input
-            ref={romInputRef}
-            type="file"
-            accept=".nes,.sfc,.smc,.gba,.gbc,.gb,.n64,.z64,.v64,.zip"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) pickRomFile(f) }}
-            className="hidden"
-          />
-        </label>
-        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border bg-background px-3 py-2 text-xs text-muted transition-colors hover:border-accent/40 hover:text-fg">
-          🖼️ {coverFile ? coverFile.name : 'Ảnh cover (tùy chọn)'}
-          <input
-            ref={coverInputRef}
-            type="file"
-            accept="image/*"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) setCoverFile(f) }}
-            className="hidden"
-          />
-        </label>
+        <div
+          ref={romDragRef}
+          onDragOver={handleRomDrag}
+          onDragEnter={handleRomDrag}
+          onDragLeave={handleRomDrag}
+          onDrop={handleRomDrop}
+          className={`flex flex-1 cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed px-4 py-3 text-xs transition-colors ${
+            dragOverRom ? 'border-accent bg-accent/5 text-accent' : 'border-border bg-background text-muted hover:border-accent/40 hover:text-fg'
+          }`}
+        >
+          <label className="flex flex-1 cursor-pointer items-center gap-2">
+            📁 {romFile ? romFile.name : `Chọn hoặc kéo file ROM (${SYSTEMS.find((s) => s.value === system)?.exts})`}
+            <input
+              ref={romInputRef}
+              type="file"
+              accept=".nes,.sfc,.smc,.gba,.gbc,.gb,.n64,.z64,.v64,.zip"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) pickRomFile(f) }}
+              className="hidden"
+            />
+          </label>
+        </div>
+        <div
+          ref={coverDragRef}
+          onDragOver={handleCoverDrag}
+          onDragEnter={handleCoverDrag}
+          onDragLeave={handleCoverDrag}
+          onDrop={handleCoverDrop}
+          className={`flex flex-1 cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed px-4 py-3 text-xs transition-colors ${
+            dragOverCover ? 'border-accent bg-accent/5 text-accent' : 'border-border bg-background text-muted hover:border-accent/40 hover:text-fg'
+          }`}
+        >
+          <label className="flex flex-1 cursor-pointer items-center gap-2">
+            🖼️ {coverFile ? coverFile.name : 'Kéo hoặc chọn ảnh cover (tùy chọn)'}
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/*"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) setCoverFile(f) }}
+              className="hidden"
+            />
+          </label>
+        </div>
       </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
       {progress !== null && (
@@ -200,7 +268,9 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
 function RomRow({ rom, onChanged }: { rom: Rom; onChanged: () => void }) {
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
+  const [dragOverCover, setDragOverCover] = useState(false)
   const coverInputRef = useRef<HTMLInputElement>(null)
+  const coverButtonRef = useRef<HTMLButtonElement>(null)
 
   const rename = async (value: string) => {
     if (!value.trim() || value.trim() === rom.name) return
@@ -241,6 +311,19 @@ function RomRow({ rom, onChanged }: { rom: Rom; onChanged: () => void }) {
     onChanged()
   }
 
+  const handleCoverDrag = (e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    if (e.type === 'dragover' || e.type === 'dragenter') setDragOverCover(true)
+    else setDragOverCover(false)
+  }
+
+  const handleCoverDrop = (e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    setDragOverCover(false)
+    const files = e.dataTransfer.files
+    if (files.length > 0) void uploadCover(files[0])
+  }
+
   const remove = async () => {
     setDeleting(true)
     setError('')
@@ -265,9 +348,16 @@ function RomRow({ rom, onChanged }: { rom: Rom; onChanged: () => void }) {
           onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void uploadCover(f) }}
         />
         <button
+          ref={coverButtonRef}
           onClick={() => coverInputRef.current?.click()}
-          title="Đổi ảnh cover"
-          className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border border-border bg-background text-muted hover:border-accent/50 hover:text-fg"
+          onDragOver={handleCoverDrag}
+          onDragEnter={handleCoverDrag}
+          onDragLeave={handleCoverDrag}
+          onDrop={handleCoverDrop}
+          title="Kéo hoặc nhấp để đổi ảnh cover"
+          className={`flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border transition-colors ${
+            dragOverCover ? 'border-accent bg-accent/10' : 'border-border bg-background hover:border-accent/50'
+          } text-muted hover:text-fg`}
         >
           {rom.cover_url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -314,6 +404,125 @@ function RomRow({ rom, onChanged }: { rom: Rom; onChanged: () => void }) {
   )
 }
 
+function CSVImportForm({ onImported }: { onImported: () => void }) {
+  const [csvFile, setCSVFile] = useState<File | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const csvInputRef = useRef<HTMLInputElement>(null)
+
+  const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    if (e.type === 'dragover' || e.type === 'dragenter') setDragOver(true)
+    else setDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setDragOver(false)
+    const files = e.dataTransfer.files
+    if (files.length > 0) setCSVFile(files[0])
+  }
+
+  const importCSV = async () => {
+    if (!csvFile) return
+    setLoading(true)
+    setError('')
+    try {
+      const text = await csvFile.text()
+      const lines = text.trim().split('\n')
+      if (lines.length < 2) {
+        setError('CSV phải có ít nhất 1 dòng dữ liệu')
+        return
+      }
+
+      const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
+      const nameIdx = headers.indexOf('name')
+      const systemIdx = headers.indexOf('system')
+      const romPathIdx = headers.indexOf('romLocalPath')
+      const coverPathIdx = headers.indexOf('coverLocalPath')
+
+      if (nameIdx === -1 || systemIdx === -1) {
+        setError('CSV phải có cột "name" và "system"')
+        return
+      }
+
+      const games = []
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''))
+        if (!cols[nameIdx] || !cols[systemIdx]) continue
+        games.push({
+          name: cols[nameIdx],
+          system: cols[systemIdx],
+          romPath: romPathIdx >= 0 ? cols[romPathIdx] : '',
+          coverPath: coverPathIdx >= 0 ? cols[coverPathIdx] : '',
+        })
+      }
+
+      const res = await fetch('/api/emulator/admin/import-csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ games }),
+      })
+      const data = await res.json()
+      if (data.error) {
+        setError(data.error)
+        return
+      }
+
+      setCSVFile(null)
+      if (csvInputRef.current) csvInputRef.current.value = ''
+      onImported()
+    } catch {
+      setError('Lỗi đọc CSV — kiểm tra định dạng file.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border bg-surface p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs uppercase tracking-widest text-muted">Import từ CSV</p>
+        <button
+          onClick={downloadCSVTemplate}
+          className="text-xs text-accent hover:text-accent-soft"
+        >
+          📥 Tải template
+        </button>
+      </div>
+      <div
+        onDragOver={handleDrag}
+        onDragEnter={handleDrag}
+        onDragLeave={handleDrag}
+        onDrop={handleDrop}
+        className={`rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors ${
+          dragOver ? 'border-accent bg-accent/5' : 'border-border bg-background'
+        }`}
+      >
+        <label className="flex cursor-pointer flex-col items-center gap-2">
+          📄 {csvFile ? csvFile.name : 'Kéo CSV hoặc nhấp để chọn'}
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) setCSVFile(f) }}
+            className="hidden"
+          />
+        </label>
+      </div>
+      {error && <p className="text-xs text-red-400">{error}</p>}
+      <button
+        onClick={importCSV}
+        disabled={loading || !csvFile}
+        className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent/80 disabled:opacity-40"
+      >
+        {loading ? 'Đang import...' : 'Import'}
+      </button>
+    </div>
+  )
+}
+
 function AdminPanel() {
   const [roms, setRoms] = useState<Rom[]>([])
   const [filter, setFilter] = useState<System | 'all'>('all')
@@ -341,6 +550,8 @@ function AdminPanel() {
       </div>
 
       <UploadForm onUploaded={load} />
+
+      <CSVImportForm onImported={load} />
 
       <div className="flex flex-wrap gap-2">
         <button
