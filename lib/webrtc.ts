@@ -24,6 +24,17 @@ const ICE_SERVERS = [
   { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
 ]
 
+// How long to give one connection attempt (from offer/answer exchange to
+// the data channel actually opening) before treating it as failed. ICE
+// negotiation can fail transiently — a free/rate-limited TURN relay not
+// responding in time, a flaky candidate pair, etc. — and this has been
+// observed in practice to disproportionately hit iOS Safari vs.
+// Chrome/Android on the same network. Retrying with a fresh connection
+// (new peerId, new ICE gathering) rather than hanging on "connecting"
+// forever gives negotiation another shot instead of a dead end.
+const CONNECT_TIMEOUT_MS = 10000
+const MAX_JOIN_ATTEMPTS = 3
+
 export type ButtonInput = {
   type: 'button'
   key: string
@@ -77,7 +88,13 @@ export async function createRoom(
   onInput: (msg: InputMessage) => void,
   onPlayersChange: (players: PlayerInfo[]) => void
 ): Promise<RoomHandle> {
-  const peers = new Map<string, { pc: RTCPeerConnection; dc: RTCDataChannel; playerIndex: number; connected: boolean }>()
+  const peers = new Map<string, {
+    pc: RTCPeerConnection
+    dc: RTCDataChannel
+    playerIndex: number
+    connected: boolean
+    connectTimer: ReturnType<typeof setTimeout>
+  }>()
 
   const notify = () =>
     onPlayersChange(
@@ -91,6 +108,15 @@ export async function createRoom(
   const sigChannel = getSupabase().channel(`ctrl-${roomId}`, {
     config: { broadcast: { self: false } },
   })
+
+  const removePeer = (peerId: string) => {
+    const peer = peers.get(peerId)
+    if (!peer) return
+    clearTimeout(peer.connectTimer)
+    peer.pc.close()
+    peers.delete(peerId)
+    notify()
+  }
 
   const handlePhoneReady = async (peerId: string) => {
     if (peers.has(peerId) || peers.size >= 4) return
@@ -111,14 +137,35 @@ export async function createRoom(
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
     const dc = pc.createDataChannel('input')
 
-    peers.set(peerId, { pc, dc, playerIndex, connected: false })
+    // Kept unconditional (not dev-only) — this is the only visibility we
+    // have into *why* a connection is stuck without a live debugger
+    // attached; on iPhone that means Safari's remote Web Inspector from a
+    // Mac (Settings → Safari → Advanced → Web Inspector).
+    pc.oniceconnectionstatechange = () => console.log(`[webrtc host] ice state (${peerId}):`, pc.iceConnectionState)
+
+    // If this peer's data channel never actually opens (ICE/DTLS never
+    // completes), evict it instead of permanently squatting on a player
+    // slot — otherwise a phone that keeps retrying with fresh peerIds (see
+    // joinRoom's own retry loop) would exhaust all 4 slots after just a
+    // few failed attempts, blocking everyone else from joining.
+    const connectTimer = setTimeout(() => {
+      const peer = peers.get(peerId)
+      if (peer && !peer.connected) removePeer(peerId)
+    }, CONNECT_TIMEOUT_MS)
+
+    peers.set(peerId, { pc, dc, playerIndex, connected: false, connectTimer })
 
     dc.onopen = () => {
       const peer = peers.get(peerId)
-      if (peer) peer.connected = true
+      if (peer) {
+        peer.connected = true
+        clearTimeout(peer.connectTimer)
+      }
       notify()
     }
     dc.onclose = () => {
+      const peer = peers.get(peerId)
+      if (peer) clearTimeout(peer.connectTimer)
       peers.delete(peerId)
       notify()
     }
@@ -171,7 +218,7 @@ export async function createRoom(
 
   return {
     cleanup: () => {
-      peers.forEach(({ pc }) => pc.close())
+      peers.forEach(({ pc, connectTimer }) => { clearTimeout(connectTimer); pc.close() })
       peers.clear()
       getSupabase().removeChannel(sigChannel)
     },
@@ -201,33 +248,69 @@ export async function joinRoom(
   // Safari), which used to make the phone display "connected" even though
   // the host never saw it. Callers should gate their "connected" UI on
   // this, not on onAssigned alone.
-  onConnected?: () => void
+  onConnected?: () => void,
+  // Fires each time an attempt times out and a fresh retry begins, with
+  // the retry's attempt number (2, 3, ...) — lets the UI show "thử lại
+  // (2/3)" instead of just sitting on a plain "connecting" forever.
+  onRetrying?: (attempt: number) => void
 ): Promise<{
   sendInput: (msg: ControllerInput) => void
   disconnect: () => void
   peerId: string
 }> {
-  const peerId = Math.random().toString(36).slice(2, 10).toUpperCase()
-  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
   const sigChannel = getSupabase().channel(`ctrl-${roomId}`, {
     config: { broadcast: { self: false } },
   })
-  let dataChannel: RTCDataChannel | null = null
 
-  pc.ondatachannel = (e) => {
-    dataChannel = e.channel
-    dataChannel.onopen = () => onConnected?.()
-    dataChannel.onclose = onDisconnected
-    dataChannel.onmessage = (msg) => onHostMessage?.(JSON.parse(msg.data as string))
+  let current: { peerId: string; pc: RTCPeerConnection; dataChannel: RTCDataChannel | null } | null = null
+  let attempt = 0
+  let connectTimer: ReturnType<typeof setTimeout> | null = null
+  let stopped = false
+
+  const clearConnectTimer = () => {
+    if (connectTimer) { clearTimeout(connectTimer); connectTimer = null }
   }
 
-  pc.onicecandidate = ({ candidate }) => {
-    if (candidate)
-      sigChannel.send({
-        type: 'broadcast',
-        event: 'ice-phone',
-        payload: { from: peerId, candidate: candidate.toJSON() },
-      })
+  const startAttempt = () => {
+    if (stopped) return
+    attempt += 1
+    const peerId = Math.random().toString(36).slice(2, 10).toUpperCase()
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+    current = { peerId, pc, dataChannel: null }
+
+    pc.oniceconnectionstatechange = () => console.log(`[webrtc phone] ice state (${peerId}):`, pc.iceConnectionState)
+
+    pc.ondatachannel = (e) => {
+      if (current?.pc !== pc) return // superseded by a later retry — ignore
+      const dc = e.channel
+      current.dataChannel = dc
+      dc.onopen = () => { clearConnectTimer(); onConnected?.() }
+      dc.onclose = () => { if (current?.pc === pc) onDisconnected() }
+      dc.onmessage = (msg) => onHostMessage?.(JSON.parse(msg.data as string))
+    }
+
+    pc.onicecandidate = ({ candidate }) => {
+      if (candidate)
+        sigChannel.send({
+          type: 'broadcast',
+          event: 'ice-phone',
+          payload: { from: peerId, candidate: candidate.toJSON() },
+        })
+    }
+
+    clearConnectTimer()
+    connectTimer = setTimeout(() => {
+      if (stopped || current?.pc !== pc || current.dataChannel?.readyState === 'open') return
+      pc.close()
+      if (attempt < MAX_JOIN_ATTEMPTS) {
+        onRetrying?.(attempt + 1)
+        startAttempt()
+      } else {
+        onDisconnected()
+      }
+    }, CONNECT_TIMEOUT_MS)
+
+    sigChannel.send({ type: 'broadcast', event: 'phone-ready', payload: { peerId } })
   }
 
   sigChannel
@@ -238,7 +321,8 @@ export async function joinRoom(
         type: string
         sdp: string
       }
-      if (to !== peerId) return
+      if (!current || to !== current.peerId) return
+      const { pc, peerId } = current
       try {
         await pc.setRemoteDescription(
           new RTCSessionDescription({ type: type as RTCSdpType, sdp })
@@ -257,9 +341,9 @@ export async function joinRoom(
     })
     .on('broadcast', { event: 'ice-host' }, async ({ payload }) => {
       const { to, candidate } = payload as { to: string; candidate: RTCIceCandidateInit }
-      if (to !== peerId) return
+      if (!current || to !== current.peerId) return
       try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate))
+        await current.pc.addIceCandidate(new RTCIceCandidate(candidate))
       } catch {}
     })
 
@@ -270,16 +354,18 @@ export async function joinRoom(
   )
 
   // Announce after subscription is confirmed — eliminates race condition
-  sigChannel.send({ type: 'broadcast', event: 'phone-ready', payload: { peerId } })
+  startAttempt()
 
   return {
-    peerId,
+    peerId: current!.peerId,
     sendInput: (msg: ControllerInput) => {
-      if (dataChannel?.readyState === 'open')
-        dataChannel.send(JSON.stringify({ ...msg, peerId }))
+      if (current?.dataChannel?.readyState === 'open')
+        current.dataChannel.send(JSON.stringify({ ...msg, peerId: current.peerId }))
     },
     disconnect: () => {
-      pc.close()
+      stopped = true
+      clearConnectTimer()
+      current?.pc.close()
       getSupabase().removeChannel(sigChannel)
     },
   }

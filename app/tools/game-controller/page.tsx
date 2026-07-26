@@ -536,6 +536,7 @@ function PhoneSetup({ onReady }: { onReady: (config: ControllerConfig) => void }
 function PhoneControllerActive({ roomId, config }: { roomId: string; config: ControllerConfig }) {
   const [playerIndex, setPlayerIndex] = useState<number | null>(null)
   const [status, setStatus] = useState<'connecting' | 'ready' | 'disconnected'>('connecting')
+  const [retryAttempt, setRetryAttempt] = useState(0)
   const [activeCombo, setActiveCombo] = useState<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showFullscreenHint, setShowFullscreenHint] = useState(false)
@@ -593,7 +594,8 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
       (idx) => { if (!cancelled) setPlayerIndex(idx) },
       () => { if (!cancelled) setStatus('disconnected') },
       undefined,
-      () => { if (!cancelled) setStatus('ready') }
+      () => { if (!cancelled) setStatus('ready') },
+      (attempt) => { if (!cancelled) setRetryAttempt(attempt) }
     )
       .then((conn) => {
         if (cancelled) conn.disconnect()
@@ -683,7 +685,7 @@ function PhoneControllerActive({ roomId, config }: { roomId: string; config: Con
   const hasCombo = Object.keys(config.combos).length > 0
 
   const badgeText =
-    status === 'connecting' ? 'Connecting...' :
+    status === 'connecting' ? (retryAttempt > 0 ? `Connecting... (thử lại ${retryAttempt}/3)` : 'Connecting...') :
     status === 'disconnected' ? 'Disconnected' :
     `Player ${(playerIndex ?? 0) + 1}`
 

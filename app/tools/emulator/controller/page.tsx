@@ -84,6 +84,7 @@ function TouchBtn({
 function ControllerView({ roomId }: { roomId: string }) {
   const [state, setState]         = useState<ConnState>('connecting')
   const [playerIdx, setPlayerIdx] = useState(0)
+  const [retryAttempt, setRetryAttempt] = useState(0)
   const [isLandscape, setIsLandscape] = useState(false)
   const connRef = useRef<{
     sendInput: (m: ControllerInput) => void
@@ -108,7 +109,8 @@ function ControllerView({ roomId }: { roomId: string }) {
       (idx) => { if (!cancelled) setPlayerIdx(idx) },
       ()    => { if (!cancelled) setState('disconnected') },
       undefined,
-      ()    => { if (!cancelled) setState('connected') }
+      ()    => { if (!cancelled) setState('connected') },
+      (attempt) => { if (!cancelled) setRetryAttempt(attempt) }
     )
       .then((conn) => { if (cancelled) conn.disconnect(); else connRef.current = conn })
       .catch(console.error)
@@ -148,7 +150,7 @@ function ControllerView({ roomId }: { roomId: string }) {
           display: 'inline-block', whiteSpace: 'nowrap',
         }}>
           {state === 'connected'    ? `P${playerIdx + 1}`  :
-           state === 'connecting'   ? 'Đang kết nối...'    :
+           state === 'connecting'   ? (retryAttempt > 0 ? `Đang kết nối... (thử lại ${retryAttempt}/3)` : 'Đang kết nối...') :
            'Mất kết nối — reload lại'}
         </span>
       </div>
