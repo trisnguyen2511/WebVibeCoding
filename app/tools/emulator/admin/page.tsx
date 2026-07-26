@@ -529,9 +529,9 @@ function FolderImportForm({ onImported }: { onImported: () => void }) {
           <input
             ref={folderInputRef}
             type="file"
-            webkitdirectory=""
             onChange={handleFolderSelect}
             className="hidden"
+            {...({ webkitdirectory: '' } as any)}
           />
         </label>
       </div>

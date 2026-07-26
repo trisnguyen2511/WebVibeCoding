@@ -13,66 +13,215 @@ const BTN = {
 
 type BtnIdx = (typeof BTN)[keyof typeof BTN]
 type ConnState = 'connecting' | 'connected' | 'disconnected'
-
 const P_COLOR = ['#7C3AED', '#2563EB', '#059669', '#D97706']
 
-// ── Generic touch button ─────────────────────────────────────────
-function TouchBtn({
-  btnIdx,
-  label,
-  style,
-  shape = 'rect',
-  accent = '#1A1A2E',
-  press,
-  release,
-}: {
-  btnIdx: BtnIdx
-  label: string
-  style: React.CSSProperties
-  shape?: 'rect' | 'circle' | 'pill'
-  accent?: string
-  press: (b: BtnIdx) => void
-  release: (b: BtnIdx) => void
+// ── Shoulder button (L or R, full-width top strip) ───────────────
+function ShoulderBtn({ btnIdx, label, side, press, release }: {
+  btnIdx: BtnIdx; label: string; side: 'left' | 'right'
+  press: (b: BtnIdx) => void; release: (b: BtnIdx) => void
 }) {
   const [active, setActive] = useState(false)
-  const br = shape === 'circle' ? '50%' : shape === 'pill' ? '999px' : '10px'
-
   return (
     <div
       style={{
         position: 'absolute',
-        borderRadius: br,
-        border: `1.5px solid ${active ? accent : '#1A1A2E'}`,
-        background: active ? `${accent}40` : '#0F0F1A',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        userSelect: 'none',
-        touchAction: 'none',
+        top: '1vmin',
+        [side]: '1vmin',
+        width: '24vmin',
+        height: '10vmin',
+        borderRadius: side === 'left' ? '5vmin 3vmin 5vmin 7vmin' : '3vmin 5vmin 7vmin 5vmin',
+        background: active ? '#7C3AED33' : '#0F0F1A',
+        border: `2px solid ${active ? '#7C3AED' : '#1A1A2E'}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        touchAction: 'none', userSelect: 'none',
+        transition: 'background 0.06s, border-color 0.06s',
+      }}
+      onPointerDown={e => {
+        e.currentTarget.setPointerCapture(e.pointerId)
+        setActive(true); press(btnIdx)
+        if (navigator.vibrate) navigator.vibrate(18)
+      }}
+      onPointerUp={e => { e.currentTarget.releasePointerCapture(e.pointerId); setActive(false); release(btnIdx) }}
+      onPointerCancel={e => { e.currentTarget.releasePointerCapture(e.pointerId); setActive(false); release(btnIdx) }}
+    >
+      <span style={{ fontSize: '6vmin', fontWeight: 800, color: active ? '#A78BFA' : '#52525B', fontFamily: 'system-ui' }}>
+        {label}
+      </span>
+    </div>
+  )
+}
+
+// ── D-Pad: single touch zone, angle-based 8-way detection ────────
+// User touches anywhere in the cross and slides — direction is
+// detected from the angle relative to center. No need to look.
+function DPad({ press, release, style }: {
+  press: (b: BtnIdx) => void; release: (b: BtnIdx) => void
+  style?: React.CSSProperties
+}) {
+  const ref    = useRef<HTMLDivElement>(null)
+  const held   = useRef<Set<BtnIdx>>(new Set())
+  const [dirs, setDirs] = useState<Set<BtnIdx>>(new Set())
+
+  function update(clientX: number, clientY: number) {
+    const el = ref.current
+    if (!el) return
+    const { left, top, width, height } = el.getBoundingClientRect()
+    const dx   = clientX - (left + width  / 2)
+    const dy   = clientY - (top  + height / 2)
+    const dist = Math.hypot(dx, dy)
+    const dead = width * 0.12  // 12% dead zone in center
+
+    const next = new Set<BtnIdx>()
+    if (dist > dead) {
+      const a = Math.atan2(dy, dx) * (180 / Math.PI)
+      // 8-way: each diagonal fires two directions simultaneously
+      if (a >= -157.5 && a < -22.5)  next.add(BTN.UP)
+      if (a >= -67.5  && a <  67.5)  next.add(BTN.RIGHT)
+      if (a >=  22.5  && a < 157.5)  next.add(BTN.DOWN)
+      if (a >=  112.5 || a < -112.5) next.add(BTN.LEFT)
+    }
+
+    const toRelease: BtnIdx[] = []
+    const toPress:   BtnIdx[] = []
+    held.current.forEach(b => { if (!next.has(b)) toRelease.push(b) })
+    next.forEach(b => { if (!held.current.has(b)) toPress.push(b) })
+    toRelease.forEach(b => { release(b); held.current.delete(b) })
+    toPress.forEach(b => { press(b); held.current.add(b) })
+    setDirs(new Set(held.current))
+  }
+
+  function releaseAll() {
+    held.current.forEach(b => release(b))
+    held.current.clear()
+    setDirs(new Set())
+  }
+
+  const u = dirs.has(BTN.UP),   d = dirs.has(BTN.DOWN)
+  const l = dirs.has(BTN.LEFT), r = dirs.has(BTN.RIGHT)
+
+  const armStyle = (on: boolean, br: string): React.CSSProperties => ({
+    background:   on ? '#7C3AED33' : '#0F0F1A',
+    border:       `1.5px solid ${on ? '#7C3AED' : '#1A1A2E'}`,
+    borderRadius: br,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'background 0.05s, border-color 0.05s',
+  })
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: 'absolute',
+        width: '38vmin', height: '38vmin',
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr 1fr',
+        gridTemplateRows: '1fr 1fr 1fr',
+        touchAction: 'none', userSelect: 'none',
+        ...style,
+      }}
+      onPointerDown={e => {
+        e.currentTarget.setPointerCapture(e.pointerId)
+        update(e.clientX, e.clientY)
+        if (navigator.vibrate) navigator.vibrate(18)
+      }}
+      onPointerMove={e => { if (e.buttons) update(e.clientX, e.clientY) }}
+      onPointerUp={releaseAll}
+      onPointerCancel={releaseAll}
+    >
+      {/* Row 1: corner · Up · corner */}
+      <div style={{ background: 'transparent' }} />
+      <div style={armStyle(u, '8px 8px 0 0')}>
+        <span style={{ fontSize: '5.5vmin', color: u ? '#A78BFA' : '#52525B', pointerEvents: 'none' }}>▲</span>
+      </div>
+      <div style={{ background: 'transparent' }} />
+
+      {/* Row 2: Left · Center · Right */}
+      <div style={armStyle(l, '8px 0 0 8px')}>
+        <span style={{ fontSize: '5.5vmin', color: l ? '#A78BFA' : '#52525B', pointerEvents: 'none' }}>◀</span>
+      </div>
+      <div style={{ background: '#0F0F1A', border: '1.5px solid #1A1A2E' }} />
+      <div style={armStyle(r, '0 8px 8px 0')}>
+        <span style={{ fontSize: '5.5vmin', color: r ? '#A78BFA' : '#52525B', pointerEvents: 'none' }}>▶</span>
+      </div>
+
+      {/* Row 3: corner · Down · corner */}
+      <div style={{ background: 'transparent' }} />
+      <div style={armStyle(d, '0 0 8px 8px')}>
+        <span style={{ fontSize: '5.5vmin', color: d ? '#A78BFA' : '#52525B', pointerEvents: 'none' }}>▼</span>
+      </div>
+      <div style={{ background: 'transparent' }} />
+    </div>
+  )
+}
+
+// ── Face button — fills its grid cell ───────────────────────────
+function FaceBtn({ btnIdx, label, accent, press, release }: {
+  btnIdx: BtnIdx; label: string; accent: string
+  press: (b: BtnIdx) => void; release: (b: BtnIdx) => void
+}) {
+  const [active, setActive] = useState(false)
+  return (
+    <div
+      style={{
+        width: '100%', height: '100%',
+        borderRadius: '50%',
+        background: active ? `${accent}33` : '#0F0F1A',
+        border: `2.5px solid ${active ? accent : '#1A1A2E'}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        touchAction: 'none', userSelect: 'none',
+        transition: 'background 0.06s, border-color 0.06s',
+        boxSizing: 'border-box',
+      }}
+      onPointerDown={e => {
+        e.currentTarget.setPointerCapture(e.pointerId)
+        setActive(true); press(btnIdx)
+        if (navigator.vibrate) navigator.vibrate(18)
+      }}
+      onPointerUp={e => { e.currentTarget.releasePointerCapture(e.pointerId); setActive(false); release(btnIdx) }}
+      onPointerCancel={e => { e.currentTarget.releasePointerCapture(e.pointerId); setActive(false); release(btnIdx) }}
+    >
+      <span style={{
+        fontSize: '5.5vmin', fontWeight: 800,
+        color: active ? accent : '#52525B',
+        fontFamily: 'system-ui', pointerEvents: 'none',
+      }}>
+        {label}
+      </span>
+    </div>
+  )
+}
+
+// ── Small pill button (SELECT / START) ───────────────────────────
+function PillBtn({ btnIdx, label, press, release, style }: {
+  btnIdx: BtnIdx; label: string
+  press: (b: BtnIdx) => void; release: (b: BtnIdx) => void
+  style?: React.CSSProperties
+}) {
+  const [active, setActive] = useState(false)
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        borderRadius: 999,
+        background: active ? '#7C3AED33' : '#0F0F1A',
+        border: `1.5px solid ${active ? '#7C3AED' : '#1A1A2E'}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        touchAction: 'none', userSelect: 'none',
         transition: 'background 0.06s, border-color 0.06s',
         ...style,
       }}
-      onPointerDown={(e) => {
+      onPointerDown={e => {
         e.currentTarget.setPointerCapture(e.pointerId)
-        setActive(true)
-        press(btnIdx)
-        if (navigator.vibrate) navigator.vibrate(18)
+        setActive(true); press(btnIdx)
+        if (navigator.vibrate) navigator.vibrate(15)
       }}
-      onPointerUp={(e) => {
-        e.currentTarget.releasePointerCapture(e.pointerId)
-        setActive(false)
-        release(btnIdx)
-      }}
-      onPointerCancel={(e) => {
-        e.currentTarget.releasePointerCapture(e.pointerId)
-        setActive(false)
-        release(btnIdx)
-      }}
+      onPointerUp={e => { e.currentTarget.releasePointerCapture(e.pointerId); setActive(false); release(btnIdx) }}
+      onPointerCancel={e => { e.currentTarget.releasePointerCapture(e.pointerId); setActive(false); release(btnIdx) }}
     >
       <span style={{
-        fontSize: 12, fontWeight: 700, pointerEvents: 'none',
-        color: active ? (accent === '#1A1A2E' ? '#fff' : accent) : '#52525B',
-        fontFamily: 'system-ui, sans-serif',
+        fontSize: '3vmin', fontWeight: 700,
+        color: active ? '#A78BFA' : '#52525B',
+        fontFamily: 'system-ui', pointerEvents: 'none', whiteSpace: 'nowrap',
       }}>
         {label}
       </span>
@@ -85,7 +234,7 @@ function ControllerView({ roomId }: { roomId: string }) {
   const [state, setState]         = useState<ConnState>('connecting')
   const [playerIdx, setPlayerIdx] = useState(0)
   const [retryAttempt, setRetryAttempt] = useState(0)
-  const [isLandscape, setIsLandscape] = useState(false)
+  const [isLandscape, setIsLandscape]   = useState(false)
   const connRef = useRef<{
     sendInput: (m: ControllerInput) => void
     disconnect: () => void
@@ -106,10 +255,10 @@ function ControllerView({ roomId }: { roomId: string }) {
     let cancelled = false
     joinRoom(
       roomId,
-      (idx) => { if (!cancelled) setPlayerIdx(idx) },
-      ()    => { if (!cancelled) setState('disconnected') },
+      (idx)     => { if (!cancelled) setPlayerIdx(idx) },
+      ()        => { if (!cancelled) setState('disconnected') },
       undefined,
-      ()    => { if (!cancelled) setState('connected') },
+      ()        => { if (!cancelled) setState('connected') },
       (attempt) => { if (!cancelled) setRetryAttempt(attempt) }
     )
       .then((conn) => { if (cancelled) conn.disconnect(); else connRef.current = conn })
@@ -122,17 +271,12 @@ function ControllerView({ roomId }: { roomId: string }) {
     }
   }, [roomId])
 
-  const press = (btn: BtnIdx) =>
+  const press   = (btn: BtnIdx) =>
     connRef.current?.sendInput({ type: 'button', key: String(btn), state: 'pressed',  ts: Date.now() })
-
   const release = (btn: BtnIdx) =>
     connRef.current?.sendInput({ type: 'button', key: String(btn), state: 'released', ts: Date.now() })
 
   const color = P_COLOR[playerIdx % 4]
-
-  // Button dimensions in vmin (scales with viewport min — safe for landscape)
-  const S  = '9vmin'   // standard button size
-  const SL = '14vmin'  // shoulder button width
 
   return (
     <div style={{
@@ -141,80 +285,76 @@ function ControllerView({ roomId }: { roomId: string }) {
       position: 'relative', overflow: 'hidden',
       touchAction: 'none',
     }}>
+
       {/* ── Status badge ── */}
-      <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 20 }}>
+      <div style={{ position: 'absolute', top: '1.5vmin', left: '50%', transform: 'translateX(-50%)', zIndex: 20 }}>
         <span style={{
           background: `${color}22`, border: `1px solid ${color}`, color,
           borderRadius: 20, padding: '2px 14px',
           fontSize: 11, fontWeight: 700, fontFamily: 'monospace',
           display: 'inline-block', whiteSpace: 'nowrap',
         }}>
-          {state === 'connected'    ? `P${playerIdx + 1}`  :
-           state === 'connecting'   ? (retryAttempt > 0 ? `Đang kết nối... (thử lại ${retryAttempt}/3)` : 'Đang kết nối...') :
+          {state === 'connected'  ? `P${playerIdx + 1}` :
+           state === 'connecting' ? (retryAttempt > 0 ? `Đang kết nối... (${retryAttempt}/3)` : 'Đang kết nối...') :
            'Mất kết nối — reload lại'}
         </span>
       </div>
 
       {/* ── L / R Shoulder ── */}
-      <TouchBtn btnIdx={BTN.L} label="L"
-        style={{ left: '2vmin', top: '4vmin', width: SL, height: '7vmin' }}
-        press={press} release={release} />
-      <TouchBtn btnIdx={BTN.R} label="R"
-        style={{ right: '2vmin', top: '4vmin', width: SL, height: '7vmin' }}
-        press={press} release={release} />
+      <ShoulderBtn btnIdx={BTN.L} label="L" side="left"  press={press} release={release} />
+      <ShoulderBtn btnIdx={BTN.R} label="R" side="right" press={press} release={release} />
 
-      {/* ── D-Pad (cross layout) ── */}
-      {/* Up */}
-      <TouchBtn btnIdx={BTN.UP} label="▲"
-        style={{ left: 'calc(14vmin + 9vmin)', top: '20vmin', width: S, height: S }}
-        press={press} release={release} />
-      {/* Down */}
-      <TouchBtn btnIdx={BTN.DOWN} label="▼"
-        style={{ left: 'calc(14vmin + 9vmin)', top: 'calc(20vmin + 18vmin)', width: S, height: S }}
-        press={press} release={release} />
-      {/* Left */}
-      <TouchBtn btnIdx={BTN.LEFT} label="◀"
-        style={{ left: '14vmin', top: 'calc(20vmin + 9vmin)', width: S, height: S }}
-        press={press} release={release} />
-      {/* Right */}
-      <TouchBtn btnIdx={BTN.RIGHT} label="▶"
-        style={{ left: 'calc(14vmin + 18vmin)', top: 'calc(20vmin + 9vmin)', width: S, height: S }}
-        press={press} release={release} />
+      {/* ── D-Pad (single zone, slide to steer) ── */}
+      <DPad
+        press={press} release={release}
+        style={{ left: '3vmin', top: '50%', transform: 'translateY(-50%)' }}
+      />
 
-      {/* ── D-Pad center (visual only) ── */}
+      {/* ── Face Buttons: 3×3 diamond grid ──
+          Layout:  [_][X][_]
+                   [Y][_][A]
+                   [_][B][_]
+          Each cell: 13vmin, gap: 1.5vmin → total 42.5vmin × 42.5vmin
+      ── */}
       <div style={{
         position: 'absolute',
-        left: 'calc(14vmin + 9vmin)', top: 'calc(20vmin + 9vmin)',
-        width: S, height: S,
-        background: '#0F0F1A', border: '1.5px solid #1A1A2E',
-        pointerEvents: 'none',
-      }} />
+        right: '3vmin',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 13vmin)',
+        gridTemplateRows: 'repeat(3, 13vmin)',
+        gap: '1.5vmin',
+      }}>
+        {/* Row 1 */}
+        <div />
+        <FaceBtn btnIdx={BTN.X} label="X" accent="#2563EB" press={press} release={release} />
+        <div />
+        {/* Row 2 */}
+        <FaceBtn btnIdx={BTN.Y} label="Y" accent="#DB2777" press={press} release={release} />
+        <div />
+        <FaceBtn btnIdx={BTN.A} label="A" accent="#059669" press={press} release={release} />
+        {/* Row 3 */}
+        <div />
+        <FaceBtn btnIdx={BTN.B} label="B" accent="#D97706" press={press} release={release} />
+        <div />
+      </div>
 
-      {/* ── Select / Start ── */}
-      <TouchBtn btnIdx={BTN.SELECT} label="SELECT" shape="pill"
-        style={{ left: 'calc(50% - 14vmin)', top: '52vmin', width: '11vmin', height: '5vmin' }}
-        press={press} release={release} />
-      <TouchBtn btnIdx={BTN.START} label="START" shape="pill"
-        style={{ left: 'calc(50% + 3vmin)', top: '52vmin', width: '11vmin', height: '5vmin' }}
-        press={press} release={release} />
-
-      {/* ── Face Buttons (SNES diamond) ── */}
-      {/* X — top, blue */}
-      <TouchBtn btnIdx={BTN.X} label="X" shape="circle" accent="#2563EB"
-        style={{ right: 'calc(14vmin + 9vmin)', top: '20vmin', width: S, height: S }}
-        press={press} release={release} />
-      {/* Y — left, pink */}
-      <TouchBtn btnIdx={BTN.Y} label="Y" shape="circle" accent="#DB2777"
-        style={{ right: 'calc(14vmin + 18vmin)', top: 'calc(20vmin + 9vmin)', width: S, height: S }}
-        press={press} release={release} />
-      {/* A — right, green */}
-      <TouchBtn btnIdx={BTN.A} label="A" shape="circle" accent="#059669"
-        style={{ right: '14vmin', top: 'calc(20vmin + 9vmin)', width: S, height: S }}
-        press={press} release={release} />
-      {/* B — bottom, amber */}
-      <TouchBtn btnIdx={BTN.B} label="B" shape="circle" accent="#D97706"
-        style={{ right: 'calc(14vmin + 9vmin)', top: 'calc(20vmin + 18vmin)', width: S, height: S }}
-        press={press} release={release} />
+      {/* ── SELECT / START — center of screen ── */}
+      <PillBtn btnIdx={BTN.SELECT} label="SELECT" press={press} release={release}
+        style={{
+          left: 'calc(50% - 14vmin)',
+          top: 'calc(50% - 3vmin)',
+          width: '12vmin', height: '6vmin',
+        }}
+      />
+      <PillBtn btnIdx={BTN.START} label="START" press={press} release={release}
+        style={{
+          left: 'calc(50% + 2vmin)',
+          top: 'calc(50% - 3vmin)',
+          width: '12vmin', height: '6vmin',
+        }}
+      />
 
       {/* ── Landscape hint (portrait mode only) ── */}
       {!isLandscape && (
