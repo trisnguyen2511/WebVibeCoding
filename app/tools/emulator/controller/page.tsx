@@ -285,7 +285,8 @@ function ControllerView({ roomId }: { roomId: string }) {
       }
     } catch { /* ignore — may already be fullscreen or not supported */ }
     try {
-      await screen.orientation.lock('landscape')
+      const orient = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }
+      await orient.lock?.('landscape')
     } catch { /* not supported on all browsers */ }
     // Recheck in case orientationchange didn't fire
     setIsLandscape(window.innerWidth > window.innerHeight)
