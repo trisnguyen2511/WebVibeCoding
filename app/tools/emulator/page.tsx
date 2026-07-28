@@ -196,6 +196,11 @@ function EmulatorHost() {
   const [biosUrl,   setBiosUrl]   = useState<string | null>(null)
   const [biosName,  setBiosName]  = useState<string | null>(null)
   const [wrapZip,   setWrapZip]   = useState(false)
+  // Smart TV: we block EmulatorJS from loading until the user explicitly taps
+  // our own Start button — that click is the user gesture needed to unlock
+  // AudioContext. Without it, TV browsers auto-suspend any AudioContext created
+  // inside EmulatorJS and the engine hangs silently.
+  const [tvReady,   setTvReady]   = useState(false)
   const [gameReady, setGameReady] = useState(false)
   const [romUrlInput,  setRomUrlInput]  = useState('')
   const [urlLoading,   setUrlLoading]   = useState(false)
@@ -259,6 +264,17 @@ function EmulatorHost() {
   }, [])
 
   const exitFakeFullscreen = useCallback(() => setFakeFullscreen(false), [])
+
+  // TV-specific start: called by our own big "▶ Start" button so the click
+  // event is the user gesture that unlocks AudioContext before EJS loads.
+  const startOnTV = useCallback(async () => {
+    try {
+      const ctx = new AudioContext()
+      await ctx.resume()
+      ctx.close()
+    } catch { /* some TV browsers throw — ignore, still proceed */ }
+    setTvReady(true)
+  }, [])
 
   // Clear all browser storage used by EmulatorJS (Cache API cores, IndexedDB saves, localStorage)
   const cleanCache = async () => {
@@ -461,6 +477,9 @@ function EmulatorHost() {
   // ── Bootstrap EmulatorJS when romUrl is set ───────────────────
   useEffect(() => {
     if (!romUrl) return
+    // On Smart TV, wait until the user has provided a gesture via our own
+    // Start button — only then do we inject the EmulatorJS script.
+    if (isSmartTV() && !tvReady) return
 
     if (scriptRef.current) {
       try { document.body.removeChild(scriptRef.current) } catch { /* already removed */ }
@@ -482,14 +501,11 @@ function EmulatorHost() {
     window.EJS_gameName      = romFileName ?? romName ?? undefined
     window.EJS_core          = SYSTEMS.find((s) => s.value === system)?.core ?? 'fceumm'
     window.EJS_pathtodata    = EJS_DATA
-    // Smart TV browsers enforce strict autoplay/gesture policies — without a
-    // user gesture the AudioContext is immediately suspended and EmulatorJS
-    // hangs with a cross-origin "Script error." when it tries to unlock audio
-    // on boot. Setting startOnLoaded=false lets EmulatorJS show its own
-    // "▶ click to play" button so the user provides the gesture that unlocks
-    // AudioContext before the core starts. On all other platforms we keep
-    // true (auto-start) because the false path broke loading on Android/PC.
-    window.EJS_startOnLoaded = !isSmartTV()
+    // AudioContext is always unlocked before we reach this point:
+    // — non-TV: no strict autoplay policy, EJS handles it fine
+    // — Smart TV: startOnTV() already called AudioContext.resume() in the
+    //   user-gesture handler before this effect ran (tvReady gate above)
+    window.EJS_startOnLoaded = true
     if (biosUrl) window.EJS_biosUrl = biosUrl
     else delete window.EJS_biosUrl
     window.EJS_onGameStart   = () => {
@@ -562,7 +578,7 @@ function EmulatorHost() {
         scriptRef.current = null
       }
     }
-  }, [romUrl, romName, romFileName, system, biosUrl, tryAutoFullscreen, loadAttempt])
+  }, [romUrl, romName, romFileName, system, biosUrl, tryAutoFullscreen, loadAttempt, tvReady])
 
   const retryLoad = useCallback(() => {
     setRuntimeError(false)
@@ -608,6 +624,7 @@ function EmulatorHost() {
     setGameReady(false)
     setRuntimeError(false)
     setRuntimeErrorMsg(null)
+    setTvReady(false)
   }
 
   const filteredLibraryRoms = librarySearch.trim()
@@ -810,6 +827,24 @@ function EmulatorHost() {
                 )}
 
               </div>
+            ) : romUrl && isSmartTV() && !tvReady ? (
+              /* TV gesture screen — shown instead of the emulator until user
+                 provides the click that unlocks AudioContext */
+              <div className="flex flex-col items-center justify-center gap-6 rounded-xl border border-border bg-surface p-16 text-center">
+                <p className="font-mono text-xs uppercase tracking-widest text-muted">
+                  {SYSTEMS.find((s) => s.value === system)?.label}
+                </p>
+                <p className="text-lg font-medium text-fg">{romName}</p>
+                <button
+                  onClick={() => void startOnTV()}
+                  className="rounded-2xl border border-accent/40 bg-accent px-12 py-5 text-2xl font-bold text-white transition-colors hover:bg-accent/80 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
+                >
+                  ▶ BẮT ĐẦU
+                </button>
+                <p className="text-xs text-muted">
+                  Bấm <strong>OK</strong> trên remote để bắt đầu tải game
+                </p>
+              </div>
             ) : (
               <div
                 ref={screenRef}
@@ -891,8 +926,7 @@ function EmulatorHost() {
                 )}
                 {!gameReady && !runtimeError && isSmartTV() && (
                   <p className="border-b border-border bg-blue-500/5 px-4 py-2 text-xs text-blue-300">
-                    📺 Smart TV: đang tải WASM core (có thể mất 60–90 giây). Khi load xong,
-                    bấm nút <strong>▶</strong> xuất hiện trên màn hình để bắt đầu chơi.
+                    📺 Smart TV: đang tải WASM core, có thể mất 30–60 giây...
                   </p>
                 )}
 
