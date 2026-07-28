@@ -143,6 +143,18 @@ function isIOS(): boolean {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 }
 
+// Smart TV browsers (LG WebOS, Samsung Tizen, Android TV, etc.) use older or
+// memory-constrained JS engines. They enforce strict autoplay/gesture policies
+// and often can't compile large WASM modules (FBNeo, N64) in time.
+// EJS_startOnLoaded must be false on TV so EmulatorJS shows its own
+// "▶ click to play" button — without a user gesture the AudioContext is
+// blocked and the boot sequence hangs with a cross-origin "Script error."
+function isSmartTV(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /\b(webOS|web0S|Tizen|SMART-TV|SmartTV|Android TV|GoogleTV|HbbTV|NetCast|BRAVIA|Viera|Roku)\b/i
+    .test(navigator.userAgent)
+}
+
 // ── ROM library (admin-uploaded, see /tools/emulator/admin) ──────
 type LibraryRom = { id: string; name: string; url: string; bytes: number; cover_url: string | null }
 
@@ -470,13 +482,14 @@ function EmulatorHost() {
     window.EJS_gameName      = romFileName ?? romName ?? undefined
     window.EJS_core          = SYSTEMS.find((s) => s.value === system)?.core ?? 'fceumm'
     window.EJS_pathtodata    = EJS_DATA
-    // REVERTED: setting this false to force EmulatorJS's own "click to play"
-    // start screen (instead of auto-starting) was meant to fix iOS/TV
-    // gesture-policy stalls, but it broke loading on every platform,
-    // including Android — confirmed by testing, so back to true. The
-    // iPhone/LG TV "won't load" bug needs a different root cause; don't
-    // touch this flag again without reproducing the actual failure first.
-    window.EJS_startOnLoaded = true
+    // Smart TV browsers enforce strict autoplay/gesture policies — without a
+    // user gesture the AudioContext is immediately suspended and EmulatorJS
+    // hangs with a cross-origin "Script error." when it tries to unlock audio
+    // on boot. Setting startOnLoaded=false lets EmulatorJS show its own
+    // "▶ click to play" button so the user provides the gesture that unlocks
+    // AudioContext before the core starts. On all other platforms we keep
+    // true (auto-start) because the false path broke loading on Android/PC.
+    window.EJS_startOnLoaded = !isSmartTV()
     if (biosUrl) window.EJS_biosUrl = biosUrl
     else delete window.EJS_biosUrl
     window.EJS_onGameStart   = () => {
@@ -498,8 +511,12 @@ function EmulatorHost() {
     const s  = document.createElement('script')
     // Cache-bust on retry so a "Thử lại" tap forces a fresh network request
     // instead of reusing whatever just failed.
-    s.src    = loadAttempt > 0 ? `${EJS_LOADER}?retry=${loadAttempt}` : EJS_LOADER
-    s.async  = true
+    s.src         = loadAttempt > 0 ? `${EJS_LOADER}?retry=${loadAttempt}` : EJS_LOADER
+    s.async       = true
+    // crossOrigin="anonymous" lets the browser expose the real error message
+    // from cross-origin scripts (instead of just "Script error.") when the
+    // CDN sends CORS headers — emulatorjs.org CDN does send these.
+    s.crossOrigin = 'anonymous'
     s.onerror = () => { setRuntimeError(true); setRuntimeErrorMsg('Không tải được loader.js từ CDN.') }
     document.body.appendChild(s)
     scriptRef.current = s
@@ -515,22 +532,25 @@ function EmulatorHost() {
     window.addEventListener('error', onWinError)
     window.addEventListener('unhandledrejection', onRejection)
 
+    // TV browsers compile WASM much slower than phones/PCs — give them 90s.
+    const stallMs = isSmartTV() ? 90000 : 45000
+    const tvMsg = 'Smart TV browser gặp lỗi khi tải WASM core. Thử: (1) chọn hệ NES/SNES/GBA thay vì Arcade/N64, (2) bấm nút ▶ xuất hiện trên màn hình để start game, (3) dọn cache rồi thử lại.'
+
     // EmulatorJS gives no explicit "failed to init" callback — if the game
-    // hasn't actually started after a generous timeout (long enough for a
-    // big core like FBNeo/N64 to compile WASM even on slow/old hardware),
-    // treat it as stalled instead of leaving the "Loading..." badge
-    // spinning forever with no feedback.
+    // hasn't actually started after the timeout, treat it as stalled.
     const timeout = setTimeout(() => {
       if (!gameReadyRef.current) {
         setRuntimeError(true)
         setRuntimeErrorMsg(
-          capturedDetail ??
-          (window.EJS_emulator
-            ? 'Core đã khởi tạo nhưng game không bao giờ báo sẵn sàng (có thể do trình duyệt chặn tự phát âm thanh, hoặc thiết bị quá yếu để biên dịch core kịp thời).'
-            : 'EmulatorJS chưa từng khởi tạo được (window.EJS_emulator không tồn tại) sau 45 giây.')
+          isSmartTV()
+            ? (capturedDetail && capturedDetail !== 'Script error.' ? capturedDetail : tvMsg)
+            : (capturedDetail ??
+              (window.EJS_emulator
+                ? 'Core đã khởi tạo nhưng game không bao giờ báo sẵn sàng (có thể do trình duyệt chặn tự phát âm thanh, hoặc thiết bị quá yếu để biên dịch core kịp thời).'
+                : 'EmulatorJS chưa từng khởi tạo được (window.EJS_emulator không tồn tại) sau 45 giây.'))
         )
       }
-    }, 45000)
+    }, stallMs)
 
     return () => {
       clearTimeout(timeout)
@@ -629,6 +649,14 @@ function EmulatorHost() {
                       đen dù báo &quot;Running&quot;. Trên iPhone nên dùng NES/SNES/GBA/Game Boy
                       thay thế, hoặc thử &quot;Thêm vào Màn hình chính&quot; từ Safari rồi mở lại
                       từ đó để có thêm bộ nhớ.
+                    </p>
+                  )}
+                  {isSmartTV() && (
+                    <p className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-300">
+                      ⚠️ Smart TV browser: RAM và JS engine giới hạn. Nên dùng{' '}
+                      <strong>NES / SNES / GBA / Game Boy</strong> — core nhẹ, tải nhanh hơn.
+                      Arcade (FBNeo) và N64 có thể không tải được do WASM quá lớn.
+                      Sau khi game load xong, bấm nút <strong>▶</strong> trên màn hình để bắt đầu.
                     </p>
                   )}
                 </div>
@@ -857,6 +885,12 @@ function EmulatorHost() {
                     ⚠️ Nếu màn hình đen dù báo &quot;Running&quot;: Safari trên iPhone/iPad
                     giới hạn RAM quá thấp cho core {system === 'arcade' ? 'Arcade' : 'N64'} này.
                     Đổi ROM sang NES/SNES/GBA/Game Boy để chơi được trên iPhone.
+                  </p>
+                )}
+                {!gameReady && !runtimeError && isSmartTV() && (
+                  <p className="border-b border-border bg-blue-500/5 px-4 py-2 text-xs text-blue-300">
+                    📺 Smart TV: đang tải WASM core (có thể mất 60–90 giây). Khi load xong,
+                    bấm nút <strong>▶</strong> xuất hiện trên màn hình để bắt đầu chơi.
                   </p>
                 )}
 
