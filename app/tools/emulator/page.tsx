@@ -513,10 +513,11 @@ function EmulatorHost() {
     // instead of reusing whatever just failed.
     s.src         = loadAttempt > 0 ? `${EJS_LOADER}?retry=${loadAttempt}` : EJS_LOADER
     s.async       = true
-    // crossOrigin="anonymous" lets the browser expose the real error message
-    // from cross-origin scripts (instead of just "Script error.") when the
-    // CDN sends CORS headers — emulatorjs.org CDN does send these.
-    s.crossOrigin = 'anonymous'
+    // crossOrigin="anonymous" exposes real error messages from cross-origin scripts,
+    // but some Smart TV browsers silently fail CORS requests (no onerror, no window
+    // error event) when the CDN doesn't return matching headers for their UA — the
+    // script just never loads and the 90s timeout fires instead. Skip on TV.
+    if (!isSmartTV()) s.crossOrigin = 'anonymous'
     s.onerror = () => { setRuntimeError(true); setRuntimeErrorMsg('Không tải được loader.js từ CDN.') }
     document.body.appendChild(s)
     scriptRef.current = s
@@ -532,9 +533,9 @@ function EmulatorHost() {
     window.addEventListener('error', onWinError)
     window.addEventListener('unhandledrejection', onRejection)
 
-    // TV browsers compile WASM much slower than phones/PCs — give them 90s.
-    const stallMs = isSmartTV() ? 90000 : 45000
-    const tvMsg = 'Smart TV browser gặp lỗi khi tải WASM core. Thử: (1) chọn hệ NES/SNES/GBA thay vì Arcade/N64, (2) bấm nút ▶ xuất hiện trên màn hình để start game, (3) dọn cache rồi thử lại.'
+    // TV browsers compile WASM much slower than phones/PCs — give them 120s.
+    const stallMs = isSmartTV() ? 120000 : 45000
+    const tvMsg = 'Smart TV browser không tải được EmulatorJS. Thử: (1) bấm "↻ Thử lại" 1–2 lần, (2) dọn cache rồi thử lại, (3) dùng điện thoại/máy tính thay thế — TV browser thường quá cũ để chạy WASM.'
 
     // EmulatorJS gives no explicit "failed to init" callback — if the game
     // hasn't actually started after the timeout, treat it as stalled.
@@ -653,10 +654,11 @@ function EmulatorHost() {
                   )}
                   {isSmartTV() && (
                     <p className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-300">
-                      ⚠️ Smart TV browser: RAM và JS engine giới hạn. Nên dùng{' '}
-                      <strong>NES / SNES / GBA / Game Boy</strong> — core nhẹ, tải nhanh hơn.
-                      Arcade (FBNeo) và N64 có thể không tải được do WASM quá lớn.
-                      Sau khi game load xong, bấm nút <strong>▶</strong> trên màn hình để bắt đầu.
+                      ⚠️ Smart TV browser: nhiều TV dùng trình duyệt cũ, không hỗ trợ tốt WASM.
+                      Nếu lỗi hãy bấm &quot;↻ Thử lại&quot; vài lần. Nên dùng{' '}
+                      <strong>NES / SNES / GBA</strong> — core nhẹ nhất. Sau khi load xong,
+                      bấm nút <strong>▶</strong> trên màn hình để bắt đầu chơi.
+                      Nếu vẫn lỗi: mở web này trên điện thoại/máy tính sẽ chạy tốt hơn.
                     </p>
                   )}
                 </div>
