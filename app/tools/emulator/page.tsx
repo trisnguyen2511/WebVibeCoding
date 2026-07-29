@@ -16,8 +16,12 @@ const EJS_DATA   = 'https://cdn.emulatorjs.org/stable/data/'
 // (there is no EJS_GameManager global and no pressButton/releaseButton method —
 // calling those silently no-ops every input, which is why controls never worked)
 interface EJSManager {
-  simulateInput:         (player: number, index: number, value: number) => void
+  simulateInput:           (player: number, index: number, value: number) => void
   setControllerPortDevice: (port: number, device: number) => void
+  saveState:               (slot?: number) => void
+  loadState:               (slot?: number) => void
+  downloadState:           () => void
+  uploadState:             () => void
 }
 
 // libretro RETRO_DEVICE_JOYPAD — the "port has a standard gamepad plugged
@@ -220,6 +224,7 @@ function EmulatorHost() {
   // instead of just "still loading, no idea why".
   const [runtimeErrorMsg, setRuntimeErrorMsg] = useState<string | null>(null)
   const [loadAttempt,    setLoadAttempt]    = useState(0)
+  const [saveMsg,        setSaveMsg]        = useState<{ text: string; ok: boolean } | null>(null)
 
   // ROM library — admin-uploaded ROMs (see /tools/emulator/admin), filtered
   // to the currently selected system.
@@ -264,6 +269,34 @@ function EmulatorHost() {
   }, [])
 
   const exitFakeFullscreen = useCallback(() => setFakeFullscreen(false), [])
+
+  const handleSaveState = useCallback(() => {
+    try {
+      ejsRef.current?.saveState?.()
+      setSaveMsg({ text: '✓ Saved', ok: true })
+    } catch {
+      setSaveMsg({ text: '✗ Lỗi', ok: false })
+    }
+    setTimeout(() => setSaveMsg(null), 2000)
+  }, [])
+
+  const handleLoadState = useCallback(() => {
+    try {
+      ejsRef.current?.loadState?.()
+      setSaveMsg({ text: '✓ Loaded', ok: true })
+    } catch {
+      setSaveMsg({ text: '✗ Lỗi', ok: false })
+    }
+    setTimeout(() => setSaveMsg(null), 2000)
+  }, [])
+
+  const handleDownloadState = useCallback(() => {
+    try { ejsRef.current?.downloadState?.() } catch { /* silent */ }
+  }, [])
+
+  const handleUploadState = useCallback(() => {
+    try { ejsRef.current?.uploadState?.() } catch { /* silent */ }
+  }, [])
 
   // TV-specific start: called by our own big "▶ Start" button so the click
   // event is the user gesture that unlocks AudioContext before EJS loads.
@@ -625,6 +658,7 @@ function EmulatorHost() {
     setRuntimeError(false)
     setRuntimeErrorMsg(null)
     setTvReady(false)
+    setSaveMsg(null)
   }
 
   const filteredLibraryRoms = librarySearch.trim()
@@ -884,6 +918,29 @@ function EmulatorHost() {
                       >
                         ↻ Thử lại
                       </button>
+                    )}
+                    {gameReady && (
+                      <>
+                        {saveMsg && (
+                          <span className={`font-mono text-xs ${saveMsg.ok ? 'text-green-400' : 'text-red-400'}`}>
+                            {saveMsg.text}
+                          </span>
+                        )}
+                        <button
+                          onClick={handleSaveState}
+                          title="Save state (lưu tiến độ)"
+                          className="text-xs text-muted transition-colors hover:text-fg"
+                        >
+                          💾 Save
+                        </button>
+                        <button
+                          onClick={handleLoadState}
+                          title="Load state (tải tiến độ đã lưu)"
+                          className="text-xs text-muted transition-colors hover:text-fg"
+                        >
+                          📂 Load
+                        </button>
+                      </>
                     )}
                     {fakeFullscreen ? (
                       <button
