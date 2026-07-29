@@ -15,13 +15,19 @@ const EJS_DATA   = 'https://cdn.emulatorjs.org/stable/data/'
 // Real API: window.EJS_emulator.gameManager.simulateInput(player, index, value)
 // (there is no EJS_GameManager global and no pressButton/releaseButton method —
 // calling those silently no-ops every input, which is why controls never worked)
+// Confirmed API from EmulatorJS stable (cdn.emulatorjs.org/stable/data/):
+// — getState() serialises current RetroArch core state → raw bytes (Uint8Array)
+// — loadState(bytes) deserialises and restores those bytes into the core
+// — quickSave/quickLoad write to the in-memory FS but NOT to IDBFS, so they
+//   don't persist across reloads either; we manage persistence ourselves via
+//   localStorage.
+// — downloadState / uploadState / saveState(slot) do NOT exist on gameManager.
 interface EJSManager {
   simulateInput:           (player: number, index: number, value: number) => void
   setControllerPortDevice: (port: number, device: number) => void
-  saveState:               (slot?: number) => void
-  loadState:               (slot?: number) => void
-  downloadState:           () => void
-  uploadState:             () => void
+  getState:                () => Uint8Array
+  loadState:               (state: Uint8Array) => void
+  supportsStates:          () => boolean
 }
 
 // libretro RETRO_DEVICE_JOYPAD — the "port has a standard gamepad plugged
@@ -225,6 +231,7 @@ function EmulatorHost() {
   const [runtimeErrorMsg, setRuntimeErrorMsg] = useState<string | null>(null)
   const [loadAttempt,    setLoadAttempt]    = useState(0)
   const [saveMsg,        setSaveMsg]        = useState<{ text: string; ok: boolean } | null>(null)
+  const [hasSave,        setHasSave]        = useState(false)
 
   // ROM library — admin-uploaded ROMs (see /tools/emulator/admin), filtered
   // to the currently selected system.
@@ -270,33 +277,56 @@ function EmulatorHost() {
 
   const exitFakeFullscreen = useCallback(() => setFakeFullscreen(false), [])
 
+  // Re-check whether a save exists in localStorage whenever the ROM changes.
+  useEffect(() => {
+    const key = romFileName ?? romName
+    setHasSave(key ? !!localStorage.getItem(`ejs_save_${key}`) : false)
+  }, [romFileName, romName])
+
   const handleSaveState = useCallback(() => {
     try {
-      ejsRef.current?.saveState?.()
-      setSaveMsg({ text: '✓ Saved', ok: true })
-    } catch {
-      setSaveMsg({ text: '✗ Lỗi', ok: false })
+      const bytes = ejsRef.current?.getState?.()
+      if (!bytes?.length) throw new Error('empty')
+      // Encode Uint8Array as base64 in chunks to avoid call-stack overflow on
+      // large states (N64 can exceed the default spread-operator stack limit).
+      const CHUNK = 8192
+      let binary = ''
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        binary += String.fromCharCode(...Array.from(bytes.subarray(i, i + CHUNK)))
+      }
+      const key = `ejs_save_${romFileName ?? romName ?? 'game'}`
+      localStorage.setItem(key, btoa(binary))
+      setHasSave(true)
+      setSaveMsg({ text: '✓ Đã lưu', ok: true })
+    } catch (e) {
+      const msg =
+        e instanceof DOMException && e.name === 'QuotaExceededError'
+          ? '✗ Bộ nhớ đầy'
+          : '✗ Lỗi save'
+      setSaveMsg({ text: msg, ok: false })
     }
-    setTimeout(() => setSaveMsg(null), 2000)
-  }, [])
+    setTimeout(() => setSaveMsg(null), 2500)
+  }, [romFileName, romName])
 
   const handleLoadState = useCallback(() => {
     try {
-      ejsRef.current?.loadState?.()
-      setSaveMsg({ text: '✓ Loaded', ok: true })
+      const key = `ejs_save_${romFileName ?? romName ?? 'game'}`
+      const stored = localStorage.getItem(key)
+      if (!stored) {
+        setSaveMsg({ text: '✗ Chưa có save', ok: false })
+        setTimeout(() => setSaveMsg(null), 2500)
+        return
+      }
+      const binary = atob(stored)
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+      ejsRef.current?.loadState?.(bytes)
+      setSaveMsg({ text: '✓ Đã tải', ok: true })
     } catch {
-      setSaveMsg({ text: '✗ Lỗi', ok: false })
+      setSaveMsg({ text: '✗ Lỗi load', ok: false })
     }
-    setTimeout(() => setSaveMsg(null), 2000)
-  }, [])
-
-  const handleDownloadState = useCallback(() => {
-    try { ejsRef.current?.downloadState?.() } catch { /* silent */ }
-  }, [])
-
-  const handleUploadState = useCallback(() => {
-    try { ejsRef.current?.uploadState?.() } catch { /* silent */ }
-  }, [])
+    setTimeout(() => setSaveMsg(null), 2500)
+  }, [romFileName, romName])
 
   // TV-specific start: called by our own big "▶ Start" button so the click
   // event is the user gesture that unlocks AudioContext before EJS loads.
@@ -659,6 +689,7 @@ function EmulatorHost() {
     setRuntimeErrorMsg(null)
     setTvReady(false)
     setSaveMsg(null)
+    setHasSave(false)
   }
 
   const filteredLibraryRoms = librarySearch.trim()
@@ -928,15 +959,16 @@ function EmulatorHost() {
                         )}
                         <button
                           onClick={handleSaveState}
-                          title="Save state (lưu tiến độ)"
+                          title="Save state — lưu tiến độ vào bộ nhớ trình duyệt"
                           className="text-xs text-muted transition-colors hover:text-fg"
                         >
                           💾 Save
                         </button>
                         <button
                           onClick={handleLoadState}
-                          title="Load state (tải tiến độ đã lưu)"
-                          className="text-xs text-muted transition-colors hover:text-fg"
+                          disabled={!hasSave}
+                          title={hasSave ? 'Load state — tải lại tiến độ đã lưu' : 'Chưa có save'}
+                          className="text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 text-muted hover:text-fg"
                         >
                           📂 Load
                         </button>
