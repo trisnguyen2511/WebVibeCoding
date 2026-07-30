@@ -232,6 +232,7 @@ function EmulatorHost() {
   const [loadAttempt,    setLoadAttempt]    = useState(0)
   const [saveMsg,        setSaveMsg]        = useState<{ text: string; ok: boolean } | null>(null)
   const [hasSave,        setHasSave]        = useState(false)
+  const [showArcadeOverlay, setShowArcadeOverlay] = useState(true)
 
   // ROM library — admin-uploaded ROMs (see /tools/emulator/admin), filtered
   // to the currently selected system.
@@ -338,6 +339,24 @@ function EmulatorHost() {
     } catch { /* some TV browsers throw — ignore, still proceed */ }
     setTvReady(true)
   }, [])
+
+  // Returns pointer event handlers for an on-screen arcade button. Uses
+  // setPointerCapture so the button keeps receiving events even if the finger
+  // slides off it — crucial for fast inputs on touch screens.
+  const arcadeBtnProps = useCallback((btns: number[]) => ({
+    onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
+      e.currentTarget.setPointerCapture(e.pointerId)
+      e.preventDefault()
+      btns.forEach(b => ejsRef.current?.simulateInput(0, b, 1))
+    },
+    onPointerUp(e: React.PointerEvent<HTMLButtonElement>) {
+      e.preventDefault()
+      btns.forEach(b => ejsRef.current?.simulateInput(0, b, 0))
+    },
+    onPointerCancel() {
+      btns.forEach(b => ejsRef.current?.simulateInput(0, b, 0))
+    },
+  }), [])
 
   // Clear all browser storage used by EmulatorJS (Cache API cores, IndexedDB saves, localStorage)
   const cleanCache = async () => {
@@ -690,6 +709,7 @@ function EmulatorHost() {
     setTvReady(false)
     setSaveMsg(null)
     setHasSave(false)
+    setShowArcadeOverlay(true)
   }
 
   const filteredLibraryRoms = librarySearch.trim()
@@ -991,6 +1011,15 @@ function EmulatorHost() {
                         ⛶ Fullscreen
                       </button>
                     )}
+                    {system === 'arcade' && gameReady && (
+                      <button
+                        onClick={() => setShowArcadeOverlay(v => !v)}
+                        title={showArcadeOverlay ? 'Tắt nút arcade' : 'Hiện nút arcade'}
+                        className={`text-xs transition-colors ${showArcadeOverlay ? 'text-accent-soft' : 'text-muted hover:text-fg'}`}
+                      >
+                        🕹️ Nút
+                      </button>
+                    )}
                     <button
                       onClick={() => { setShowRomSwap((v) => !v); setUrlError(null) }}
                       className={`text-xs transition-colors ${showRomSwap ? 'text-accent-soft' : 'text-muted hover:text-fg'}`}
@@ -1073,6 +1102,103 @@ function EmulatorHost() {
                     fakeFullscreen ? 'min-h-0 flex-1' : ''
                   } ${runtimeError ? 'hidden' : ''}`}
                 />
+
+                {/* ── Arcade on-screen controls ─────────────────────── */}
+                {system === 'arcade' && gameReady && showArcadeOverlay && !runtimeError && (
+                  <div
+                    className="shrink-0 border-t border-border bg-black/95 px-3 py-2.5 select-none"
+                    style={{ touchAction: 'none' }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+
+                      {/* D-pad */}
+                      <div
+                        className="grid gap-0.5"
+                        style={{ gridTemplateColumns: 'repeat(3,38px)', gridTemplateRows: 'repeat(3,38px)' }}
+                      >
+                        {(
+                          [
+                            null,                    { label: '↑', btns: [4] }, null,
+                            { label: '←', btns: [6] }, null,                    { label: '→', btns: [7] },
+                            null,                    { label: '↓', btns: [5] }, null,
+                          ] as ({ label: string; btns: number[] } | null)[]
+                        ).map((btn, i) =>
+                          btn ? (
+                            <button
+                              key={i}
+                              {...arcadeBtnProps(btn.btns)}
+                              className="flex h-[38px] w-[38px] items-center justify-center rounded-md border border-border/60 bg-zinc-800 text-sm font-bold text-fg active:bg-accent/40"
+                            >
+                              {btn.label}
+                            </button>
+                          ) : (
+                            <div key={i} />
+                          )
+                        )}
+                      </div>
+
+                      {/* Attack + system buttons */}
+                      <div className="flex flex-col gap-1">
+                        {/* Row 1: Punches */}
+                        <div className="flex gap-1">
+                          {(
+                            [
+                              { label: 'LP', btns: [1],        cls: 'bg-blue-600/80  border-blue-500/60'    },
+                              { label: 'MP', btns: [9],        cls: 'bg-blue-700/80  border-blue-600/60'    },
+                              { label: 'HP', btns: [10],       cls: 'bg-blue-900/80  border-blue-800/60'    },
+                              { label: '3P', btns: [1, 9, 10], cls: 'bg-violet-700/80 border-violet-500/60' },
+                            ] as { label: string; btns: number[]; cls: string }[]
+                          ).map(btn => (
+                            <button
+                              key={btn.label}
+                              {...arcadeBtnProps(btn.btns)}
+                              className={`flex h-10 w-12 items-center justify-center rounded-lg border font-mono text-xs font-bold text-white active:brightness-125 ${btn.cls}`}
+                            >
+                              {btn.label}
+                            </button>
+                          ))}
+                        </div>
+                        {/* Row 2: Kicks */}
+                        <div className="flex gap-1">
+                          {(
+                            [
+                              { label: 'LK', btns: [0],        cls: 'bg-red-600/80    border-red-500/60'    },
+                              { label: 'MK', btns: [8],        cls: 'bg-red-700/80    border-red-600/60'    },
+                              { label: 'HK', btns: [11],       cls: 'bg-red-900/80    border-red-800/60'    },
+                              { label: '3K', btns: [0, 8, 11], cls: 'bg-orange-700/80 border-orange-500/60' },
+                            ] as { label: string; btns: number[]; cls: string }[]
+                          ).map(btn => (
+                            <button
+                              key={btn.label}
+                              {...arcadeBtnProps(btn.btns)}
+                              className={`flex h-10 w-12 items-center justify-center rounded-lg border font-mono text-xs font-bold text-white active:brightness-125 ${btn.cls}`}
+                            >
+                              {btn.label}
+                            </button>
+                          ))}
+                        </div>
+                        {/* Row 3: System */}
+                        <div className="flex gap-1">
+                          {(
+                            [
+                              { label: 'COIN',  btns: [2] },
+                              { label: 'START', btns: [3] },
+                            ] as { label: string; btns: number[] }[]
+                          ).map(btn => (
+                            <button
+                              key={btn.label}
+                              {...arcadeBtnProps(btn.btns)}
+                              className="flex h-7 w-[49px] items-center justify-center rounded-full border border-border/60 bg-zinc-800/80 font-mono text-[9px] text-muted active:bg-accent/30"
+                            >
+                              {btn.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
