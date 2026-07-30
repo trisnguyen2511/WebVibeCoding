@@ -1177,9 +1177,17 @@ function EmulatorHost() {
                 />
 
                 {/* ── Arcade on-screen controls ─────────────────────── */}
+                {system === 'arcade' && gameReady && !runtimeError && (
+                  <button
+                    onClick={() => setShowArcadeOverlay(v => !v)}
+                    className="shrink-0 flex w-full items-center justify-center gap-1.5 border-t border-border bg-black/95 py-1.5 font-mono text-[10px] text-zinc-500 transition-colors hover:text-zinc-300 select-none"
+                  >
+                    {showArcadeOverlay ? '▼ Ẩn nút' : '▲ Hiện nút'}
+                  </button>
+                )}
                 {system === 'arcade' && gameReady && showArcadeOverlay && !runtimeError && (
                   <div
-                    className="shrink-0 border-t border-border bg-black/95 px-3 py-2.5 select-none"
+                    className="shrink-0 bg-black/95 px-3 py-2.5 select-none"
                     style={{ touchAction: 'none' }}
                   >
                     <div className="flex items-center justify-between gap-2">
