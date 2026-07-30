@@ -188,6 +188,79 @@ function extractRomFilename(url: string): string {
   }
 }
 
+// ── Arcade virtual joystick ─────────────────────────────────────
+// Circular touch area: drag in any direction to press that dpad button.
+// Supports 8 directions (including diagonals like up-left, down-right).
+function ArcadeJoystick({ simulate }: { simulate: (btn: number, val: 0 | 1) => void }) {
+  const baseRef  = useRef<HTMLDivElement>(null)
+  const thumbRef = useRef<HTMLDivElement>(null)
+  const activeRef = useRef<number[]>([])
+  const RADIUS = 46   // half the base circle diameter
+  const DEAD   = 13   // deadzone px from centre — no direction inside this
+
+  // Returns which RetroPad buttons to press for a given (dx, dy) offset.
+  // Uses 8 sectors of 45° each; overlapping sectors produce diagonals.
+  const dirs8 = (dx: number, dy: number): number[] => {
+    const d = Math.sqrt(dx * dx + dy * dy)
+    if (d < DEAD) return []
+    const a = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360
+    if (a >= 337.5 || a < 22.5)  return [7]      // →  right
+    if (a < 67.5)                 return [7, 5]   // ↘  right+down
+    if (a < 112.5)                return [5]      // ↓  down
+    if (a < 157.5)                return [5, 6]   // ↙  down+left
+    if (a < 202.5)                return [6]      // ←  left
+    if (a < 247.5)                return [4, 6]   // ↖  up+left
+    if (a < 292.5)                return [4]      // ↑  up
+    return                               [4, 7]   // ↗  up+right
+  }
+
+  const update = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!baseRef.current) return
+    const rect = baseRef.current.getBoundingClientRect()
+    let dx = e.clientX - (rect.left + rect.width / 2)
+    let dy = e.clientY - (rect.top  + rect.height / 2)
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    if (dist > RADIUS) { dx = dx / dist * RADIUS; dy = dy / dist * RADIUS }
+    if (thumbRef.current)
+      thumbRef.current.style.transform = `translate(${dx}px,${dy}px)`
+    const next = dirs8(dx, dy)
+    const prev = activeRef.current
+    prev.filter(b => !next.includes(b)).forEach(b => simulate(b, 0))
+    next.filter(b => !prev.includes(b)).forEach(b => simulate(b, 1))
+    activeRef.current = next
+  }
+
+  const release = () => {
+    activeRef.current.forEach(b => simulate(b, 0))
+    activeRef.current = []
+    if (thumbRef.current) thumbRef.current.style.transform = 'translate(0,0)'
+  }
+
+  return (
+    <div
+      ref={baseRef}
+      className="relative shrink-0 flex items-center justify-center rounded-full bg-zinc-900 border-2 border-zinc-700 select-none"
+      style={{ width: RADIUS * 2, height: RADIUS * 2, touchAction: 'none' }}
+      onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); e.preventDefault(); update(e) }}
+      onPointerMove={e => { if (e.currentTarget.hasPointerCapture(e.pointerId)) { e.preventDefault(); update(e) } }}
+      onPointerUp={release}
+      onPointerCancel={release}
+    >
+      {/* Direction hints */}
+      <span className="pointer-events-none absolute top-1 left-1/2 -translate-x-1/2 text-[9px] text-zinc-600">↑</span>
+      <span className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] text-zinc-600">↓</span>
+      <span className="pointer-events-none absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-zinc-600">←</span>
+      <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-zinc-600">→</span>
+      {/* Thumb */}
+      <div
+        ref={thumbRef}
+        className="h-9 w-9 rounded-full bg-zinc-600 border-2 border-zinc-500 shadow-lg pointer-events-none"
+        style={{ transform: 'translate(0,0)' }}
+      />
+    </div>
+  )
+}
+
 // ── Host page ────────────────────────────────────────────────────
 function EmulatorHost() {
   const [roomId]  = useState(generateRoomId)
@@ -1111,31 +1184,8 @@ function EmulatorHost() {
                   >
                     <div className="flex items-center justify-between gap-2">
 
-                      {/* D-pad */}
-                      <div
-                        className="grid gap-0.5"
-                        style={{ gridTemplateColumns: 'repeat(3,38px)', gridTemplateRows: 'repeat(3,38px)' }}
-                      >
-                        {(
-                          [
-                            null,                    { label: '↑', btns: [4] }, null,
-                            { label: '←', btns: [6] }, null,                    { label: '→', btns: [7] },
-                            null,                    { label: '↓', btns: [5] }, null,
-                          ] as ({ label: string; btns: number[] } | null)[]
-                        ).map((btn, i) =>
-                          btn ? (
-                            <button
-                              key={i}
-                              {...arcadeBtnProps(btn.btns)}
-                              className="flex h-[38px] w-[38px] items-center justify-center rounded-md border border-border/60 bg-zinc-800 text-sm font-bold text-fg active:bg-accent/40"
-                            >
-                              {btn.label}
-                            </button>
-                          ) : (
-                            <div key={i} />
-                          )
-                        )}
-                      </div>
+                      {/* Joystick */}
+                      <ArcadeJoystick simulate={(btn, val) => ejsRef.current?.simulateInput(0, btn, val)} />
 
                       {/* Attack + system buttons */}
                       <div className="flex flex-col gap-1">
