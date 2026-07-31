@@ -20,6 +20,14 @@ interface OnlineLobbyGMProps {
   onDissolved: () => void
 }
 
+async function kickPlayer(roomId: string, playerId: string): Promise<void> {
+  await fetch('/api/werewolf/room/kick', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ roomId, gmDeviceId: getGmDeviceId(), playerId }),
+  })
+}
+
 function toPlayerSetup(p: RoomPlayer): PlayerSetup {
   return { id: p.id, name: p.name, roleIds: [] }
 }
@@ -67,6 +75,10 @@ export function OnlineLobbyGM({ room, onRoomCreated, players, onPlayersChange, o
       onPlayersChange([...playersRef.current, toPlayerSetup(player)])
     })
     channel.on('broadcast', { event: 'player_left' }, (msg) => {
+      const { playerId } = msg.payload as { playerId: string }
+      onPlayersChange(playersRef.current.filter((p) => p.id !== playerId))
+    })
+    channel.on('broadcast', { event: 'player_kicked' }, (msg) => {
       const { playerId } = msg.payload as { playerId: string }
       onPlayersChange(playersRef.current.filter((p) => p.id !== playerId))
     })
@@ -199,6 +211,14 @@ export function OnlineLobbyGM({ room, onRoomCreated, players, onPlayersChange, o
                 </span>
                 <p className="min-w-0 flex-1 truncate text-sm text-fg">{p.name}</p>
                 <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" title="Đã kết nối" />
+                <button
+                  type="button"
+                  onClick={() => room && kickPlayer(room.roomId, p.id)}
+                  className="shrink-0 rounded-lg border border-red-500/30 px-2 py-1 text-xs text-red-400 transition-colors hover:border-red-500/60 hover:bg-red-500/10"
+                  title="Kick khỏi phòng"
+                >
+                  ✕
+                </button>
               </li>
             ))}
           </ul>

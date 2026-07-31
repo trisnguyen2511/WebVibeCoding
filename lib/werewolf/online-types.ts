@@ -40,6 +40,7 @@ export function roomChannelName(roomId: string): string {
 export type RoomBroadcastEvent =
   | { event: 'player_joined'; payload: RoomPlayer }
   | { event: 'player_left'; payload: { playerId: string } }
+  | { event: 'player_kicked'; payload: { playerId: string } }
   | { event: 'room_locked'; payload: Record<string, never> }
   | { event: 'room_reopened'; payload: Record<string, never> }
   | {

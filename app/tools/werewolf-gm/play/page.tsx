@@ -29,6 +29,7 @@ function WerewolfPlayInner() {
   const [error, setError] = useState('')
   const [joined, setJoined] = useState<JoinedState | null>(null)
   const [dissolved, setDissolved] = useState(false)
+  const [kicked, setKicked] = useState(false)
   const deviceIdRef = useRef('')
   const joinedRef = useRef<JoinedState | null>(null)
   joinedRef.current = joined
@@ -72,6 +73,13 @@ function WerewolfPlayInner() {
     })
     channel.on('broadcast', { event: 'game_ended' }, () => {
       setJoined((s) => (s ? { ...s, status: 'lobby', roleIds: [], gameEndedAt: new Date().toISOString() } : s))
+    })
+    channel.on('broadcast', { event: 'player_kicked' }, (msg) => {
+      const { playerId } = msg.payload as { playerId: string }
+      if (playerId !== joinedRef.current?.playerId) return
+      clearPlayerSession()
+      setKicked(true)
+      setJoined(null)
     })
     channel.on('broadcast', { event: 'room_dissolved' }, () => {
       clearPlayerSession()
@@ -138,6 +146,22 @@ function WerewolfPlayInner() {
     setJoined(null)
     setCodeInput('')
     setNameInput('')
+  }
+
+  if (kicked) {
+    return (
+      <div className="space-y-3 rounded-2xl border border-dashed border-border px-4 py-10 text-center">
+        <p className="text-2xl">🚫</p>
+        <p className="text-sm text-muted">Bạn đã bị quản trò kick khỏi phòng.</p>
+        <button
+          type="button"
+          onClick={() => setKicked(false)}
+          className="mx-auto rounded-xl border border-border px-4 py-2 text-sm text-fg"
+        >
+          Vào phòng khác
+        </button>
+      </div>
+    )
   }
 
   if (dissolved) {
