@@ -1197,14 +1197,32 @@ function EmulatorHost() {
 
                       {/* Attack + system buttons */}
                       <div className="flex flex-col gap-1">
-                        {/* Row 1: Punches */}
+                        {/* Column combos — top row: press both buttons in same column simultaneously */}
                         <div className="flex gap-1">
                           {(
                             [
-                              { label: 'LP', btns: [1],        cls: 'bg-blue-600/80  border-blue-500/60'    },
-                              { label: 'MP', btns: [9],        cls: 'bg-blue-700/80  border-blue-600/60'    },
-                              { label: 'HP', btns: [10],       cls: 'bg-blue-900/80  border-blue-800/60'    },
-                              { label: '3P', btns: [1, 9, 10], cls: 'bg-violet-700/80 border-violet-500/60' },
+                              { label: 'L', btns: [1, 0],   cls: 'bg-amber-600/80 border-amber-500/60' },
+                              { label: 'M', btns: [9, 8],   cls: 'bg-amber-700/80 border-amber-600/60' },
+                              { label: 'H', btns: [10, 11], cls: 'bg-amber-800/80 border-amber-700/60' },
+                            ] as { label: string; btns: number[]; cls: string }[]
+                          ).map(btn => (
+                            <button
+                              key={btn.label}
+                              {...arcadeBtnProps(btn.btns)}
+                              className={`flex h-7 w-12 items-center justify-center rounded-md border font-mono text-[10px] font-bold text-white active:brightness-125 ${btn.cls}`}
+                            >
+                              {btn.label}
+                            </button>
+                          ))}
+                        </div>
+                        {/* Punch row + row combo (3P) */}
+                        <div className="flex gap-1">
+                          {(
+                            [
+                              { label: 'LP', btns: [1],        cls: 'bg-blue-600/80   border-blue-500/60'    },
+                              { label: 'MP', btns: [9],        cls: 'bg-blue-700/80   border-blue-600/60'    },
+                              { label: 'HP', btns: [10],       cls: 'bg-blue-900/80   border-blue-800/60'    },
+                              { label: '3P', btns: [1, 9, 10], cls: 'bg-violet-700/80 border-violet-500/60'  },
                             ] as { label: string; btns: number[]; cls: string }[]
                           ).map(btn => (
                             <button
@@ -1216,7 +1234,7 @@ function EmulatorHost() {
                             </button>
                           ))}
                         </div>
-                        {/* Row 2: Kicks */}
+                        {/* Kick row + row combo (3K) */}
                         <div className="flex gap-1">
                           {(
                             [
@@ -1235,7 +1253,7 @@ function EmulatorHost() {
                             </button>
                           ))}
                         </div>
-                        {/* Row 3: System */}
+                        {/* System */}
                         <div className="flex gap-1">
                           {(
                             [
