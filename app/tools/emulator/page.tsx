@@ -1417,7 +1417,6 @@ function EmulatorHost() {
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
               </svg>
               <input
-                autoFocus
                 value={librarySearch}
                 onChange={(e) => setLibrarySearch(e.target.value)}
                 placeholder={`Tìm game — ${SYSTEMS.find((s) => s.value === system)?.label}`}
