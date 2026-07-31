@@ -153,6 +153,12 @@ export function OnlineLobbyGM({ room, onRoomCreated, players, onPlayersChange, o
         >
           Tạo phòng online
         </button>
+        <a
+          href="/tools/werewolf-gm/play"
+          className="block w-full rounded-xl border border-border px-4 py-3 text-sm text-muted transition-colors hover:border-accent/40 hover:text-fg"
+        >
+          🎴 Vào phòng với tư cách người chơi
+        </a>
       </div>
     )
   }
