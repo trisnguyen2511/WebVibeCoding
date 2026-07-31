@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ToolShell } from '@/components/tool-shell'
 import { cloneBuiltInRoles, syncBuiltInRoles } from '@/lib/werewolf/built-in-roles'
 import { derivePlayers } from '@/lib/werewolf/derive-game-state'
@@ -12,8 +12,11 @@ import { getActiveNightActions } from '@/lib/werewolf/selectors'
 import { totalRoleSlots } from '@/lib/werewolf/role-bundles'
 import { clearGameState, loadGameState, saveGameState } from '@/lib/werewolf/storage'
 import type { GameEvent, GameState, RoleDef } from '@/lib/werewolf/types'
+import { getGmDeviceId, loadGmOnlineSession, saveGmOnlineSession, clearGmOnlineSession } from '@/lib/werewolf/online-storage'
+import type { OnlineRoomRef } from '@/components/werewolf/online-lobby-gm'
 
 import { SetupPlayers } from '@/components/werewolf/setup-players'
+import { OnlineLobbyGM } from '@/components/werewolf/online-lobby-gm'
 import { SetupRoles } from '@/components/werewolf/setup-roles'
 import { SetupAssign } from '@/components/werewolf/setup-assign'
 import { SetupOrder } from '@/components/werewolf/setup-order'
@@ -48,6 +51,10 @@ export default function WerewolfGmPage() {
   const [showTimeline, setShowTimeline] = useState(false)
   const [showRoster, setShowRoster] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [mode, setMode] = useState<'offline' | 'online'>('offline')
+  const [onlineRoom, setOnlineRoom] = useState<OnlineRoomRef | null>(null)
+  const [onlineRealtimeEnabled, setOnlineRealtimeEnabled] = useState(true)
+  const roomEndedNotifiedRef = useRef(false)
   // Ngăn xếp redo — event cuối mảng là cái sắp được redo tiếp theo. Bị xoá
   // sạch bất cứ khi nào có 1 event MỚI được ghi (không phải do undo/redo),
   // vì lúc đó "tương lai" đã undo không còn hợp lệ nữa.
@@ -68,6 +75,12 @@ export default function WerewolfGmPage() {
       clearGameState()
     }
     setLoaded(true)
+
+    const onlineSession = loadGmOnlineSession()
+    if (onlineSession) {
+      setMode('online')
+      setOnlineRoom(onlineSession)
+    }
   }, [])
 
   useEffect(() => {
@@ -112,6 +125,15 @@ export default function WerewolfGmPage() {
       ...s,
       setupPlayers: s.setupPlayers.map((p) => (p.id === playerId ? { ...p, roleIds: [...p.roleIds, ...roleIds] } : p)),
     }))
+    if (mode === 'online' && onlineRoom) {
+      fetch('/api/werewolf/room/assign-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: onlineRoom.roomId, gmDeviceId: getGmDeviceId(), playerId, roleIds }),
+      }).catch(() => {
+        // best-effort — MC still announces the role out loud regardless
+      })
+    }
   }
 
   function handleEndNight() {
@@ -241,6 +263,16 @@ export default function WerewolfGmPage() {
    * nhập/chọn lại từ đầu, chỉ cần đi qua bước "Gán vai" một lần nữa.
    */
   function handlePlayAgain() {
+    // Natural game-overs already reopened the online room the instant they
+    // ended (see the currentPhase 'ended' effect below) — this only needs to
+    // reopen it itself for the "abandon mid-game and restart" path.
+    if (mode === 'online' && onlineRoom && state.currentPhase !== 'ended') {
+      fetch('/api/werewolf/room/end', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: onlineRoom.roomId, gmDeviceId: getGmDeviceId() }),
+      }).catch(() => {})
+    }
     setRedoStack([])
     setState((s) => ({
       ...s,
@@ -261,6 +293,16 @@ export default function WerewolfGmPage() {
   }
 
   function handleResetEverything() {
+    if (onlineRoom) {
+      fetch('/api/werewolf/room/dissolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: onlineRoom.roomId, gmDeviceId: getGmDeviceId() }),
+      }).catch(() => {})
+      clearGmOnlineSession()
+      setOnlineRoom(null)
+      setMode('offline')
+    }
     clearGameState()
     setState(initialState())
     setRedoStack([])
@@ -290,10 +332,75 @@ export default function WerewolfGmPage() {
   const canStart =
     state.setupPlayers.length >= 4 && rolesFullyChosen && (state.assignMode === 'live' || everyoneHasRole)
 
-  function handleStartGame() {
+  async function handleStartGame() {
+    if (mode === 'online' && onlineRoom) {
+      try {
+        const res = await fetch('/api/werewolf/room/finalize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            roomId: onlineRoom.roomId,
+            gmDeviceId: getGmDeviceId(),
+            roles: state.roles,
+            roleCounts: state.setupRoleCounts,
+            assignMode: state.assignMode,
+            players: state.setupPlayers.map((p, i) => ({ id: p.id, seat: i, roleIds: p.roleIds })),
+          }),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          window.alert(data.error ?? 'Không thể bắt đầu ván online — vui lòng thử lại.')
+          return
+        }
+        setOnlineRealtimeEnabled(true)
+      } catch {
+        window.alert('Lỗi kết nối — không thể bắt đầu ván online.')
+        return
+      }
+    }
     // Chế độ 'live' cố tình KHÔNG random trước — vai được MC gán tay ngay lúc
     // gọi từng chức năng trong đêm 1 (xem NightLiveAssign).
     setState((s) => ({ ...s, currentPhase: 'night', currentNight: 1, currentDay: 1 }))
+  }
+
+  // Reopen the online room the instant a round ends (win condition confirmed
+  // by the MC) — players can then hit "Chơi lại" on their phones right away,
+  // independently of whether the MC has clicked "Chơi lại" locally yet.
+  useEffect(() => {
+    if (state.currentPhase === 'ended') {
+      if (mode === 'online' && onlineRoom && !roomEndedNotifiedRef.current) {
+        roomEndedNotifiedRef.current = true
+        fetch('/api/werewolf/room/end', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomId: onlineRoom.roomId, gmDeviceId: getGmDeviceId() }),
+        }).catch(() => {})
+      }
+    } else {
+      roomEndedNotifiedRef.current = false
+    }
+  }, [state.currentPhase, mode, onlineRoom])
+
+  async function handleToggleRealtime() {
+    if (!onlineRoom) return
+    const next = !onlineRealtimeEnabled
+    setOnlineRealtimeEnabled(next)
+    try {
+      await fetch('/api/werewolf/room/toggle-realtime', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: onlineRoom.roomId, gmDeviceId: getGmDeviceId(), enabled: next }),
+      })
+    } catch {
+      // best-effort — worst case players just keep seeing the old banner
+    }
+  }
+
+  function handleModeChange(next: 'offline' | 'online') {
+    if (next === mode) return
+    if (state.setupPlayers.length > 0 && !window.confirm('Chuyển chế độ sẽ xoá danh sách người chơi hiện tại. Tiếp tục?')) return
+    setState((s) => ({ ...s, setupPlayers: [] }))
+    setMode(next)
   }
 
   const SETUP_STEPS: { key: SetupStep; label: string }[] = [
@@ -307,6 +414,19 @@ export default function WerewolfGmPage() {
   return (
     <ToolShell name="Werewolf GM" icon="🐺" description="Quản trò Ma Sói — chia vai, điều hành đêm, undo, lịch sử ván">
       <div className="space-y-4">
+        {mode === 'online' && onlineRoom && state.currentPhase !== 'setup' && (
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-xs text-muted">
+            <span>
+              📡 Online · Mã phòng <span className="font-mono text-fg">{onlineRoom.code}</span>
+            </span>
+            {state.currentPhase !== 'ended' && (
+              <button type="button" onClick={handleToggleRealtime} className="underline underline-offset-2 hover:text-fg">
+                {onlineRealtimeEnabled ? 'Tắt đồng bộ trực tuyến' : 'Bật lại đồng bộ trực tuyến'}
+              </button>
+            )}
+          </div>
+        )}
+
         {state.currentPhase !== 'setup' && (
           <div className="flex items-center justify-between gap-2">
             <div className="flex gap-3">
@@ -397,18 +517,59 @@ export default function WerewolfGmPage() {
 
             {setupStep === 'players' && (
               <>
-                <SetupPlayers
-                  players={state.setupPlayers}
-                  onChange={(setupPlayers) => setState((s) => ({ ...s, setupPlayers }))}
-                />
-                <button
-                  type="button"
-                  disabled={state.setupPlayers.length < 4}
-                  onClick={() => setSetupStep('order')}
-                  className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg transition-transform active:scale-[0.98] disabled:opacity-40"
-                >
-                  Tiếp: sắp xếp vị trí
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange('offline')}
+                    className={`rounded-xl border px-3 py-2.5 text-sm transition-colors ${
+                      mode === 'offline' ? 'border-accent bg-accent/10 text-fg' : 'border-border text-muted hover:border-accent/40'
+                    }`}
+                  >
+                    💻 Offline
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange('online')}
+                    className={`rounded-xl border px-3 py-2.5 text-sm transition-colors ${
+                      mode === 'online' ? 'border-accent bg-accent/10 text-fg' : 'border-border text-muted hover:border-accent/40'
+                    }`}
+                  >
+                    📡 Online — phát thẻ qua điện thoại
+                  </button>
+                </div>
+
+                {mode === 'offline' ? (
+                  <>
+                    <SetupPlayers
+                      players={state.setupPlayers}
+                      onChange={(setupPlayers) => setState((s) => ({ ...s, setupPlayers }))}
+                    />
+                    <button
+                      type="button"
+                      disabled={state.setupPlayers.length < 4}
+                      onClick={() => setSetupStep('order')}
+                      className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg transition-transform active:scale-[0.98] disabled:opacity-40"
+                    >
+                      Tiếp: sắp xếp vị trí
+                    </button>
+                  </>
+                ) : (
+                  <OnlineLobbyGM
+                    room={onlineRoom}
+                    onRoomCreated={(room) => {
+                      setOnlineRoom(room)
+                      saveGmOnlineSession(room)
+                    }}
+                    players={state.setupPlayers}
+                    onPlayersChange={(setupPlayers) => setState((s) => ({ ...s, setupPlayers }))}
+                    onLocked={() => setSetupStep('order')}
+                    onDissolved={() => {
+                      clearGmOnlineSession()
+                      setOnlineRoom(null)
+                      setState((s) => ({ ...s, setupPlayers: [] }))
+                    }}
+                  />
+                )}
               </>
             )}
 

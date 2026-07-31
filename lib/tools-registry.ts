@@ -111,7 +111,7 @@ export const tools: Tool[] = [
     name: 'Werewolf GM',
     slug: 'werewolf-gm',
     icon: '🐺',
-    description: 'Công cụ quản trò Ma Sói — chia vai, điều hành đêm, kéo thả chọn mục tiêu, undo, lịch sử ván',
+    description: 'Công cụ quản trò Ma Sói — chia vai, điều hành đêm, kéo thả chọn mục tiêu, undo, lịch sử ván, phát thẻ vai trò online qua QR/mã phòng',
     category: 'game',
   },
   {
