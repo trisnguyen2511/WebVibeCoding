@@ -13,85 +13,115 @@ right = ArrowRight
 diagonal = true
 hold_interval = 50
 
+; ── Column combos (top row) ────────────────────────────────────
+; L = LP+LK  |  M = MP+MK  |  H = HP+HK
+
+[combo:L]
+label = L
+x = 42
+y = 3
+w = 13
+h = 11
+chord = f+x
+
+[combo:M]
+label = M
+x = 56
+y = 3
+w = 13
+h = 11
+chord = c+z
+
+[combo:H]
+label = H
+x = 70
+y = 3
+w = 13
+h = 11
+chord = q+e
+
+; ── Punch row ──────────────────────────────────────────────────
+
 [button:LP]
 label = LP
 key = f
 x = 42
-y = 4
-w = 18
-h = 24
+y = 17
+w = 13
+h = 26
 
 [button:MP]
 label = MP
 key = c
-x = 61
-y = 4
-w = 18
-h = 24
+x = 56
+y = 17
+w = 13
+h = 26
 
 [button:HP]
 label = HP
 key = q
-x = 80
-y = 4
-w = 18
-h = 24
+x = 70
+y = 17
+w = 13
+h = 26
+
+[combo:3P]
+label = 3P
+x = 84
+y = 17
+w = 14
+h = 26
+chord = f+c+q
+
+; ── Kick row ───────────────────────────────────────────────────
 
 [button:LK]
 label = LK
 key = x
 x = 42
-y = 30
-w = 18
-h = 24
+y = 45
+w = 13
+h = 26
 
 [button:MK]
 label = MK
 key = z
-x = 61
-y = 30
-w = 18
-h = 24
+x = 56
+y = 45
+w = 13
+h = 26
 
 [button:HK]
 label = HK
 key = e
-x = 80
-y = 30
-w = 18
-h = 24
+x = 70
+y = 45
+w = 13
+h = 26
+
+[combo:3K]
+label = 3K
+x = 84
+y = 45
+w = 14
+h = 26
+chord = x+z+e
+
+; ── System ─────────────────────────────────────────────────────
 
 [button:COIN]
 label = COIN
 key = v
-x = 38
-y = 80
-w = 16
-h = 8
+x = 42
+y = 82
+w = 20
+h = 10
 
 [button:START]
 label = START
 key = Enter
-x = 58
-y = 80
-w = 16
-h = 8
-
-; ── Combos ─────────────────────────────────────────────────────
-; Bấm đồng thời cả 3 đấm / cả 3 đá — combo phổ biến trong game CPS/NeoGeo
-
-[combo:3P]
-label = 3P
-x = 42
-y = 58
-w = 27
-h = 13
-chord = f+c+q
-
-[combo:3K]
-label = 3K
-x = 71
-y = 58
-w = 27
-h = 13
-chord = x+z+e
+x = 64
+y = 82
+w = 20
+h = 10
