@@ -3,9 +3,9 @@ name = SNES Layout - P2
 orientation = landscape
 
 [dpad:MOVE]
-x = 2
-y = 28
-size = 38
+x = 7
+y = 25
+size = 44
 up = w
 down = s
 left = a

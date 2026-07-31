@@ -6,9 +6,9 @@ orientation = landscape
 ; Non-overlapping: P2=WASD+JKLU, P3=TFGH+YREQ, P4=IBNO+PM
 
 [dpad:MOVE]
-x = 3
-y = 20
-size = 40
+x = 8
+y = 17
+size = 46
 up = ArrowUp
 down = ArrowDown
 left = ArrowLeft
