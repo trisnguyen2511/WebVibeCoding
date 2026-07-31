@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import type { PlayerSetup } from '@/lib/werewolf/types'
+import { MIN_PLAYERS, type PlayerSetup } from '@/lib/werewolf/types'
 import { getSupabaseBrowser } from '@/lib/supabase-browser'
 import { getGmDeviceId } from '@/lib/werewolf/online-storage'
 import { roomChannelName, type RoomPlayer } from '@/lib/werewolf/online-types'
@@ -209,15 +209,15 @@ export function OnlineLobbyGM({ room, onRoomCreated, players, onPlayersChange, o
         </button>
         <button
           type="button"
-          disabled={players.length < 4 || locking}
+          disabled={players.length < MIN_PLAYERS || locking}
           onClick={lockRoom}
           className="flex-1 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg transition-transform active:scale-[0.98] disabled:opacity-40"
         >
           🔒 Khoá phòng & tiếp tục
         </button>
       </div>
-      {players.length > 0 && players.length < 4 && (
-        <p className="text-xs text-amber-400">Cần tối thiểu 4 người chơi để khoá phòng.</p>
+      {players.length > 0 && players.length < MIN_PLAYERS && (
+        <p className="text-xs text-amber-400">Cần tối thiểu {MIN_PLAYERS} người chơi để khoá phòng.</p>
       )}
     </div>
   )

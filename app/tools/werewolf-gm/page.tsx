@@ -11,7 +11,7 @@ import { resolveNight } from '@/lib/werewolf/resolve-night'
 import { getActiveNightActions } from '@/lib/werewolf/selectors'
 import { totalRoleSlots } from '@/lib/werewolf/role-bundles'
 import { clearGameState, loadGameState, saveGameState } from '@/lib/werewolf/storage'
-import type { GameEvent, GameState, RoleDef } from '@/lib/werewolf/types'
+import { MIN_PLAYERS, type GameEvent, type GameState, type RoleDef } from '@/lib/werewolf/types'
 import { getGmDeviceId, loadGmOnlineSession, saveGmOnlineSession, clearGmOnlineSession } from '@/lib/werewolf/online-storage'
 import type { OnlineRoomRef } from '@/components/werewolf/online-lobby-gm'
 
@@ -330,7 +330,7 @@ export default function WerewolfGmPage() {
   const rolesFullyChosen = totalAssigned === state.setupPlayers.length
   const everyoneHasRole = state.setupPlayers.every((p) => p.roleIds.length > 0)
   const canStart =
-    state.setupPlayers.length >= 4 && rolesFullyChosen && (state.assignMode === 'live' || everyoneHasRole)
+    state.setupPlayers.length >= MIN_PLAYERS && rolesFullyChosen && (state.assignMode === 'live' || everyoneHasRole)
 
   async function handleStartGame() {
     if (mode === 'online' && onlineRoom) {
@@ -546,7 +546,7 @@ export default function WerewolfGmPage() {
                     />
                     <button
                       type="button"
-                      disabled={state.setupPlayers.length < 4}
+                      disabled={state.setupPlayers.length < MIN_PLAYERS}
                       onClick={() => setSetupStep('order')}
                       className="w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-fg transition-transform active:scale-[0.98] disabled:opacity-40"
                     >

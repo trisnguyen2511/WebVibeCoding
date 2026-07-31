@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import type { PlayerSetup } from '@/lib/werewolf/types'
+import { MIN_PLAYERS, type PlayerSetup } from '@/lib/werewolf/types'
 
 interface SetupPlayersProps {
   players: PlayerSetup[]
@@ -193,8 +193,8 @@ export function SetupPlayers({ players, onChange }: SetupPlayersProps) {
         </ul>
       )}
 
-      {players.length > 0 && players.length < 4 && (
-        <p className="text-xs text-amber-400">Cần tối thiểu 4 người chơi để bắt đầu ván.</p>
+      {players.length > 0 && players.length < MIN_PLAYERS && (
+        <p className="text-xs text-amber-400">Cần tối thiểu {MIN_PLAYERS} người chơi để bắt đầu ván.</p>
       )}
     </div>
   )
