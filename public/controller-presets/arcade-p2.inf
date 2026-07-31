@@ -5,9 +5,9 @@ orientation = landscape
 ; P2 keys — WASD + J/K/L/U + 2/6
 
 [dpad:MOVE]
-x = 8
-y = 17
-size = 46
+x = 10
+y = 6
+size = 69
 up = w
 down = s
 left = a

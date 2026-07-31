@@ -5,9 +5,9 @@ orientation = landscape
 ; P4 keys — I/B/N/O (up/down/left/right) + P/M/comma/period + 4/8
 
 [dpad:MOVE]
-x = 8
-y = 17
-size = 46
+x = 10
+y = 6
+size = 69
 up = i
 down = b
 left = n

@@ -6,9 +6,9 @@ orientation = landscape
 ; 8-way diagonal: top-left = w+a, top-right = w+d, etc.
 
 [dpad:MOVE]
-x = 7
-y = 22
-size = 46
+x = 9
+y = 11
+size = 69
 up = w
 down = s
 left = a

@@ -3,9 +3,9 @@ name = SNES Layout
 orientation = landscape
 
 [dpad:MOVE]
-x = 7
-y = 25
-size = 44
+x = 9
+y = 14
+size = 66
 up = ArrowUp
 down = ArrowDown
 left = ArrowLeft

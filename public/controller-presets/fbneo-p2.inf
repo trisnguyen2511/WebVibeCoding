@@ -3,9 +3,9 @@ name = Arcade Fighter - P2
 orientation = landscape
 
 [dpad:MOVE]
-x = 5
-y = 28
-size = 40
+x = 7
+y = 18
+size = 60
 up = w
 down = s
 left = a
@@ -19,7 +19,7 @@ hold_interval = 50
 [combo:L]
 label = L
 x = 42
-y = 8
+y = 11
 w = 13
 h = 11
 chord = g+m
@@ -27,7 +27,7 @@ chord = g+m
 [combo:M]
 label = M
 x = 56
-y = 8
+y = 11
 w = 13
 h = 11
 chord = h+n
@@ -35,7 +35,7 @@ chord = h+n
 [combo:H]
 label = H
 x = 70
-y = 8
+y = 11
 w = 13
 h = 11
 chord = y+p
@@ -46,7 +46,7 @@ chord = y+p
 label = LP
 key = g
 x = 42
-y = 22
+y = 26
 w = 13
 h = 26
 
@@ -54,7 +54,7 @@ h = 26
 label = MP
 key = h
 x = 56
-y = 22
+y = 26
 w = 13
 h = 26
 
@@ -62,15 +62,15 @@ h = 26
 label = HP
 key = y
 x = 70
-y = 22
+y = 26
 w = 13
 h = 26
 
 [combo:3P]
 label = 3P
 x = 84
-y = 22
-w = 14
+y = 26
+w = 7
 h = 26
 chord = g+h+y
 
@@ -80,7 +80,7 @@ chord = g+h+y
 label = LK
 key = m
 x = 42
-y = 50
+y = 54
 w = 13
 h = 26
 
@@ -88,7 +88,7 @@ h = 26
 label = MK
 key = n
 x = 56
-y = 50
+y = 54
 w = 13
 h = 26
 
@@ -96,15 +96,15 @@ h = 26
 label = HK
 key = p
 x = 70
-y = 50
+y = 54
 w = 13
 h = 26
 
 [combo:3K]
 label = 3K
 x = 84
-y = 50
-w = 14
+y = 54
+w = 7
 h = 26
 chord = m+n+p
 
@@ -113,15 +113,15 @@ chord = m+n+p
 [button:COIN]
 label = COIN
 key = u
-x = 55
-y = 85
-w = 13
-h = 8
+x = 39
+y = 88
+w = 10
+h = 6
 
 [button:START]
 label = START
 key = o
-x = 70
-y = 85
-w = 13
-h = 8
+x = 51
+y = 88
+w = 10
+h = 6

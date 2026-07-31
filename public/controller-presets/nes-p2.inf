@@ -3,9 +3,9 @@ name = NES Layout - P2
 orientation = landscape
 
 [dpad:MOVE]
-x = 8
-y = 27
-size = 42
+x = 10
+y = 16
+size = 63
 up = w
 down = s
 left = a

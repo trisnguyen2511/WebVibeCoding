@@ -3,9 +3,9 @@ name = NES Layout
 orientation = landscape
 
 [dpad:MOVE]
-x = 8
-y = 27
-size = 42
+x = 10
+y = 16
+size = 63
 up = ArrowUp
 down = ArrowDown
 left = ArrowLeft
