@@ -4,8 +4,8 @@ orientation = landscape
 
 [dpad:MOVE]
 x = 7
-y = 18
-size = 60
+y = 24
+size = 48
 up = p3_up
 down = p3_down
 left = p3_left
@@ -13,11 +13,9 @@ right = p3_right
 diagonal = true
 hold_interval = 50
 
-; ── Column combos (top row) ────────────────────────────────────
-
 [combo:L]
 label = L
-x = 42
+x = 49
 y = 11
 w = 13
 h = 11
@@ -25,7 +23,7 @@ chord = p3_lp+p3_lk
 
 [combo:M]
 label = M
-x = 56
+x = 63
 y = 11
 w = 13
 h = 11
@@ -33,18 +31,16 @@ chord = p3_mp+p3_mk
 
 [combo:H]
 label = H
-x = 70
+x = 77
 y = 11
 w = 13
 h = 11
 chord = p3_hp+p3_hk
 
-; ── Punch row ──────────────────────────────────────────────────
-
 [button:LP]
 label = LP
 key = p3_lp
-x = 42
+x = 49
 y = 26
 w = 13
 h = 26
@@ -52,7 +48,7 @@ h = 26
 [button:MP]
 label = MP
 key = p3_mp
-x = 56
+x = 63
 y = 26
 w = 13
 h = 26
@@ -60,25 +56,23 @@ h = 26
 [button:HP]
 label = HP
 key = p3_hp
-x = 70
+x = 77
 y = 26
 w = 13
 h = 26
 
 [combo:3P]
 label = 3P
-x = 84
+x = 91
 y = 26
 w = 7
 h = 26
 chord = p3_lp+p3_mp+p3_hp
 
-; ── Kick row ───────────────────────────────────────────────────
-
 [button:LK]
 label = LK
 key = p3_lk
-x = 42
+x = 49
 y = 54
 w = 13
 h = 26
@@ -86,7 +80,7 @@ h = 26
 [button:MK]
 label = MK
 key = p3_mk
-x = 56
+x = 63
 y = 54
 w = 13
 h = 26
@@ -94,20 +88,18 @@ h = 26
 [button:HK]
 label = HK
 key = p3_hk
-x = 70
+x = 77
 y = 54
 w = 13
 h = 26
 
 [combo:3K]
 label = 3K
-x = 84
+x = 91
 y = 54
 w = 7
 h = 26
 chord = p3_lk+p3_mk+p3_hk
-
-; ── System ─────────────────────────────────────────────────────
 
 [button:COIN]
 label = COIN

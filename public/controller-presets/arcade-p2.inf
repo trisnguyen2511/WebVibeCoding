@@ -6,8 +6,8 @@ orientation = landscape
 
 [dpad:MOVE]
 x = 10
-y = 6
-size = 69
+y = 13
+size = 55
 up = w
 down = s
 left = a

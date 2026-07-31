@@ -4,8 +4,8 @@ orientation = landscape
 
 [dpad:MOVE]
 x = 7
-y = 18
-size = 60
+y = 24
+size = 48
 up = ArrowUp
 down = ArrowDown
 left = ArrowLeft
@@ -18,7 +18,7 @@ hold_interval = 50
 
 [combo:L]
 label = L
-x = 42
+x = 49
 y = 11
 w = 13
 h = 11
@@ -26,7 +26,7 @@ chord = f+x
 
 [combo:M]
 label = M
-x = 56
+x = 63
 y = 11
 w = 13
 h = 11
@@ -34,7 +34,7 @@ chord = c+z
 
 [combo:H]
 label = H
-x = 70
+x = 77
 y = 11
 w = 13
 h = 11
@@ -45,7 +45,7 @@ chord = q+e
 [button:LP]
 label = LP
 key = f
-x = 42
+x = 49
 y = 26
 w = 13
 h = 26
@@ -53,7 +53,7 @@ h = 26
 [button:MP]
 label = MP
 key = c
-x = 56
+x = 63
 y = 26
 w = 13
 h = 26
@@ -61,14 +61,14 @@ h = 26
 [button:HP]
 label = HP
 key = q
-x = 70
+x = 77
 y = 26
 w = 13
 h = 26
 
 [combo:3P]
 label = 3P
-x = 84
+x = 91
 y = 26
 w = 7
 h = 26
@@ -79,7 +79,7 @@ chord = f+c+q
 [button:LK]
 label = LK
 key = x
-x = 42
+x = 49
 y = 54
 w = 13
 h = 26
@@ -87,7 +87,7 @@ h = 26
 [button:MK]
 label = MK
 key = z
-x = 56
+x = 63
 y = 54
 w = 13
 h = 26
@@ -95,14 +95,14 @@ h = 26
 [button:HK]
 label = HK
 key = e
-x = 70
+x = 77
 y = 54
 w = 13
 h = 26
 
 [combo:3K]
 label = 3K
-x = 84
+x = 91
 y = 54
 w = 7
 h = 26

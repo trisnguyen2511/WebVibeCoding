@@ -4,8 +4,8 @@ orientation = landscape
 
 [dpad:MOVE]
 x = 10
-y = 16
-size = 63
+y = 23
+size = 50
 up = ArrowUp
 down = ArrowDown
 left = ArrowLeft
