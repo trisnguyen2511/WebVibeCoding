@@ -470,15 +470,6 @@ export default function WerewolfGmPage() {
                   🔄 Chơi lại
                 </button>
               )}
-              {state.events.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleUndo}
-                  className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-accent/40 hover:text-fg"
-                >
-                  ↩ Hoàn tác
-                </button>
-              )}
               {redoStack.length > 0 && (
                 <button
                   type="button"
@@ -486,6 +477,15 @@ export default function WerewolfGmPage() {
                   className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-accent/40 hover:text-fg"
                 >
                   ↪ Làm lại
+                </button>
+              )}
+              {state.events.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleUndo}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-accent/40 hover:text-fg"
+                >
+                  ↩ Hoàn tác
                 </button>
               )}
             </div>
