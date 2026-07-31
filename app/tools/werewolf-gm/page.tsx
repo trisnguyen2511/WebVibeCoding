@@ -262,16 +262,25 @@ export default function WerewolfGmPage() {
    * và chế độ gán vai (chỉ cần assign lại người cho vai) — MC không phải
    * nhập/chọn lại từ đầu, chỉ cần đi qua bước "Gán vai" một lần nữa.
    */
-  function handlePlayAgain() {
+  async function handlePlayAgain() {
     // Natural game-overs already reopened the online room the instant they
     // ended (see the currentPhase 'ended' effect below) — this only needs to
-    // reopen it itself for the "abandon mid-game and restart" path.
+    // reopen it itself for the "abandon mid-game and restart" path. This is
+    // awaited (not fire-and-forget) so the room is confirmed back to 'lobby'
+    // on the server *before* the setup wizard remounts below — otherwise the
+    // lobby screen's own fetch can race the reset and still see the old
+    // 'locked'/'in_game' status, sending the MC straight to the seat step
+    // where there's no way back to re-open the room for joining.
     if (mode === 'online' && onlineRoom && state.currentPhase !== 'ended') {
-      fetch('/api/werewolf/room/end', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId: onlineRoom.roomId, gmDeviceId: getGmDeviceId() }),
-      }).catch(() => {})
+      try {
+        await fetch('/api/werewolf/room/end', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomId: onlineRoom.roomId, gmDeviceId: getGmDeviceId() }),
+        })
+      } catch {
+        // best-effort — worst case the MC has to re-lock manually
+      }
     }
     setRedoStack([])
     setState((s) => ({

@@ -134,5 +134,4 @@ export interface GameState {
 
 export const STORAGE_KEY = 'wv-werewolf-gm-state'
 
-// TEMP: lowered from 4 to 3 for testing — revert to 4 when done.
-export const MIN_PLAYERS = 3
+export const MIN_PLAYERS = 4

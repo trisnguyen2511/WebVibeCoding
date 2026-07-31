@@ -54,7 +54,7 @@ export const BUILT_IN_ROLES: RoleDef[] = [
     firstNightOnly: false,
     extraLives: 0,
     isCouncil: true,
-    skippable: false,
+    skippable: true,
     isWolfBite: true,
     description: 'Cả bầy Sói cùng thức dậy và thống nhất chọn 1 người để cắn — có thể cắn bất kỳ ai, kể cả chính mình.',
   },
