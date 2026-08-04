@@ -48,7 +48,9 @@ function runNightActions(roleById: Map<string, RoleDef>, players: Player[], sort
     const actorName = nameById.get(action.actorPlayerId) ?? '?'
     const targetNames = action.targetPlayerIds.map((id) => nameById.get(id) ?? '?')
 
-    if (role.effect !== 'block' && blocked.has(action.actorPlayerId)) {
+    // 'link' (Cupid) is always priority 1 — Moonmaiden can't retroactively block
+    // an action that already happened before she acted.
+    if (role.effect !== 'block' && role.effect !== 'link' && blocked.has(action.actorPlayerId)) {
       notes.push(`${role.name} (${actorName}) bị Nguyệt Nữ khóa — hành động không có hiệu lực đêm nay`)
       continue
     }

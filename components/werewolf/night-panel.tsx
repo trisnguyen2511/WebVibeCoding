@@ -179,7 +179,7 @@ export function NightPanel({ roles, players, night, events, onCommitAction, onEn
             Đã gọi giả — tiếp tục
           </button>
         </div>
-      ) : isBlocked && role.effect !== 'inspect' ? (
+      ) : isBlocked && role.effect !== 'inspect' && role.effect !== 'link' ? (
         <div className="space-y-3">
           <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-6 text-center">
             <p className="text-2xl">🔒</p>
