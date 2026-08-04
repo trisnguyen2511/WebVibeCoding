@@ -172,9 +172,9 @@ export function NightRecap({ players, roles, night, actions, deaths, healed, onT
               <text x={pos.x} y={pos.y + NODE_R + 11} textAnchor="middle" className="pointer-events-none select-none text-[9px] fill-muted">
                 {player.name.length > 8 ? `${player.name.slice(0, 7)}…` : player.name}
               </text>
-              {deathSet.has(player.id) && !player.isAlive && (
+              {!player.isAlive && (deathSet.has(player.id) || (player.deathCause === 'link' && player.deathNight === night)) && (
                 <text x={pos.x} y={pos.y - NODE_R - 6} textAnchor="middle" className="pointer-events-none select-none text-[11px]">
-                  💀
+                  {player.deathCause === 'link' ? '💘' : '💀'}
                 </text>
               )}
             </g>
@@ -187,19 +187,29 @@ export function NightRecap({ players, roles, night, actions, deaths, healed, onT
         <ul className="space-y-1.5">
           {players.map((player) => {
             const role = primaryRole(player, roleById)
-            const diedTonight = deathSet.has(player.id) && !player.isAlive
+            const diedDirect = deathSet.has(player.id) && !player.isAlive
+            const diedAsCouple = !player.isAlive && player.deathCause === 'link' && player.deathNight === night
+            const diedTonight = diedDirect || diedAsCouple
             return (
               <li
                 key={player.id}
                 className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
-                  diedTonight ? 'border-red-500/40 bg-red-500/5' : 'border-border bg-surface'
+                  diedAsCouple
+                    ? 'border-pink-500/40 bg-pink-500/5'
+                    : diedDirect
+                      ? 'border-red-500/40 bg-red-500/5'
+                      : 'border-border bg-surface'
                 }`}
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm text-fg">{player.name}</span>
                   <span className="block truncate text-xs text-muted">
                     {player.roleIds.map((id) => roleById.get(id)?.name).filter(Boolean).join(', ') || '—'}
-                    {player.linkedWith.length > 0 && <span className="text-pink-400"> · 💘 Cặp đôi</span>}
+                    {player.linkedWith.length > 0 && (
+                      <span className={diedAsCouple ? 'text-pink-400 font-medium' : 'text-pink-400'}>
+                        {' '}· 💘 {diedAsCouple ? 'Chết theo cặp đôi' : 'Cặp đôi'}
+                      </span>
+                    )}
                   </span>
                 </span>
                 {readOnly ? (

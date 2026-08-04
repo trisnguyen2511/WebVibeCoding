@@ -29,8 +29,14 @@ export function describeEvent(event: GameEvent, players: Player[], roles: RoleDe
       const { night, deaths, saved, blocked, conversions, healed } = event.payload
       const parts: string[] = []
 
-      if (deaths.length) {
-        parts.push(`Chết: ${deaths.map(name).join(', ')}`)
+      const linkDeaths = players.filter(
+        (p) => p.deathCause === 'link' && p.deathNight === night && !deaths.includes(p.id),
+      )
+
+      if (deaths.length || linkDeaths.length) {
+        if (deaths.length) parts.push(`Chết: ${deaths.map(name).join(', ')}`)
+        if (linkDeaths.length)
+          parts.push(`Chết theo cặp đôi 💘: ${linkDeaths.map((p) => name(p.id)).join(', ')}`)
       } else {
         parts.push('Không ai chết')
       }
