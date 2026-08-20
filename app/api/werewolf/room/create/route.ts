@@ -14,8 +14,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'gmDeviceId is required' }, { status: 400 })
   }
 
-  const supabase = getSupabaseAdmin()
-  const code = await generateUniqueRoomCode(supabase)
+  let supabase: ReturnType<typeof getSupabaseAdmin>
+  try {
+    supabase = getSupabaseAdmin()
+  } catch (e) {
+    return NextResponse.json({ error: 'Server config error: ' + String(e) }, { status: 500 })
+  }
+
+  let code: string
+  try {
+    code = await generateUniqueRoomCode(supabase)
+  } catch (e) {
+    return NextResponse.json({ error: 'Không tạo được mã phòng: ' + String(e) }, { status: 500 })
+  }
 
   const { data: room, error } = await supabase
     .from('werewolf_rooms')
