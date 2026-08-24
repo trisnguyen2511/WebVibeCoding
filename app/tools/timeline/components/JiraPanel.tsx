@@ -21,7 +21,11 @@ async function jiraRequest(config: JiraConfig, path: string, method = 'GET', dat
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ host: config.host, email: config.email, token: config.token, path, method, data }),
   })
-  return res.json()
+  const json = await res.json() as Record<string, unknown>
+  if (!res.ok && !json.errorMessages) {
+    throw new Error((json.error as string) ?? `HTTP ${res.status}`)
+  }
+  return json
 }
 
 function generateId() {
@@ -45,14 +49,13 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   async function testConnection() {
     setError('')
     try {
-      const res = await jiraRequest(getConfig(), '/myself') as { displayName?: string; errorMessages?: string[] }
+      const res = await jiraRequest(getConfig(), '/myself') as { displayName?: string; accountId?: string; errorMessages?: string[] }
       if (res.errorMessages?.length) throw new Error(res.errorMessages[0])
-      if (res.displayName) {
-        setError(`✓ Connected as ${res.displayName}`)
-        onUpdateConfig(getConfig())
-      }
+      if (!res.accountId) throw new Error('Invalid response from Jira — check your host URL, email, and API token')
+      setError(`✓ Connected as ${res.displayName ?? res.accountId}`)
+      onUpdateConfig(getConfig())
     } catch (e) {
-      setError(`Connection failed: ${e}`)
+      setError(`Connection failed: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -64,7 +67,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       const myself = await jiraRequest(config, '/myself') as { accountId: string }
       const accountId = myself.accountId
 
-      const jql = `assignee = "${accountId}" AND issuetype = Sub-task ORDER BY updated DESC`
+      const jql = `assignee = "${accountId}" ORDER BY updated DESC`
       const searchRes = await jiraRequest(config, `/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,status,parent,duedate,timeoriginalestimate,timespent`) as {
         issues?: Array<{
           id: string
@@ -126,7 +129,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       setPendingTasks(merged)
       setStep('preview')
     } catch (e) {
-      setError(`Sync failed: ${e}`)
+      setError(`Sync failed: ${e instanceof Error ? e.message : String(e)}`)
       setStep('idle')
     }
   }
@@ -171,7 +174,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       setError(`✓ Synced time for ${updates.length} tasks`)
       setStep('idle')
     } catch (e) {
-      setError(`Sync failed: ${e}`)
+      setError(`Sync failed: ${e instanceof Error ? e.message : String(e)}`)
       setStep('idle')
     }
   }

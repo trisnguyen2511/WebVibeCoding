@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const url = `${host.replace(/\/$/, '')}/rest/api/3${path}`
+  const normalizedHost = host.replace(/\/$/, '').replace(/^(?!https?:\/\/)/, 'https://')
+  const url = `${normalizedHost}/rest/api/3${path}`
   const authHeader = `Basic ${Buffer.from(`${email}:${token}`).toString('base64')}`
 
   try {
