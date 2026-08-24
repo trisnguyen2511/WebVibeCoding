@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { X, Plug, RefreshCw, Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import type { Project, Task, JiraConfig, JiraSyncLog, JiraUploadLog } from '@/lib/timeline-types'
 
 interface Props {
@@ -210,9 +211,16 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     <>
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
       <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-surface border-l border-border flex flex-col shadow-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-border">
-          <h2 className="font-display text-lg font-semibold text-fg">Jira Integration</h2>
-          <button onClick={onClose} className="text-muted hover:text-fg text-xl">×</button>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+              <Plug size={15} className="text-blue-400" />
+            </div>
+            <h2 className="font-display text-base font-semibold text-fg">Jira Integration</h2>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-muted hover:text-fg hover:bg-border/60 transition-colors">
+            <X size={16} />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
@@ -230,7 +238,10 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
           </div>
 
           {error && (
-            <p className={`text-sm ${error.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{error}</p>
+            <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${error.startsWith('✓') ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
+              {error.startsWith('✓') ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+              {error}
+            </div>
           )}
 
           {/* Sync actions */}
@@ -239,16 +250,18 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
             <button
               onClick={syncTasks}
               disabled={step === 'syncing' || !host || !email || !token}
-              className="w-full rounded-lg bg-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/30 transition-colors disabled:opacity-40"
+              className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40"
             >
-              {step === 'syncing' ? 'Syncing...' : 'Sync Tasks (subtasks assigned to me)'}
+              {step === 'syncing' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              {step === 'syncing' ? 'Syncing...' : 'Pull Tasks (my subtasks from Jira)'}
             </button>
             <button
               onClick={syncTime}
               disabled={step === 'syncing' || !host || !email || !token}
-              className="w-full rounded-lg bg-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/30 transition-colors disabled:opacity-40"
+              className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40"
             >
-              Sync Time (pull Jira worklogs)
+              {step === 'syncing' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              Pull Time (Jira worklogs → local)
             </button>
           </div>
 
@@ -281,9 +294,10 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
             <button
               onClick={handleUploadTime}
               disabled={step === 'uploading' || !host || !email || !token}
-              className="w-full rounded-lg border border-accent/40 py-2.5 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40"
+              className="w-full flex items-center justify-center gap-2 rounded-lg border border-accent/40 py-2.5 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40"
             >
-              {step === 'uploading' ? 'Uploading...' : 'Upload Time Entries → Jira'}
+              {step === 'uploading' ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              {step === 'uploading' ? 'Uploading...' : 'Push Time Entries → Jira'}
             </button>
           </div>
 
