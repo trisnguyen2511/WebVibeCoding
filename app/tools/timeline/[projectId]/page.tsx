@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Plus, Calendar, RefreshCw, Download, ChevronRight,
@@ -45,11 +45,11 @@ function getTimelineRange(tasks: Task[], sprints: Sprint[]): { start: string; en
 }
 
 interface PageProps {
-  params: Promise<{ projectId: string }>
+  params: { projectId: string }
 }
 
 export default function ProjectPage({ params }: PageProps) {
-  const { projectId } = use(params)
+  const { projectId } = params
   const router = useRouter()
 
   const [project,         setProject]         = useState<Project | null>(null)
