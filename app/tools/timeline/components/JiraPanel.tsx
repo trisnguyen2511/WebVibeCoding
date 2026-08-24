@@ -16,10 +16,32 @@ interface Props {
 type SyncStep = 'idle' | 'syncing' | 'preview' | 'uploading' | 'done'
 
 async function jiraRequest(config: JiraConfig, path: string, method = 'GET', data?: unknown, serverMode = false): Promise<unknown> {
+  if (serverMode) {
+    // Server/DC: call directly from browser (Vercel can't reach internal hosts)
+    const host = config.host.replace(/\/$/, '').replace(/^(?!https?:\/\/)/, 'https://')
+    const res = await fetch(`${host}/rest/api/2${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: data ? JSON.stringify(data) : undefined,
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      let msg = `HTTP ${res.status}`
+      try { const j = JSON.parse(text) as { errorMessages?: string[]; message?: string }; msg = j.errorMessages?.[0] ?? j.message ?? msg } catch { /* ignore */ }
+      throw new Error(msg)
+    }
+    return res.json()
+  }
+
+  // Cloud: proxy through Vercel to avoid Atlassian CORS
   const res = await fetch('/api/jira', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ host: config.host, email: config.email, token: config.token, path, method, data, serverMode }),
+    body: JSON.stringify({ host: config.host, email: config.email, token: config.token, path, method, data }),
   })
   const json = await res.json() as Record<string, unknown>
   if (!res.ok && !json.errorMessages) {
