@@ -37,7 +37,7 @@ function getTimelineRange(tasks: Task[], sprints: Sprint[]): { start: string; en
     dates.push(s.startDate)
     dates.push(s.endDate)
   }
-  const sorted = [...new Set(dates)].sort()
+  const sorted = dates.filter((d, i) => dates.indexOf(d) === i).sort()
   return {
     start: addDays(sorted[0], -7),
     end:   addDays(sorted[sorted.length - 1], 14),
