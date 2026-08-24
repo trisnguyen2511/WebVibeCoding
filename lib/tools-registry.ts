@@ -128,4 +128,11 @@ export const tools: Tool[] = [
     description: 'Generate images and videos via the Agnes AI API — multi-model, reference image support',
     category: 'media',
   },
+  {
+    name: 'Timeline',
+    slug: 'timeline',
+    icon: '📅',
+    description: 'Scrum project manager with Gantt chart, sprint tracking, and Jira sync',
+    category: 'productivity',
+  },
 ]
