@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Pencil, Trash2, Upload, Calendar, Layers, Clock, ChevronRight } from 'lucide-react'
-import ToolShell from '@/components/tool-shell'
+import { ToolShell } from '@/components/tool-shell'
 import { getProjects, saveProject, deleteProject, importData } from '@/lib/timeline-storage'
 import type { Project } from '@/lib/timeline-types'
 import { ProjectForm } from './components/ProjectForm'
