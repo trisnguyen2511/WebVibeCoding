@@ -15,23 +15,23 @@ interface Props {
 
 type SyncStep = 'idle' | 'syncing' | 'preview' | 'uploading' | 'done'
 
-async function jiraRequest(config: JiraConfig, path: string, method = 'GET', data?: unknown, serverMode = false): Promise<unknown> {
+const DEFAULT_BRIDGE = 'http://localhost:3456'
+
+async function jiraRequest(
+  config: JiraConfig, path: string, method = 'GET',
+  data?: unknown, serverMode = false, bridgeUrl = DEFAULT_BRIDGE,
+): Promise<unknown> {
   if (serverMode) {
-    // Server/DC: call directly from browser (Vercel can't reach internal hosts)
-    const host = config.host.replace(/\/$/, '').replace(/^(?!https?:\/\/)/, 'https://')
-    const res = await fetch(`${host}/rest/api/2${path}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: data ? JSON.stringify(data) : undefined,
+    // Server/DC: route through local bridge (node jira-bridge.js) to avoid CORS
+    const res = await fetch(bridgeUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ host: config.host, token: config.token, path, method, data }),
     })
     if (!res.ok) {
       const text = await res.text()
       let msg = `HTTP ${res.status}`
-      try { const j = JSON.parse(text) as { errorMessages?: string[]; message?: string }; msg = j.errorMessages?.[0] ?? j.message ?? msg } catch { /* ignore */ }
+      try { const j = JSON.parse(text) as { errorMessages?: string[]; message?: string; error?: string }; msg = j.errorMessages?.[0] ?? j.message ?? j.error ?? msg } catch { /* ignore */ }
       throw new Error(msg)
     }
     return res.json()
@@ -62,6 +62,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     const h = project.jiraConfig?.host ?? ''
     return h.length > 0 && !h.includes('atlassian.net')
   })
+  const [bridgeUrl, setBridgeUrl] = useState(DEFAULT_BRIDGE)
   const [step, setStep] = useState<SyncStep>('idle')
   const [error, setError] = useState('')
   const [syncLogs, setSyncLogs] = useState<JiraSyncLog[]>([])
@@ -73,7 +74,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   }
 
   function req(path: string, method = 'GET', data?: unknown) {
-    return jiraRequest(getConfig(), path, method, data, serverMode)
+    return jiraRequest(getConfig(), path, method, data, serverMode, bridgeUrl)
   }
 
   async function testConnection() {
@@ -300,7 +301,22 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none font-mono"
               />
               {serverMode && (
-                <p className="text-[11px] text-muted">Jira Server/DC: dùng Personal Access Token. Tạo tại Profile → Personal Access Tokens.</p>
+                <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 space-y-2">
+                  <p className="text-[11px] text-amber-300 font-medium">Cần chạy Jira Bridge trên máy (tránh CORS)</p>
+                  <ol className="text-[11px] text-muted space-y-1 list-decimal list-inside">
+                    <li>Tải file: <a href="/jira-bridge.js" download className="text-accent-soft underline">jira-bridge.js</a></li>
+                    <li>Chạy: <code className="font-mono bg-background px-1 rounded">node jira-bridge.js</code></li>
+                    <li>Giữ terminal mở, rồi Test Connection bên dưới</li>
+                  </ol>
+                  <div className="flex items-center gap-2 pt-1">
+                    <span className="text-[11px] text-muted shrink-0">Bridge URL:</span>
+                    <input
+                      value={bridgeUrl}
+                      onChange={e => setBridgeUrl(e.target.value)}
+                      className="flex-1 rounded border border-border bg-background px-2 py-1 text-[11px] font-mono text-fg focus:border-accent focus:outline-none"
+                    />
+                  </div>
+                </div>
               )}
             </div>
             <button onClick={testConnection} className="w-full rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors">
