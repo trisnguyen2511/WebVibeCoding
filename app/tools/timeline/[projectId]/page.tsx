@@ -6,7 +6,7 @@ import {
   ArrowLeft, Plus, Calendar, RefreshCw, Download, ChevronRight,
   ListTodo, Clock, Flag, Keyboard,
 } from 'lucide-react'
-import ToolShell from '@/components/tool-shell'
+import { ToolShell } from '@/components/tool-shell'
 import {
   getProject, getTasks, saveProject, saveTask, deleteTask,
   upsertTimeEntry, deleteTimeEntry, exportData,
