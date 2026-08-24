@@ -8,17 +8,21 @@ export async function POST(req: NextRequest) {
     path: string
     method?: string
     data?: unknown
+    serverMode?: boolean
   }
 
-  const { host, email, token, path, method = 'GET', data } = body
+  const { host, email, token, path, method = 'GET', data, serverMode = false } = body
 
-  if (!host || !email || !token || !path) {
+  if (!host || !token || !path) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
   const normalizedHost = host.replace(/\/$/, '').replace(/^(?!https?:\/\/)/, 'https://')
-  const url = `${normalizedHost}/rest/api/3${path}`
-  const authHeader = `Basic ${Buffer.from(`${email}:${token}`).toString('base64')}`
+  const apiVersion = serverMode ? '2' : '3'
+  const url = `${normalizedHost}/rest/api/${apiVersion}${path}`
+  const authHeader = serverMode
+    ? `Bearer ${token}`
+    : `Basic ${Buffer.from(`${email}:${token}`).toString('base64')}`
 
   try {
     const res = await fetch(url, {

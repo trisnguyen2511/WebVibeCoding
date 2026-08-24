@@ -15,11 +15,11 @@ interface Props {
 
 type SyncStep = 'idle' | 'syncing' | 'preview' | 'uploading' | 'done'
 
-async function jiraRequest(config: JiraConfig, path: string, method = 'GET', data?: unknown): Promise<unknown> {
+async function jiraRequest(config: JiraConfig, path: string, method = 'GET', data?: unknown, serverMode = false): Promise<unknown> {
   const res = await fetch('/api/jira', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ host: config.host, email: config.email, token: config.token, path, method, data }),
+    body: JSON.stringify({ host: config.host, email: config.email, token: config.token, path, method, data, serverMode }),
   })
   const json = await res.json() as Record<string, unknown>
   if (!res.ok && !json.errorMessages) {
@@ -36,6 +36,10 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   const [host, setHost] = useState(project.jiraConfig?.host ?? '')
   const [email, setEmail] = useState(project.jiraConfig?.email ?? '')
   const [token, setToken] = useState(project.jiraConfig?.token ?? '')
+  const [serverMode, setServerMode] = useState(() => {
+    const h = project.jiraConfig?.host ?? ''
+    return h.length > 0 && !h.includes('atlassian.net')
+  })
   const [step, setStep] = useState<SyncStep>('idle')
   const [error, setError] = useState('')
   const [syncLogs, setSyncLogs] = useState<JiraSyncLog[]>([])
@@ -46,13 +50,18 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     return { host: host.trim(), email: email.trim(), token: token.trim() }
   }
 
+  function req(path: string, method = 'GET', data?: unknown) {
+    return jiraRequest(getConfig(), path, method, data, serverMode)
+  }
+
   async function testConnection() {
     setError('')
     try {
-      const res = await jiraRequest(getConfig(), '/myself') as { displayName?: string; accountId?: string; errorMessages?: string[] }
+      const res = await req('/myself') as { displayName?: string; accountId?: string; name?: string; errorMessages?: string[] }
       if (res.errorMessages?.length) throw new Error(res.errorMessages[0])
-      if (!res.accountId) throw new Error('Invalid response from Jira — check your host URL, email, and API token')
-      setError(`✓ Connected as ${res.displayName ?? res.accountId}`)
+      const id = res.accountId ?? res.name
+      if (!id) throw new Error('Invalid response — check host URL and credentials')
+      setError(`✓ Connected as ${res.displayName ?? id}`)
       onUpdateConfig(getConfig())
     } catch (e) {
       setError(`Connection failed: ${e instanceof Error ? e.message : String(e)}`)
@@ -63,12 +72,11 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     setStep('syncing')
     setError('')
     try {
-      const config = getConfig()
-      const myself = await jiraRequest(config, '/myself') as { accountId: string }
-      const accountId = myself.accountId
+      const myself = await req('/myself') as { accountId?: string; name?: string }
+      const accountId = myself.accountId ?? myself.name
 
-      const jql = `assignee = "${accountId}" ORDER BY updated DESC`
-      const searchRes = await jiraRequest(config, `/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,status,parent,duedate,timeoriginalestimate,timespent`) as {
+      const jql = `assignee = currentUser() ORDER BY updated DESC`
+      const searchRes = await req(`/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,status,parent,duedate,timeoriginalestimate,timespent`) as {
         issues?: Array<{
           id: string
           key: string
@@ -138,13 +146,12 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     setStep('syncing')
     setError('')
     try {
-      const config = getConfig()
-      const myself = await jiraRequest(config, '/myself') as { accountId: string }
-      const accountId = myself.accountId
+      const myself = await req('/myself') as { accountId?: string; name?: string }
+      const accountId = myself.accountId ?? myself.name
       const updates: { taskId: string; entries: Task['timeEntries'] }[] = []
 
       for (const task of tasks.filter(t => t.jiraId)) {
-        const worklogRes = await jiraRequest(config, `/issue/${task.jiraId}/worklog`) as {
+        const worklogRes = await req(`/issue/${task.jiraId}/worklog`) as {
           worklogs?: Array<{
             id: string
             author: { accountId: string }
@@ -152,7 +159,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
             timeSpentSeconds: number
           }>
         }
-        const myWorklogs = (worklogRes.worklogs ?? []).filter(w => w.author.accountId === accountId)
+        const myWorklogs = (worklogRes.worklogs ?? []).filter(w => w.author.accountId === accountId || (w.author as { name?: string }).name === accountId)
         const newEntries = myWorklogs.map(w => ({
           id: `jira-${w.id}`,
           date: w.started.slice(0, 10),
@@ -181,17 +188,19 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
 
   async function handleUploadTime() {
     setStep('uploading')
-    const config = getConfig()
     const logs: JiraUploadLog[] = []
 
     for (const task of tasks.filter(t => t.jiraId)) {
       const manualEntries = task.timeEntries.filter(e => e.source === 'manual')
       for (const entry of manualEntries) {
         try {
-          await jiraRequest(config, `/issue/${task.jiraId}/worklog`, 'POST', {
+          const comment = serverMode
+            ? entry.note ?? 'Logged via Timeline'
+            : { type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text: entry.note ?? 'Logged via Timeline' }] }] }
+          await req(`/issue/${task.jiraId}/worklog`, 'POST', {
             started: `${entry.date}T09:00:00.000+0000`,
             timeSpentSeconds: Math.round(entry.hours * 3600),
-            comment: { type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text: entry.note ?? 'Logged via Timeline' }] }] },
+            comment,
           })
           logs.push({ action: 'create_worklog', jiraKey: task.jiraKey ?? task.id, date: entry.date, hours: entry.hours })
         } catch {
@@ -229,11 +238,48 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* Connection config */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-fg">Connection</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-fg">Connection</h3>
+              <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs">
+                <button
+                  onClick={() => setServerMode(false)}
+                  className={`px-3 py-1 transition-colors ${!serverMode ? 'bg-accent text-white' : 'text-muted hover:text-fg'}`}
+                >
+                  Cloud
+                </button>
+                <button
+                  onClick={() => setServerMode(true)}
+                  className={`px-3 py-1 transition-colors ${serverMode ? 'bg-accent text-white' : 'text-muted hover:text-fg'}`}
+                >
+                  Server / DC
+                </button>
+              </div>
+            </div>
             <div className="space-y-2">
-              <input value={host} onChange={e => setHost(e.target.value)} placeholder="https://company.atlassian.net" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none" />
-              <input value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none" />
-              <input type="password" value={token} onChange={e => setToken(e.target.value)} placeholder="Jira API Token" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none font-mono" />
+              <input
+                value={host}
+                onChange={e => setHost(e.target.value)}
+                placeholder={serverMode ? 'https://jira.company.com:8443' : 'https://company.atlassian.net'}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none"
+              />
+              {!serverMode && (
+                <input
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none"
+                />
+              )}
+              <input
+                type="password"
+                value={token}
+                onChange={e => setToken(e.target.value)}
+                placeholder={serverMode ? 'Personal Access Token (PAT)' : 'Jira API Token'}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none font-mono"
+              />
+              {serverMode && (
+                <p className="text-[11px] text-muted">Jira Server/DC: dùng Personal Access Token. Tạo tại Profile → Personal Access Tokens.</p>
+              )}
             </div>
             <button onClick={testConnection} className="w-full rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors">
               Test Connection
