@@ -78,7 +78,8 @@ function jiraStatusBadgeStyle(status: string): string {
 }
 
 type DisplayRow =
-  | { type: 'header'; parentKey: string; parentTitle: string; count: number; colorIdx: number }
+  | { type: 'header'; parentKey: string; parentTitle: string; count: number; colorIdx: number
+      estStart?: string; estEnd?: string; actStart?: string; actEnd?: string }
   | { type: 'task';   task: Task; isSubtask: boolean; colorIdx: number }
 
 interface Tooltip { x: number; y: number; task: Task; date?: string; entry?: TimeEntry }
@@ -208,7 +209,15 @@ export function GanttChart({
     let colorIdx = 0
     for (const [parentKey, children] of Array.from(byParent)) {
       const parentTitle = children[0].parentTitle ?? parentKey
-      rows.push({ type: 'header', parentKey, parentTitle, count: children.length, colorIdx })
+      const estDates = children.flatMap(t => [t.estimateStartDate, t.estimateEndDate]).filter(Boolean) as string[]
+      const actDates = children.flatMap(t => [t.actualStartDate,   t.actualEndDate  ]).filter(Boolean) as string[]
+      rows.push({
+        type: 'header', parentKey, parentTitle, count: children.length, colorIdx,
+        estStart: estDates.length ? estDates.reduce((a, b) => a < b ? a : b) : undefined,
+        estEnd:   estDates.length ? estDates.reduce((a, b) => a > b ? a : b) : undefined,
+        actStart: actDates.length ? actDates.reduce((a, b) => a < b ? a : b) : undefined,
+        actEnd:   actDates.length ? actDates.reduce((a, b) => a > b ? a : b) : undefined,
+      })
       for (const task of children) rows.push({ type: 'task', task, isSubtask: true, colorIdx })
       colorIdx++
     }
@@ -389,8 +398,8 @@ export function GanttChart({
   }
 
   // ── Helpers ──────────────────────────────────────────────────
-  function rowHeight(row: DisplayRow) {
-    return row.type === 'header' ? GROUP_H : ROW_H
+  function rowHeight(_row: DisplayRow) {
+    return ROW_H
   }
 
   return (
@@ -420,11 +429,17 @@ export function GanttChart({
               const pal = GROUP_PALETTE[row.colorIdx % GROUP_PALETTE.length]
               return (
                 <div key={`gh-${row.parentKey}`}
-                  className="flex items-center px-3 gap-2 border-b border-border/60"
-                  style={{ height: GROUP_H, borderLeftWidth: 3, borderLeftColor: pal.border, background: pal.bg }}>
-                  <span className="font-mono text-[10px] text-muted shrink-0">{row.parentKey}</span>
-                  <span className="text-[11px] font-semibold text-fg truncate">{row.parentTitle}</span>
-                  <span className="text-[10px] text-muted shrink-0 ml-auto">{row.count}</span>
+                  className="grid items-center border-b border-border/60 px-3"
+                  style={{ gridTemplateColumns: '16px 1fr 48px 52px', height: ROW_H, borderLeftWidth: 3, borderLeftColor: pal.border, background: pal.bg }}>
+                  <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: pal.border, opacity: 0.7 }} />
+                  <div className="min-w-0 pr-1">
+                    <span className="font-mono text-[10px]" style={{ color: pal.border }}>{row.parentKey}</span>
+                    <p className="text-xs font-semibold text-fg truncate leading-snug">{row.parentTitle}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono text-[10px] text-muted">{row.count}t</span>
+                  </div>
+                  <div />
                 </div>
               )
             }
@@ -591,11 +606,43 @@ export function GanttChart({
 
               if (row.type === 'header') {
                 const pal = GROUP_PALETTE[row.colorIdx % GROUP_PALETTE.length]
+                const estS = row.estStart ? dateToIndex(row.estStart, timelineStart) : null
+                const estE = row.estEnd   ? dateToIndex(row.estEnd,   timelineStart) : null
+                const actS = row.actStart ? dateToIndex(row.actStart, timelineStart) : null
+                const actE = row.actEnd   ? dateToIndex(row.actEnd,   timelineStart) : null
                 return (
                   <div key={`ghr-${row.parentKey}`}
-                    className="border-b border-border/50 flex items-center px-3"
+                    className="relative border-b border-border/50"
                     style={{ height: h, borderLeftWidth: 3, borderLeftColor: pal.border, background: pal.bg }}>
-                    <span className="text-[10px] text-muted font-semibold">{row.parentTitle}</span>
+                    {/* Estimate summary bar */}
+                    {estS !== null && estE !== null && estS < totalDays && estE >= 0 && (
+                      <div className="absolute rounded-sm pointer-events-none"
+                        style={{
+                          left:   Math.max(0, estS) * DAY_W + 1,
+                          width:  (Math.min(totalDays - 1, estE) - Math.max(0, estS) + 1) * DAY_W - 2,
+                          top:    h / 2 - 14,
+                          height: 6,
+                          background: pal.border,
+                          opacity: 0.25,
+                        }} />
+                    )}
+                    {/* Actual summary bar */}
+                    {actS !== null && actE !== null && actS < totalDays && actE >= 0 && (
+                      <div className="absolute rounded pointer-events-none"
+                        style={{
+                          left:   Math.max(0, actS) * DAY_W + 4,
+                          width:  (Math.min(totalDays - 1, actE) - Math.max(0, actS) + 1) * DAY_W - 8,
+                          top:    h / 2 - 6,
+                          height: 12,
+                          background: pal.border,
+                          opacity: 0.35,
+                          borderRadius: 4,
+                        }}>
+                        <span className="absolute inset-0 flex items-center px-2 text-[10px] font-semibold text-white truncate" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                          {row.parentTitle}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )
               }
