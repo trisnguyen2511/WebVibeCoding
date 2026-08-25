@@ -116,8 +116,11 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   // JQL query (user-editable)
   const [jql, setJql] = useState(DEFAULT_JQL)
 
-  // Replace mode: replace all Jira tasks instead of merging
-  const [replaceMode, setReplaceMode] = useState(true)
+  // Sync mode:
+  //   merge   — add/update only, keep everything
+  //   replace — keep manual tasks, replace Jira tasks with new results
+  //   clear   — delete ALL tasks then import fresh
+  const [syncMode, setSyncMode] = useState<'merge' | 'replace' | 'clear'>('replace')
 
   const [step, setStep] = useState<SyncStep>('idle')
   const [error, setError] = useState('')
@@ -298,24 +301,27 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     fields: { summary: string; status: { name: string }; parent?: { key: string }; duedate?: string; timeoriginalestimate?: number }
   }
 
-  function buildIssueLink(key: string): string {
-    const base = host.trim().replace(/\/$/, '').replace(/^(?!https?:\/\/)/, 'https://')
+  function buildIssueLink(key: string): string | undefined {
+    const h = host.trim()
+    if (!h) return undefined
+    const base = h.replace(/\/$/, '').replace(/^(?!https?:\/\/)/, 'https://')
     return `${base}/browse/${key}`
   }
 
   function mergePulledIssues(issues: IssueRow[], parentMap: Record<string, string>) {
     const logs: JiraSyncLog[] = []
 
-    // In replace mode: start from non-Jira tasks only, then add all synced issues fresh
-    // In merge mode: carry all existing tasks forward and update matches
-    const base: Task[] = replaceMode
-      ? tasks.filter(t => !t.jiraId)
-      : [...tasks]
+    // Base set of existing tasks depending on sync mode
+    const base: Task[] =
+      syncMode === 'clear'   ? [] :               // nuke everything
+      syncMode === 'replace' ? tasks.filter(t => !t.jiraId) :  // keep only manual tasks
+      [...tasks]                                   // merge: keep all
 
     const result: Task[] = [...base]
 
     for (const issue of issues) {
-      const existing = result.find(t => t.jiraId === issue.id)
+      // Match by jiraId in the result set (not in original tasks — base may have fewer items)
+      const existingIdx = result.findIndex(t => t.jiraId === issue.id)
       const jiraStatusName = issue.fields.status.name
       const statusName = jiraStatusName.toLowerCase()
       const status = statusName.includes('done') || statusName.includes('closed') || statusName.includes('resolved') ? 'done' as const
@@ -326,23 +332,30 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       const parentTitle = parentKey ? (parentMap[parentKey] ?? parentKey) : undefined
       const link = buildIssueLink(issue.key)
 
-      if (existing) {
-        existing.title = issue.fields.summary
-        existing.jiraKey = issue.key
-        existing.jiraStatus = jiraStatusName
-        existing.status = status
-        existing.parentKey = parentKey
-        existing.parentTitle = parentTitle
-        existing.link = link
-        existing.dueDate = issue.fields.duedate ?? existing.dueDate
-        existing.estimateHours = issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : existing.estimateHours
-        existing.updatedAt = new Date().toISOString()
+      if (existingIdx >= 0) {
+        // Spread to avoid mutating original object
+        result[existingIdx] = {
+          ...result[existingIdx],
+          title: issue.fields.summary,
+          jiraKey: issue.key,
+          jiraStatus: jiraStatusName,
+          status,
+          parentKey,
+          parentTitle,
+          ...(link ? { link } : {}),
+          dueDate: issue.fields.duedate ?? result[existingIdx].dueDate,
+          estimateHours: issue.fields.timeoriginalestimate
+            ? issue.fields.timeoriginalestimate / 3600
+            : result[existingIdx].estimateHours,
+          updatedAt: new Date().toISOString(),
+        }
         logs.push({ action: 'update', jiraKey: issue.key, title: issue.fields.summary })
       } else {
         const now = new Date().toISOString()
         result.push({
           id: generateId(), projectId: project.id, jiraId: issue.id, jiraKey: issue.key,
-          jiraStatus: jiraStatusName, parentKey, parentTitle, link,
+          jiraStatus: jiraStatusName, parentKey, parentTitle,
+          ...(link ? { link } : {}),
           title: issue.fields.summary, status,
           dueDate: issue.fields.duedate ?? undefined,
           estimateHours: issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : undefined,
@@ -352,11 +365,17 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       }
     }
 
-    // In replace mode, count removed tasks in the log
-    if (replaceMode) {
+    // Count removed Jira tasks (replace/clear modes)
+    if (syncMode !== 'merge') {
       const removedCount = tasks.filter(t => t.jiraId && !issues.find(i => i.id === t.jiraId)).length
       if (removedCount > 0) {
-        logs.push({ action: 'skip', jiraKey: '—', title: `${removedCount} old Jira task(s) removed`, reason: 'replace mode' })
+        logs.push({ action: 'skip', jiraKey: '—', title: `${removedCount} Jira task(s) removed`, reason: syncMode })
+      }
+    }
+    if (syncMode === 'clear') {
+      const removedManual = tasks.filter(t => !t.jiraId).length
+      if (removedManual > 0) {
+        logs.push({ action: 'skip', jiraKey: '—', title: `${removedManual} manual task(s) cleared`, reason: 'clear-all' })
       }
     }
 
@@ -507,23 +526,36 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
               />
             </div>
 
-            {/* Replace vs Merge toggle */}
-            <label className="flex items-center gap-2.5 cursor-pointer select-none">
-              <button
-                role="switch"
-                aria-checked={replaceMode}
-                onClick={() => setReplaceMode(v => !v)}
-                className={`relative w-9 h-5 rounded-full transition-colors ${replaceMode ? 'bg-accent' : 'bg-border'}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${replaceMode ? 'translate-x-4' : 'translate-x-0'}`} />
-              </button>
-              <span className="text-xs text-fg">
-                {replaceMode ? 'Replace all Jira tasks' : 'Merge (add / update only)'}
-              </span>
-              <span className="text-[10px] text-muted">
-                {replaceMode ? '— xóa tasks cũ không có trong kết quả mới' : '— giữ lại tasks cũ'}
-              </span>
-            </label>
+            {/* Sync mode selector */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] text-muted">Sync mode</label>
+              <div className="space-y-1">
+                {([
+                  { value: 'merge',   label: 'Merge',        desc: 'Chỉ add / update — giữ lại tất cả tasks cũ' },
+                  { value: 'replace', label: 'Replace Jira', desc: 'Xóa Jira tasks cũ, giữ manual tasks' },
+                  { value: 'clear',   label: 'Clear All',    desc: 'Xóa toàn bộ rồi import lại từ đầu', danger: true },
+                ] as { value: 'merge' | 'replace' | 'clear'; label: string; desc: string; danger?: boolean }[]).map(opt => (
+                  <button key={opt.value} onClick={() => setSyncMode(opt.value)}
+                    className={`w-full flex items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
+                      syncMode === opt.value
+                        ? opt.danger
+                          ? 'border-red-500/50 bg-red-500/10'
+                          : 'border-accent/50 bg-accent/10'
+                        : 'border-border hover:border-border/80 hover:bg-surface/60'
+                    }`}>
+                    <span className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 transition-colors ${
+                      syncMode === opt.value
+                        ? opt.danger ? 'border-red-400 bg-red-400' : 'border-accent bg-accent'
+                        : 'border-muted/50'
+                    }`} />
+                    <div className="min-w-0">
+                      <span className={`text-xs font-medium ${opt.danger ? 'text-red-400' : 'text-fg'}`}>{opt.label}</span>
+                      <span className="text-[10px] text-muted ml-2">{opt.desc}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {!curlMode ? (
               <>
@@ -575,7 +607,12 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
           {/* ── Sync preview ── */}
           {step === 'preview' && syncLogs.length > 0 && (
             <div className="space-y-3">
-              <h3 className="text-sm font-medium text-fg">Preview Changes ({syncLogs.filter(l => l.action !== 'skip').length} tasks)</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-fg">Preview ({syncLogs.filter(l => l.action !== 'skip').length} tasks)</h3>
+                {syncMode === 'clear' && (
+                  <span className="text-[10px] font-medium text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">⚠ Clear All</span>
+                )}
+              </div>
               <div className="max-h-48 overflow-y-auto space-y-1">
                 {syncLogs.map((log, i) => (
                   <div key={i} className="flex items-center gap-2 rounded-lg bg-background px-3 py-2 text-xs">
