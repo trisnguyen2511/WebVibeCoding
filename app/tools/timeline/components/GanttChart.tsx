@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, ExternalLink } from 'lucide-react'
 import type { Task, Sprint, TimeEntry } from '@/lib/timeline-types'
 import { TimeEntryModal } from './TimeEntryModal'
 
@@ -386,7 +386,13 @@ export function GanttChart({
                 }}
                 onMouseEnter={() => setHoveredRow(task.id)}
                 onMouseLeave={() => setHoveredRow(null)}
-                onClick={() => onEditTask(task)}
+                onClick={e => {
+                  if ((e.ctrlKey || e.metaKey) && task.link) {
+                    window.open(task.link, '_blank', 'noopener,noreferrer')
+                  } else {
+                    onEditTask(task)
+                  }
+                }}
                 onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, task }) }}
               >
                 {/* Status dot */}
@@ -401,6 +407,9 @@ export function GanttChart({
                         <span className={`text-[9px] px-1 py-0.5 rounded font-medium leading-none ${jiraStatusBadgeStyle(task.jiraStatus)}`}>
                           {task.jiraStatus}
                         </span>
+                      )}
+                      {task.link && isHovered && (
+                        <ExternalLink size={9} className="text-muted/60" />
                       )}
                     </div>
                   )}
