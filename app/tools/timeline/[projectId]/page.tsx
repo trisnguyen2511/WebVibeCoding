@@ -17,14 +17,19 @@ import { TaskForm } from '../components/TaskForm'
 import { TodayPanel } from '../components/TodayPanel'
 import { JiraPanel } from '../components/JiraPanel'
 
+function localToday(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function addDays(date: string, n: number): string {
   const d = new Date(date + 'T00:00:00')
   d.setDate(d.getDate() + n)
-  return d.toISOString().slice(0, 10)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function getTimelineRange(tasks: Task[], sprints: Sprint[]): { start: string; end: string } {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localToday()
   const dates: string[] = [today]
   for (const t of tasks) {
     if (t.estimateStartDate) dates.push(t.estimateStartDate)

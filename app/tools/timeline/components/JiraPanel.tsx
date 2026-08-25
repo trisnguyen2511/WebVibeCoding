@@ -178,12 +178,14 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       const parentMap: Record<string, string> = {}
       if (parentKeysSet.size > 0) {
         try {
-          const pKeys = Array.from(parentKeysSet).map(k => `"${k}"`).join(',')
+          const pKeys = Array.from(parentKeysSet).join(',')
           const parentRes = await req(`/search?jql=key in (${pKeys})&maxResults=${parentKeysSet.size}&fields=summary`) as {
             issues?: Array<{ key: string; fields: { summary: string } }>
           }
           for (const p of parentRes.issues ?? []) parentMap[p.key] = p.fields.summary
-        } catch { /* best-effort */ }
+        } catch (e) {
+          console.warn('Parent fetch failed:', e)
+        }
       }
 
       mergePulledIssues(issues, parentMap)
