@@ -16,7 +16,7 @@ interface Props {
 type SyncStep = 'idle' | 'syncing' | 'preview' | 'uploading' | 'done'
 
 const BRIDGE_DEFAULT = 'http://localhost:3456'
-const DEFAULT_JQL = 'issuetype = Sub-task AND assignee = currentUser() ORDER BY parent, updated DESC'
+const DEFAULT_JQL = 'issuetype = Sub-task AND assignee = currentUser() ORDER BY updated DESC'
 const FIELDS = 'summary,status,parent,duedate,timeoriginalestimate,timespent'
 
 async function jiraRequest(
