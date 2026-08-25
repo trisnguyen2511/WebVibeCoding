@@ -148,14 +148,29 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     setStep('syncing')
     setError('')
     try {
-      const jql = `assignee = currentUser() ORDER BY updated DESC`
+      const jql = `issuetype = Sub-task AND assignee = currentUser() ORDER BY parent, updated DESC`
       const searchRes = await req(`/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,status,parent,duedate,timeoriginalestimate,timespent`) as {
         issues?: Array<{
           id: string; key: string
           fields: { summary: string; status: { name: string }; parent?: { key: string }; duedate?: string; timeoriginalestimate?: number }
         }>
       }
-      mergePulledIssues(searchRes.issues ?? [])
+      const issues = searchRes.issues ?? []
+
+      // Batch-fetch parent issue summaries
+      const parentKeysSet = new Set(issues.flatMap(i => i.fields.parent?.key ? [i.fields.parent.key] : []))
+      const parentMap: Record<string, string> = {}
+      if (parentKeysSet.size > 0) {
+        try {
+          const pKeys = Array.from(parentKeysSet).map(k => `"${k}"`).join(',')
+          const parentRes = await req(`/search?jql=key in (${pKeys})&maxResults=${parentKeysSet.size}&fields=summary`) as {
+            issues?: Array<{ key: string; fields: { summary: string } }>
+          }
+          for (const p of parentRes.issues ?? []) parentMap[p.key] = p.fields.summary
+        } catch { /* parent fetch is best-effort */ }
+      }
+
+      mergePulledIssues(issues, parentMap)
     } catch (e) {
       setError(`Sync failed: ${e instanceof Error ? e.message : String(e)}`)
       setStep('idle')
@@ -225,7 +240,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   function generateTasksCurl() {
     const h = host.trim(); const t = token.trim()
     if (!h || !t) { setError('Enter host and token first'); return }
-    const jql = `assignee = currentUser() ORDER BY updated DESC`
+    const jql = `issuetype = Sub-task AND assignee = currentUser() ORDER BY parent, updated DESC`
     const path = `/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,status,parent,duedate,timeoriginalestimate,timespent`
     setTasksCurl(buildCurl(h, t, path))
     setError('')
@@ -240,7 +255,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       mergePulledIssues(parsed.issues as Array<{
         id: string; key: string
         fields: { summary: string; status: { name: string }; parent?: { key: string }; duedate?: string; timeoriginalestimate?: number }
-      }>)
+      }>, {})
     } catch (e) {
       setError(`Parse error: ${e instanceof Error ? e.message : String(e)}`)
     }
@@ -267,26 +282,34 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
 
   // ── Shared merge logic ──────────────────────────────────────
 
-  function mergePulledIssues(issues: Array<{
-    id: string; key: string
-    fields: { summary: string; status: { name: string }; parent?: { key: string }; duedate?: string; timeoriginalestimate?: number }
-  }>) {
+  function mergePulledIssues(
+    issues: Array<{
+      id: string; key: string
+      fields: { summary: string; status: { name: string }; parent?: { key: string }; duedate?: string; timeoriginalestimate?: number }
+    }>,
+    parentMap: Record<string, string>,
+  ) {
     const logs: JiraSyncLog[] = []
     const merged: Task[] = [...tasks]
 
     for (const issue of issues) {
       const existing = merged.find(t => t.jiraId === issue.id)
-      const statusName = issue.fields.status.name.toLowerCase()
-      const status = statusName.includes('done') ? 'done' as const
-        : statusName.includes('progress') ? 'in-progress' as const
+      const jiraStatusName = issue.fields.status.name
+      const statusName = jiraStatusName.toLowerCase()
+      const status = statusName.includes('done') || statusName.includes('closed') || statusName.includes('resolved') ? 'done' as const
+        : statusName.includes('progress') || statusName.includes('review') || statusName.includes('testing') ? 'in-progress' as const
         : statusName.includes('block') ? 'blocked' as const
         : 'todo' as const
+      const parentKey = issue.fields.parent?.key
+      const parentTitle = parentKey ? (parentMap[parentKey] ?? parentKey) : undefined
 
       if (existing) {
         existing.title = issue.fields.summary
         existing.jiraKey = issue.key
+        existing.jiraStatus = jiraStatusName
         existing.status = status
-        existing.parentKey = issue.fields.parent?.key
+        existing.parentKey = parentKey
+        existing.parentTitle = parentTitle
         existing.dueDate = issue.fields.duedate ?? existing.dueDate
         existing.estimateHours = issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : existing.estimateHours
         existing.updatedAt = new Date().toISOString()
@@ -295,7 +318,8 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
         const now = new Date().toISOString()
         merged.push({
           id: generateId(), projectId: project.id, jiraId: issue.id, jiraKey: issue.key,
-          parentKey: issue.fields.parent?.key, title: issue.fields.summary, status,
+          jiraStatus: jiraStatusName, parentKey, parentTitle,
+          title: issue.fields.summary, status,
           dueDate: issue.fields.duedate ?? undefined,
           estimateHours: issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : undefined,
           timeEntries: [], order: merged.length, createdAt: now, updatedAt: now,

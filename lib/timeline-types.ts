@@ -16,7 +16,9 @@ export interface Task {
   sprintId?: string
   jiraId?: string
   jiraKey?: string
+  jiraStatus?: string   // original Jira status label e.g. "In Progress"
   parentKey?: string
+  parentTitle?: string  // parent issue summary for grouping
   title: string
   description?: string
   link?: string
