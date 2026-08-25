@@ -92,6 +92,12 @@ interface DragState {
   origEnd: string
 }
 
+interface DragPreview {
+  taskId: string
+  estStart?: string; estEnd?: string
+  actStart?: string; actEnd?: string
+}
+
 interface Props {
   tasks: Task[]
   sprints: Sprint[]
@@ -165,6 +171,9 @@ export function GanttChart({
   const containerRef = useRef<HTMLDivElement>(null)
   const dragRef      = useRef<DragState | null>(null)
   const panelDragRef = useRef<{ startX: number; startW: number } | null>(null)
+  const rafRef       = useRef<number | null>(null)
+  const tasksRef     = useRef(tasks)
+  const onUpdateTaskRef = useRef(onUpdateTask)
 
   const [leftW,        setLeftW]        = useState(LEFT_DEFAULT)
   const [tooltip,      setTooltip]      = useState<Tooltip | null>(null)
@@ -172,6 +181,11 @@ export function GanttChart({
   const [entryModal,   setEntryModal]   = useState<{ task: Task; date: string; entry?: TimeEntry } | null>(null)
   const [estModal,     setEstModal]     = useState<{ task: Task; date: string } | null>(null)
   const [hoveredRow,   setHoveredRow]   = useState<string | null>(null)
+  const [dragPreview,  setDragPreview]  = useState<DragPreview | null>(null)
+
+  // Keep refs in sync so drag handlers always see latest values
+  useEffect(() => { tasksRef.current = tasks }, [tasks])
+  useEffect(() => { onUpdateTaskRef.current = onUpdateTask }, [onUpdateTask])
 
   const totalDays  = dateToIndex(timelineEnd, timelineStart) + 1
   const todayIndex = dateToIndex(new Date().toISOString().slice(0, 10), timelineStart)
@@ -228,47 +242,94 @@ export function GanttChart({
       if (!dragRef.current) return
       const { type, taskId, startX, origStart, origEnd } = dragRef.current
       const delta = Math.round((e.clientX - startX) / DAY_W)
-      if (delta === 0) return
-      const task = tasks.find(t => t.id === taskId)
+      const task = tasksRef.current.find(t => t.id === taskId)
       if (!task) return
 
-      if (type === 'resize-start') {
-        const newStart = addDays(origStart, delta)
-        if (task.actualEndDate && newStart > task.actualEndDate) return
-        onUpdateTask({ ...task, actualStartDate: newStart, updatedAt: new Date().toISOString() })
-      } else if (type === 'resize-end') {
-        const newEnd = addDays(origEnd, delta)
-        if (task.actualStartDate && newEnd < task.actualStartDate) return
-        onUpdateTask({ ...task, actualEndDate: newEnd, updatedAt: new Date().toISOString() })
-      } else if (type === 'move') {
-        onUpdateTask({
-          ...task,
-          actualStartDate: origStart ? addDays(origStart, delta) : undefined,
-          actualEndDate:   origEnd   ? addDays(origEnd,   delta) : undefined,
-          updatedAt: new Date().toISOString(),
-        })
-      } else if (type === 'resize-est-start') {
-        const newStart = addDays(origStart, delta)
-        if (task.estimateEndDate && newStart > task.estimateEndDate) return
-        onUpdateTask({ ...task, estimateStartDate: newStart, updatedAt: new Date().toISOString() })
-      } else if (type === 'resize-est-end') {
-        const newEnd = addDays(origEnd, delta)
-        if (task.estimateStartDate && newEnd < task.estimateStartDate) return
-        onUpdateTask({ ...task, estimateEndDate: newEnd, updatedAt: new Date().toISOString() })
-      } else if (type === 'move-est') {
-        onUpdateTask({
-          ...task,
-          estimateStartDate: origStart ? addDays(origStart, delta) : undefined,
-          estimateEndDate:   origEnd   ? addDays(origEnd,   delta) : undefined,
-          updatedAt: new Date().toISOString(),
-        })
-      }
+      // Throttle visual updates to rAF — no persist yet
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null
+        if (type === 'resize-start') {
+          const s = origStart ? addDays(origStart, delta) : undefined
+          if (task.actualEndDate && s && s > task.actualEndDate) return
+          setDragPreview({ taskId, actStart: s, actEnd: task.actualEndDate })
+        } else if (type === 'resize-end') {
+          const en = origEnd ? addDays(origEnd, delta) : undefined
+          if (task.actualStartDate && en && en < task.actualStartDate) return
+          setDragPreview({ taskId, actStart: task.actualStartDate, actEnd: en })
+        } else if (type === 'move') {
+          setDragPreview({
+            taskId,
+            actStart: origStart ? addDays(origStart, delta) : undefined,
+            actEnd:   origEnd   ? addDays(origEnd,   delta) : undefined,
+          })
+        } else if (type === 'resize-est-start') {
+          const s = origStart ? addDays(origStart, delta) : undefined
+          if (task.estimateEndDate && s && s > task.estimateEndDate) return
+          setDragPreview({ taskId, estStart: s, estEnd: task.estimateEndDate })
+        } else if (type === 'resize-est-end') {
+          const en = origEnd ? addDays(origEnd, delta) : undefined
+          if (task.estimateStartDate && en && en < task.estimateStartDate) return
+          setDragPreview({ taskId, estStart: task.estimateStartDate, estEnd: en })
+        } else if (type === 'move-est') {
+          setDragPreview({
+            taskId,
+            estStart: origStart ? addDays(origStart, delta) : undefined,
+            estEnd:   origEnd   ? addDays(origEnd,   delta) : undefined,
+          })
+        }
+      })
     }
-    function onUp() { dragRef.current = null }
+
+    function onUp(e: MouseEvent) {
+      if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+      if (dragRef.current) {
+        const { type, taskId, startX, origStart, origEnd } = dragRef.current
+        const delta = Math.round((e.clientX - startX) / DAY_W)
+        const task = tasksRef.current.find(t => t.id === taskId)
+        if (task) {
+          const now = new Date().toISOString()
+          if (type === 'resize-start') {
+            const s = origStart ? addDays(origStart, delta) : undefined
+            if (!(task.actualEndDate && s && s > task.actualEndDate))
+              onUpdateTaskRef.current({ ...task, actualStartDate: s, updatedAt: now })
+          } else if (type === 'resize-end') {
+            const en = origEnd ? addDays(origEnd, delta) : undefined
+            if (!(task.actualStartDate && en && en < task.actualStartDate))
+              onUpdateTaskRef.current({ ...task, actualEndDate: en, updatedAt: now })
+          } else if (type === 'move') {
+            onUpdateTaskRef.current({
+              ...task,
+              actualStartDate: origStart ? addDays(origStart, delta) : undefined,
+              actualEndDate:   origEnd   ? addDays(origEnd,   delta) : undefined,
+              updatedAt: now,
+            })
+          } else if (type === 'resize-est-start') {
+            const s = origStart ? addDays(origStart, delta) : undefined
+            if (!(task.estimateEndDate && s && s > task.estimateEndDate))
+              onUpdateTaskRef.current({ ...task, estimateStartDate: s, updatedAt: now })
+          } else if (type === 'resize-est-end') {
+            const en = origEnd ? addDays(origEnd, delta) : undefined
+            if (!(task.estimateStartDate && en && en < task.estimateStartDate))
+              onUpdateTaskRef.current({ ...task, estimateEndDate: en, updatedAt: now })
+          } else if (type === 'move-est') {
+            onUpdateTaskRef.current({
+              ...task,
+              estimateStartDate: origStart ? addDays(origStart, delta) : undefined,
+              estimateEndDate:   origEnd   ? addDays(origEnd,   delta) : undefined,
+              updatedAt: now,
+            })
+          }
+        }
+      }
+      dragRef.current = null
+      setDragPreview(null)
+    }
+
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
-  }, [tasks, onUpdateTask])
+  }, []) // stable: reads tasks/onUpdateTask through refs
 
   // ── Panel resize ─────────────────────────────────────────────
   useEffect(() => {
@@ -487,7 +548,7 @@ export function GanttChart({
 
         {/* Timeline body */}
         <div ref={rightRef} className="flex-1 overflow-auto"
-          style={{ cursor: estimateMode ? 'crosshair' : 'default' }}
+          style={{ cursor: dragPreview ? 'grabbing' : estimateMode ? 'crosshair' : 'default', userSelect: dragPreview ? 'none' : undefined }}
           onScroll={e => {
             const el = e.target as HTMLDivElement
             syncScroll('right')
@@ -541,16 +602,25 @@ export function GanttChart({
 
               const { task, isSubtask, colorIdx } = row
               const pal = colorIdx >= 0 ? GROUP_PALETTE[colorIdx % GROUP_PALETTE.length] : null
-              const estS = task.estimateStartDate ? dateToIndex(task.estimateStartDate, timelineStart) : null
-              const estE = task.estimateEndDate   ? dateToIndex(task.estimateEndDate,   timelineStart) : null
-              const actS = task.actualStartDate   ? dateToIndex(task.actualStartDate,   timelineStart) : null
-              const actE = task.actualEndDate     ? dateToIndex(task.actualEndDate,     timelineStart) : null
-              const dueI = task.dueDate           ? dateToIndex(task.dueDate,           timelineStart) : null
 
-              const bars    = STATUS_BAR[task.status] ?? STATUS_BAR.todo
-              const logged  = totalLogged(task)
-              const progress = task.estimateHours && logged > 0 ? Math.min(1, logged / task.estimateHours) : 0
+              // Use drag preview dates while dragging, fall back to task data
+              const dp = dragPreview?.taskId === task.id ? dragPreview : null
+              const estStartD = dp?.estStart !== undefined ? dp.estStart : task.estimateStartDate
+              const estEndD   = dp?.estEnd   !== undefined ? dp.estEnd   : task.estimateEndDate
+              const actStartD = dp?.actStart !== undefined ? dp.actStart : task.actualStartDate
+              const actEndD   = dp?.actEnd   !== undefined ? dp.actEnd   : task.actualEndDate
+
+              const estS = estStartD ? dateToIndex(estStartD, timelineStart) : null
+              const estE = estEndD   ? dateToIndex(estEndD,   timelineStart) : null
+              const actS = actStartD ? dateToIndex(actStartD, timelineStart) : null
+              const actE = actEndD   ? dateToIndex(actEndD,   timelineStart) : null
+              const dueI = task.dueDate ? dateToIndex(task.dueDate, timelineStart) : null
+
+              const bars      = STATUS_BAR[task.status] ?? STATUS_BAR.todo
+              const logged    = totalLogged(task)
+              const progress  = task.estimateHours && logged > 0 ? Math.min(1, logged / task.estimateHours) : 0
               const isHovered = hoveredRow === task.id
+              const isDragging = dragPreview?.taskId === task.id
 
               return (
                 <div key={task.id}
@@ -597,7 +667,11 @@ export function GanttChart({
                   {/* Estimate bar (draggable) */}
                   {estS !== null && estE !== null && estS < totalDays && estE >= 0 && (
                     <div
-                      className="absolute rounded-sm bg-accent/15 border border-accent/25 cursor-move"
+                      className={`absolute rounded-sm border cursor-move transition-opacity ${
+                        isDragging
+                          ? 'bg-accent/35 border-accent/60 shadow-lg shadow-accent/20'
+                          : 'bg-accent/15 border-accent/25'
+                      }`}
                       style={{
                         left:   Math.max(0, estS) * DAY_W + 1,
                         width:  (Math.min(totalDays - 1, estE) - Math.max(0, estS) + 1) * DAY_W - 2,
@@ -621,7 +695,7 @@ export function GanttChart({
                     const barW = (Math.min(totalDays - 1, actE) - Math.max(0, actS) + 1) * DAY_W - 8
                     return (
                       <div
-                        className={`absolute rounded border ${bars.actual} ${bars.border} cursor-move`}
+                        className={`absolute rounded border cursor-move transition-shadow ${bars.actual} ${bars.border} ${isDragging ? 'shadow-lg brightness-125' : ''}`}
                         style={{ left: barL, width: barW, top: h / 2 - 6, height: 12 }}
                         onMouseDown={e => startBarDrag(e, task, 'move')}
                         onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, task })}
