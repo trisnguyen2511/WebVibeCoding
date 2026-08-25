@@ -12,6 +12,14 @@ const HEADER_H    = 64
 const LEFT_MIN    = 260
 const LEFT_DEFAULT = 360
 
+function localToday(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function dateToIndex(date: string, start: string): number {
   const ms = new Date(date + 'T00:00:00').getTime() - new Date(start + 'T00:00:00').getTime()
   return Math.floor(ms / 86400000)
@@ -189,7 +197,7 @@ export function GanttChart({
   useEffect(() => { onUpdateTaskRef.current = onUpdateTask }, [onUpdateTask])
 
   const totalDays  = dateToIndex(timelineEnd, timelineStart) + 1
-  const todayIndex = dateToIndex(new Date().toISOString().slice(0, 10), timelineStart)
+  const todayIndex = dateToIndex(localToday(), timelineStart)
   const days = useMemo(() => Array.from({ length: totalDays }, (_, i) => addDays(timelineStart, i)), [totalDays, timelineStart])
 
   // ── Build display rows (group subtasks under parents) ───────
@@ -501,7 +509,7 @@ export function GanttChart({
 
                 {/* Due date */}
                 <div className="text-right">
-                  <span className={`font-mono text-[11px] ${task.dueDate && task.dueDate < new Date().toISOString().slice(0, 10) && task.status !== 'done' ? 'text-red-400' : 'text-muted'}`}>
+                  <span className={`font-mono text-[11px] ${task.dueDate && task.dueDate < localToday() && task.status !== 'done' ? 'text-red-400' : 'text-muted'}`}>
                     {task.dueDate ? task.dueDate.slice(5) : '—'}
                   </span>
                 </div>
@@ -550,11 +558,14 @@ export function GanttChart({
               const isToday   = i === todayIndex
               return (
                 <div key={day}
-                  className={`absolute bottom-0 flex items-center justify-center text-[11px] border-r border-border/20 font-mono ${
-                    isToday ? 'text-red-400 font-bold' : isWeekend ? 'text-muted/60' : 'text-fg/70'
+                  className={`absolute bottom-0 flex flex-col items-center justify-end border-r border-border/20 font-mono ${
+                    isToday ? 'text-red-400' : isWeekend ? 'text-muted/60' : 'text-fg/70'
                   }`}
                   style={{ left: i * DAY_W, width: DAY_W, height: 24 }}>
-                  {fmtDay(day)}
+                  {isToday && (
+                    <span className="text-[8px] font-bold leading-none mb-0.5 tracking-wider text-red-400">TODAY</span>
+                  )}
+                  <span className={`text-[11px] leading-none mb-1 ${isToday ? 'font-bold' : ''}`}>{fmtDay(day)}</span>
                 </div>
               )
             })}
@@ -574,7 +585,7 @@ export function GanttChart({
             {/* Background: today highlight */}
             {todayIndex >= 0 && todayIndex < totalDays && (
               <div className="absolute top-0 bottom-0 pointer-events-none"
-                style={{ left: todayIndex * DAY_W, width: DAY_W, background: 'rgba(239,68,68,0.04)' }} />
+                style={{ left: todayIndex * DAY_W, width: DAY_W, background: 'rgba(239,68,68,0.08)' }} />
             )}
 
             {/* Background: weekends */}
@@ -797,7 +808,7 @@ export function GanttChart({
                       style={{ left: dueI * DAY_W, width: DAY_W, top: 3, height: 10 }}>
                       <div className={`w-2 h-2 rotate-45 rounded-sm ${
                         task.status === 'done' ? 'bg-emerald-400'
-                        : task.dueDate! < new Date().toISOString().slice(0, 10) ? 'bg-red-400'
+                        : task.dueDate! < localToday() ? 'bg-red-400'
                         : 'bg-yellow-400'
                       }`} />
                     </div>
@@ -940,14 +951,14 @@ export function GanttChart({
           </button>
           <button className="w-full text-left px-3 py-2 text-fg hover:bg-surface/80 transition-colors"
             onClick={() => {
-              setEntryModal({ task: ctxMenu.task, date: new Date().toISOString().slice(0, 10) })
+              setEntryModal({ task: ctxMenu.task, date: localToday() })
               setCtxMenu(null)
             }}>
             Log hours today
           </button>
           <button className="w-full text-left px-3 py-2 text-accent-soft hover:bg-accent/10 transition-colors"
             onClick={() => {
-              setEstModal({ task: ctxMenu.task, date: ctxMenu.task.estimateStartDate ?? new Date().toISOString().slice(0, 10) })
+              setEstModal({ task: ctxMenu.task, date: ctxMenu.task.estimateStartDate ?? localToday() })
               setCtxMenu(null)
             }}>
             Set estimate dates…
