@@ -165,30 +165,28 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     setStep('syncing')
     setError('')
     try {
-      const searchRes = await req(buildSearchPath(jql)) as {
-        issues?: Array<{
-          id: string; key: string
-          fields: { summary: string; status: { name: string }; parent?: { key: string }; duedate?: string; timeoriginalestimate?: number }
-        }>
-      }
-      const issues = searchRes.issues ?? []
+      const searchRes = await req(buildSearchPath(jql)) as { issues?: IssueRow[] }
+      const subtasks: IssueRow[] = searchRes.issues ?? []
 
-      // Batch-fetch parent issue summaries
-      const parentKeysSet = new Set(issues.flatMap(i => i.fields.parent?.key ? [i.fields.parent.key] : []))
-      const parentMap: Record<string, string> = {}
+      // Fetch parent tasks as full issues so their title & status are available
+      const parentKeysSet = new Set(subtasks.flatMap(i => i.fields.parent?.key ? [i.fields.parent.key] : []))
+      let parentIssues: IssueRow[] = []
       if (parentKeysSet.size > 0) {
         try {
           const pKeys = Array.from(parentKeysSet).join(',')
-          const parentRes = await req(`/search?jql=key in (${pKeys})&maxResults=${parentKeysSet.size}&fields=summary`) as {
-            issues?: Array<{ key: string; fields: { summary: string } }>
-          }
-          for (const p of parentRes.issues ?? []) parentMap[p.key] = p.fields.summary
+          const parentRes = await req(`/search?jql=key in (${pKeys})&maxResults=${parentKeysSet.size}&fields=${FIELDS}`) as { issues?: IssueRow[] }
+          parentIssues = parentRes.issues ?? []
         } catch (e) {
           console.warn('Parent fetch failed:', e)
         }
       }
 
-      mergePulledIssues(issues, parentMap)
+      // Build parentMap from fetched parent issues
+      const parentMap: Record<string, string> = {}
+      for (const p of parentIssues) parentMap[p.key] = p.fields.summary
+
+      // Merge subtasks first, then parent tasks (parents have no parentKey → standalone)
+      mergePulledIssues([...subtasks, ...parentIssues], parentMap)
     } catch (e) {
       setError(`Sync failed: ${e instanceof Error ? e.message : String(e)}`)
       setStep('idle')
