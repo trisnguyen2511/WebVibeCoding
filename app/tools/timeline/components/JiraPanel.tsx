@@ -298,6 +298,11 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     fields: { summary: string; status: { name: string }; parent?: { key: string }; duedate?: string; timeoriginalestimate?: number }
   }
 
+  function buildIssueLink(key: string): string {
+    const base = host.trim().replace(/\/$/, '').replace(/^(?!https?:\/\/)/, 'https://')
+    return `${base}/browse/${key}`
+  }
+
   function mergePulledIssues(issues: IssueRow[], parentMap: Record<string, string>) {
     const logs: JiraSyncLog[] = []
 
@@ -319,6 +324,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
         : 'todo' as const
       const parentKey = issue.fields.parent?.key
       const parentTitle = parentKey ? (parentMap[parentKey] ?? parentKey) : undefined
+      const link = buildIssueLink(issue.key)
 
       if (existing) {
         existing.title = issue.fields.summary
@@ -327,6 +333,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
         existing.status = status
         existing.parentKey = parentKey
         existing.parentTitle = parentTitle
+        existing.link = link
         existing.dueDate = issue.fields.duedate ?? existing.dueDate
         existing.estimateHours = issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : existing.estimateHours
         existing.updatedAt = new Date().toISOString()
@@ -335,7 +342,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
         const now = new Date().toISOString()
         result.push({
           id: generateId(), projectId: project.id, jiraId: issue.id, jiraKey: issue.key,
-          jiraStatus: jiraStatusName, parentKey, parentTitle,
+          jiraStatus: jiraStatusName, parentKey, parentTitle, link,
           title: issue.fields.summary, status,
           dueDate: issue.fields.duedate ?? undefined,
           estimateHours: issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : undefined,
