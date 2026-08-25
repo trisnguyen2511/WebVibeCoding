@@ -342,7 +342,7 @@ export function GanttChart({
         {/* Left header */}
         <div className="flex items-end px-3 pb-2 bg-surface border-b border-border shrink-0"
           style={{ height: HEADER_H }}>
-          <div className="grid w-full gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted"
+          <div className="grid w-full gap-1 text-[10px] font-semibold uppercase tracking-wider text-fg/60"
             style={{ gridTemplateColumns: '16px 1fr 48px 52px' }}>
             <span /><span>Task</span>
             <span className="text-right">Hrs</span>
@@ -361,9 +361,9 @@ export function GanttChart({
                 <div key={`gh-${row.parentKey}`}
                   className="flex items-center px-3 gap-2 border-b border-border/60"
                   style={{ height: GROUP_H, borderLeftWidth: 3, borderLeftColor: pal.border, background: pal.bg }}>
-                  <span className="font-mono text-[10px] text-muted/70 shrink-0">{row.parentKey}</span>
+                  <span className="font-mono text-[10px] text-muted shrink-0">{row.parentKey}</span>
                   <span className="text-[11px] font-semibold text-fg truncate">{row.parentTitle}</span>
-                  <span className="text-[10px] text-muted/50 shrink-0 ml-auto">{row.count}</span>
+                  <span className="text-[10px] text-muted shrink-0 ml-auto">{row.count}</span>
                 </div>
               )
             }
@@ -443,7 +443,7 @@ export function GanttChart({
           <div style={{ width: totalDays * DAY_W, position: 'relative', height: HEADER_H }}>
             {monthGroups.map((g, i) => (
               <div key={i}
-                className="absolute top-0 text-[10px] text-muted/70 font-semibold uppercase tracking-wider border-r border-border/30 flex items-center px-2"
+                className="absolute top-0 text-[10px] text-fg/80 font-semibold uppercase tracking-wider border-r border-border/50 flex items-center px-2"
                 style={{ left: g.start * DAY_W, width: g.count * DAY_W, height: 20 }}>
                 {g.label}
               </div>
@@ -454,9 +454,9 @@ export function GanttChart({
               if (e < 0 || s >= totalDays) return null
               return (
                 <div key={sprint.id}
-                  className="absolute flex items-center px-2 bg-accent/8 border-l-2 border-accent/50"
+                  className="absolute flex items-center px-2 bg-accent/20 border-l-2 border-accent/70"
                   style={{ left: s * DAY_W, width: (e - s + 1) * DAY_W, top: 20, height: 20 }}>
-                  <span className="text-[10px] text-accent-soft font-medium truncate">{sprint.name}</span>
+                  <span className="text-[10px] text-accent-soft font-semibold truncate">{sprint.name}</span>
                 </div>
               )
             })}
@@ -465,8 +465,8 @@ export function GanttChart({
               const isToday   = i === todayIndex
               return (
                 <div key={day}
-                  className={`absolute bottom-0 flex items-center justify-center text-[11px] border-r border-border/10 font-mono ${
-                    isToday ? 'text-red-400 font-bold' : isWeekend ? 'text-muted/30' : 'text-muted/60'
+                  className={`absolute bottom-0 flex items-center justify-center text-[11px] border-r border-border/20 font-mono ${
+                    isToday ? 'text-red-400 font-bold' : isWeekend ? 'text-muted/60' : 'text-fg/70'
                   }`}
                   style={{ left: i * DAY_W, width: DAY_W, height: 24 }}>
                   {fmtDay(day)}
@@ -495,7 +495,7 @@ export function GanttChart({
             {/* Background: weekends */}
             {days.map((day, i) => getDayOfWeek(day) === 0 || getDayOfWeek(day) === 6 ? (
               <div key={day} className="absolute top-0 bottom-0 pointer-events-none"
-                style={{ left: i * DAY_W, width: DAY_W, background: 'rgba(255,255,255,0.015)' }} />
+                style={{ left: i * DAY_W, width: DAY_W, background: 'rgba(255,255,255,0.03)' }} />
             ) : null)}
 
             {/* Background: sprint separators */}
@@ -504,7 +504,7 @@ export function GanttChart({
               if (idx < 0 || idx >= totalDays) return null
               return (
                 <div key={sprint.id}
-                  className="absolute top-0 bottom-0 border-l border-accent/20 pointer-events-none"
+                  className="absolute top-0 bottom-0 border-l-2 border-accent/40 pointer-events-none"
                   style={{ left: idx * DAY_W }} />
               )
             })}
@@ -525,7 +525,7 @@ export function GanttChart({
                   <div key={`ghr-${row.parentKey}`}
                     className="border-b border-border/50 flex items-center px-3"
                     style={{ height: h, borderLeftWidth: 3, borderLeftColor: pal.border, background: pal.bg }}>
-                    <span className="text-[10px] text-muted/50 font-medium">{row.parentTitle}</span>
+                    <span className="text-[10px] text-muted font-semibold">{row.parentTitle}</span>
                   </div>
                 )
               }
@@ -673,23 +673,23 @@ export function GanttChart({
             </span>
           ) : (
             <>
-              <div className="flex items-center gap-1.5 text-[10px] text-muted">
+              <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
                 <div className="w-6 h-2 rounded-sm bg-accent/15 border border-accent/25" />
                 <span>Estimate (drag)</span>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-muted">
+              <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
                 <div className="w-5 h-2.5 rounded bg-blue-500/70 border border-blue-400" />
                 <span>Actual</span>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-muted">
+              <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
                 <div className="w-5 h-1 rounded-sm bg-accent/70" />
                 <span>Hours logged</span>
               </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-muted">
+              <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
                 <div className="w-2 h-2 rotate-45 rounded-sm bg-yellow-400" />
                 <span>Due date</span>
               </div>
-              <div className="ml-auto text-[10px] text-muted/50 hidden lg:block">
+              <div className="ml-auto text-[10px] text-fg/40 hidden lg:block">
                 Click cell to log hours · Drag bar to move · Right-click for more
               </div>
             </>
