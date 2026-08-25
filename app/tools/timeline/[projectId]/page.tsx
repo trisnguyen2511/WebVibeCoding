@@ -124,7 +124,12 @@ export default function ProjectPage({ params }: PageProps) {
   }
 
   function handleSyncTasks(syncedTasks: Task[]) {
-    for (const t of syncedTasks) saveTask(t); reload()
+    const newIds = new Set(syncedTasks.map(t => t.id))
+    for (const t of tasks) {
+      if (!newIds.has(t.id)) deleteTask(t.id)
+    }
+    for (const t of syncedTasks) saveTask(t)
+    reload()
   }
 
   function handleSyncTime(updates: { taskId: string; entries: TimeEntry[] }[]) {
