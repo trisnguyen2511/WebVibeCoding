@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Plug, RefreshCw, Upload, CheckCircle, AlertCircle, Loader2, Copy, Terminal } from 'lucide-react'
+import { X, Plug, RefreshCw, Upload, CheckCircle, AlertCircle, Loader2, Copy, Terminal, RotateCcw } from 'lucide-react'
 import type { Project, Task, JiraConfig, JiraSyncLog, JiraUploadLog } from '@/lib/timeline-types'
 
 interface Props {
@@ -16,6 +16,8 @@ interface Props {
 type SyncStep = 'idle' | 'syncing' | 'preview' | 'uploading' | 'done'
 
 const BRIDGE_DEFAULT = 'http://localhost:3456'
+const DEFAULT_JQL = 'issuetype = Sub-task AND assignee = currentUser() ORDER BY parent, updated DESC'
+const FIELDS = 'summary,status,parent,duedate,timeoriginalestimate,timespent'
 
 async function jiraRequest(
   config: JiraConfig, path: string, method = 'GET',
@@ -103,12 +105,20 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   const [host, setHost] = useState(project.jiraConfig?.host ?? '')
   const [email, setEmail] = useState(project.jiraConfig?.email ?? '')
   const [token, setToken] = useState(project.jiraConfig?.token ?? '')
+  // Default: Server/DC + curl/Postman
   const [serverMode, setServerMode] = useState(() => {
     const h = project.jiraConfig?.host ?? ''
-    return h.length > 0 && !h.includes('atlassian.net')
+    return h.length === 0 || !h.includes('atlassian.net')
   })
   const [bridge, setBridge] = useState(BRIDGE_DEFAULT)
-  const [curlMode, setCurlMode] = useState(false)
+  const [curlMode, setCurlMode] = useState(true)
+
+  // JQL query (user-editable)
+  const [jql, setJql] = useState(DEFAULT_JQL)
+
+  // Replace mode: replace all Jira tasks instead of merging
+  const [replaceMode, setReplaceMode] = useState(true)
+
   const [step, setStep] = useState<SyncStep>('idle')
   const [error, setError] = useState('')
   const [syncLogs, setSyncLogs] = useState<JiraSyncLog[]>([])
@@ -126,6 +136,10 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
 
   function req(path: string, method = 'GET', data?: unknown) {
     return jiraRequest(getConfig(), path, method, data, serverMode, bridge)
+  }
+
+  function buildSearchPath(jqlStr: string) {
+    return `/search?jql=${encodeURIComponent(jqlStr.trim())}&maxResults=100&fields=${FIELDS}`
   }
 
   // ── Live mode handlers ──────────────────────────────────────
@@ -148,8 +162,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     setStep('syncing')
     setError('')
     try {
-      const jql = `issuetype = Sub-task AND assignee = currentUser() ORDER BY parent, updated DESC`
-      const searchRes = await req(`/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,status,parent,duedate,timeoriginalestimate,timespent`) as {
+      const searchRes = await req(buildSearchPath(jql)) as {
         issues?: Array<{
           id: string; key: string
           fields: { summary: string; status: { name: string }; parent?: { key: string }; duedate?: string; timeoriginalestimate?: number }
@@ -167,7 +180,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
             issues?: Array<{ key: string; fields: { summary: string } }>
           }
           for (const p of parentRes.issues ?? []) parentMap[p.key] = p.fields.summary
-        } catch { /* parent fetch is best-effort */ }
+        } catch { /* best-effort */ }
       }
 
       mergePulledIssues(issues, parentMap)
@@ -240,9 +253,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   function generateTasksCurl() {
     const h = host.trim(); const t = token.trim()
     if (!h || !t) { setError('Enter host and token first'); return }
-    const jql = `issuetype = Sub-task AND assignee = currentUser() ORDER BY parent, updated DESC`
-    const path = `/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,status,parent,duedate,timeoriginalestimate,timespent`
-    setTasksCurl(buildCurl(h, t, path))
+    setTasksCurl(buildCurl(h, t, buildSearchPath(jql)))
     setError('')
     onUpdateConfig(getConfig())
   }
@@ -280,20 +291,26 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     setError('')
   }
 
-  // ── Shared merge logic ──────────────────────────────────────
+  // ── Shared merge/replace logic ──────────────────────────────
 
-  function mergePulledIssues(
-    issues: Array<{
-      id: string; key: string
-      fields: { summary: string; status: { name: string }; parent?: { key: string }; duedate?: string; timeoriginalestimate?: number }
-    }>,
-    parentMap: Record<string, string>,
-  ) {
+  type IssueRow = {
+    id: string; key: string
+    fields: { summary: string; status: { name: string }; parent?: { key: string }; duedate?: string; timeoriginalestimate?: number }
+  }
+
+  function mergePulledIssues(issues: IssueRow[], parentMap: Record<string, string>) {
     const logs: JiraSyncLog[] = []
-    const merged: Task[] = [...tasks]
+
+    // In replace mode: start from non-Jira tasks only, then add all synced issues fresh
+    // In merge mode: carry all existing tasks forward and update matches
+    const base: Task[] = replaceMode
+      ? tasks.filter(t => !t.jiraId)
+      : [...tasks]
+
+    const result: Task[] = [...base]
 
     for (const issue of issues) {
-      const existing = merged.find(t => t.jiraId === issue.id)
+      const existing = result.find(t => t.jiraId === issue.id)
       const jiraStatusName = issue.fields.status.name
       const statusName = jiraStatusName.toLowerCase()
       const status = statusName.includes('done') || statusName.includes('closed') || statusName.includes('resolved') ? 'done' as const
@@ -316,20 +333,28 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
         logs.push({ action: 'update', jiraKey: issue.key, title: issue.fields.summary })
       } else {
         const now = new Date().toISOString()
-        merged.push({
+        result.push({
           id: generateId(), projectId: project.id, jiraId: issue.id, jiraKey: issue.key,
           jiraStatus: jiraStatusName, parentKey, parentTitle,
           title: issue.fields.summary, status,
           dueDate: issue.fields.duedate ?? undefined,
           estimateHours: issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : undefined,
-          timeEntries: [], order: merged.length, createdAt: now, updatedAt: now,
+          timeEntries: [], order: result.length, createdAt: now, updatedAt: now,
         })
         logs.push({ action: 'add', jiraKey: issue.key, title: issue.fields.summary })
       }
     }
 
+    // In replace mode, count removed tasks in the log
+    if (replaceMode) {
+      const removedCount = tasks.filter(t => t.jiraId && !issues.find(i => i.id === t.jiraId)).length
+      if (removedCount > 0) {
+        logs.push({ action: 'skip', jiraKey: '—', title: `${removedCount} old Jira task(s) removed`, reason: 'replace mode' })
+      }
+    }
+
     setSyncLogs(logs)
-    setPendingTasks(merged)
+    setPendingTasks(result)
     setStep('preview')
   }
 
@@ -427,25 +452,19 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 </div>
               )}
 
-              {/* Curl mode hint */}
-              {serverMode && curlMode && (
-                <div className="rounded-lg bg-surface border border-border p-3 text-[11px] text-muted space-y-1">
-                  <p className="text-fg font-medium">Chạy curl trong Postman → paste kết quả vào đây để import</p>
-                  <p>Không cần cài thêm gì — chỉ cần Host và PAT token ở trên.</p>
-                </div>
+              {/* Curl mode: connection test curl */}
+              {curlMode && host.trim() && token.trim() && (
+                <CurlBlock label="Test Connection:" curl={buildCurl(host.trim(), token.trim(), '/myself')} />
+              )}
+
+              {/* Test connection (live modes only) */}
+              {!curlMode && (
+                <button onClick={testConnection}
+                  className="w-full rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors">
+                  Test Connection
+                </button>
               )}
             </div>
-
-            {/* Test connection */}
-            {!curlMode && (
-              <button onClick={testConnection}
-                className="w-full rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors">
-                Test Connection
-              </button>
-            )}
-            {curlMode && host.trim() && token.trim() && (
-              <CurlBlock label="Test Connection curl:" curl={buildCurl(host.trim(), token.trim(), '/myself')} />
-            )}
           </div>
 
           {error && (
@@ -459,13 +478,53 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-fg">Pull from Jira</h3>
 
+            {/* JQL query input */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] text-muted">JQL Query</label>
+                <button
+                  onClick={() => setJql(DEFAULT_JQL)}
+                  className="flex items-center gap-1 text-[11px] text-muted hover:text-accent-soft transition-colors"
+                  title="Reset to default"
+                >
+                  <RotateCcw size={10} />
+                  Reset
+                </button>
+              </div>
+              <textarea
+                value={jql}
+                onChange={e => setJql(e.target.value)}
+                rows={3}
+                placeholder={DEFAULT_JQL}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[11px] font-mono text-fg placeholder:text-muted focus:border-accent focus:outline-none resize-y"
+              />
+            </div>
+
+            {/* Replace vs Merge toggle */}
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <button
+                role="switch"
+                aria-checked={replaceMode}
+                onClick={() => setReplaceMode(v => !v)}
+                className={`relative w-9 h-5 rounded-full transition-colors ${replaceMode ? 'bg-accent' : 'bg-border'}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${replaceMode ? 'translate-x-4' : 'translate-x-0'}`} />
+              </button>
+              <span className="text-xs text-fg">
+                {replaceMode ? 'Replace all Jira tasks' : 'Merge (add / update only)'}
+              </span>
+              <span className="text-[10px] text-muted">
+                {replaceMode ? '— xóa tasks cũ không có trong kết quả mới' : '— giữ lại tasks cũ'}
+              </span>
+            </label>
+
             {!curlMode ? (
               <>
                 <button onClick={syncTasks}
-                  disabled={step === 'syncing' || !hasCredentials}
+                  disabled={step === 'syncing' || !hasCredentials || !jql.trim()}
                   className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40">
                   {step === 'syncing' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                  {step === 'syncing' ? 'Syncing...' : 'Pull Tasks (my issues from Jira)'}
+                  {step === 'syncing' ? 'Syncing...' : 'Pull Tasks'}
                 </button>
                 <button onClick={syncTime}
                   disabled={step === 'syncing' || !hasCredentials}
@@ -477,7 +536,8 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
             ) : (
               <div className="space-y-3">
                 <button onClick={generateTasksCurl}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2 text-sm text-accent-soft hover:bg-accent/25 transition-colors">
+                  disabled={!hasCredentials || !jql.trim()}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40">
                   <Terminal size={13} />
                   Generate curl — Pull Tasks
                 </button>
@@ -508,14 +568,14 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
           {/* ── Sync preview ── */}
           {step === 'preview' && syncLogs.length > 0 && (
             <div className="space-y-3">
-              <h3 className="text-sm font-medium text-fg">Preview Changes ({syncLogs.length})</h3>
+              <h3 className="text-sm font-medium text-fg">Preview Changes ({syncLogs.filter(l => l.action !== 'skip').length} tasks)</h3>
               <div className="max-h-48 overflow-y-auto space-y-1">
                 {syncLogs.map((log, i) => (
                   <div key={i} className="flex items-center gap-2 rounded-lg bg-background px-3 py-2 text-xs">
-                    <span className={`font-medium ${log.action === 'add' ? 'text-green-400' : log.action === 'update' ? 'text-blue-400' : 'text-muted'}`}>
-                      {log.action}
+                    <span className={`font-medium shrink-0 ${log.action === 'add' ? 'text-green-400' : log.action === 'update' ? 'text-blue-400' : 'text-red-400/70'}`}>
+                      {log.action === 'add' ? '+add' : log.action === 'update' ? '~update' : '−remove'}
                     </span>
-                    <span className="font-mono text-accent-soft">{log.jiraKey}</span>
+                    <span className="font-mono text-accent-soft shrink-0">{log.jiraKey}</span>
                     <span className="text-muted truncate">{log.title}</span>
                   </div>
                 ))}
