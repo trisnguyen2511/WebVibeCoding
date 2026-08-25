@@ -583,6 +583,21 @@ export function GanttChart({
                 style={{ left: i * DAY_W, width: DAY_W, background: 'rgba(255,255,255,0.03)' }} />
             ) : null)}
 
+            {/* Vertical day lines */}
+            {days.map((_, i) => (
+              <div key={`vl-${i}`} className="absolute top-0 bottom-0 pointer-events-none"
+                style={{ left: i * DAY_W, width: 1, background: 'rgba(255,255,255,0.04)' }} />
+            ))}
+
+            {/* Horizontal row lines */}
+            {displayRows.map((row, ri) => {
+              const top = displayRows.slice(0, ri).reduce((sum, r) => sum + rowHeight(r), 0)
+              return (
+                <div key={`hl-${ri}`} className="absolute left-0 right-0 pointer-events-none"
+                  style={{ top, height: 1, background: 'rgba(255,255,255,0.05)' }} />
+              )
+            })}
+
             {/* Background: sprint separators */}
             {sprints.map(sprint => {
               const idx = dateToIndex(sprint.startDate, timelineStart)
