@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
-import { GripVertical, ExternalLink } from 'lucide-react'
+import { GripVertical, ExternalLink, Trash2 } from 'lucide-react'
 import type { Task, Sprint, TimeEntry } from '@/lib/timeline-types'
 import { TimeEntryModal } from './TimeEntryModal'
 
@@ -414,7 +414,7 @@ export function GanttChart({
 
   // ── List reorder drag ────────────────────────────────────────
   function isValidListDrop(dragIdx: number, dropIdx: number): boolean {
-    if (dragIdx === dropIdx || dropIdx === dragIdx - 1) return false
+    if (dragIdx === dropIdx) return false
     const dragged = displayRows[dragIdx]
     const target  = displayRows[dropIdx]
     if (!dragged || !target || dragged.type === 'header') return false
@@ -526,7 +526,7 @@ export function GanttChart({
             return (
               <div key={task.id}
                 draggable={canDrag}
-                className={`group grid items-center border-b border-border/40 cursor-pointer transition-all duration-150 ${isHovered && !isBeingDragged ? 'bg-surface' : 'hover:bg-surface/60'} ${isBeingDragged ? 'opacity-40 scale-[0.98]' : ''}`}
+                className={`group relative grid items-center border-b border-border/40 cursor-pointer transition-all duration-150 ${isHovered && !isBeingDragged ? 'bg-surface' : 'hover:bg-surface/60'} ${isBeingDragged ? 'opacity-40 scale-[0.98]' : ''}`}
                 style={{
                   gridTemplateColumns: '16px 1fr 48px 52px',
                   height: ROW_H,
@@ -590,6 +590,16 @@ export function GanttChart({
                     {task.dueDate ? task.dueDate.slice(5) : '—'}
                   </span>
                 </div>
+
+                {/* Delete button (hover) */}
+                {isHovered && onDeleteTask && (
+                  <button
+                    className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-muted/40 hover:text-red-400 transition-colors rounded"
+                    onClick={e => { e.stopPropagation(); onDeleteTask(task.id) }}
+                    title="Delete task">
+                    <Trash2 size={11} />
+                  </button>
+                )}
               </div>
             )
           })}
