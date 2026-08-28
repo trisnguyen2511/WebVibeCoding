@@ -18,9 +18,10 @@ interface Props {
 export function ProjectForm({ project, onSave, onClose }: Props) {
   const [name, setName] = useState(project?.name ?? '')
   const [description, setDescription] = useState(project?.description ?? '')
-  const [startDayOfWeek, setStartDayOfWeek] = useState(project?.sprintConfig.defaultStartDayOfWeek ?? 1)
-  const [weeksPerSprint, setWeeksPerSprint] = useState(project?.sprintConfig.defaultWeeksPerSprint ?? 2)
-  const [sprints, setSprints] = useState<Sprint[]>(project?.sprints ?? [])
+  const [startDayOfWeek,   setStartDayOfWeek]   = useState(project?.sprintConfig.defaultStartDayOfWeek ?? 1)
+  const [weeksPerSprint,   setWeeksPerSprint]   = useState(project?.sprintConfig.defaultWeeksPerSprint ?? 2)
+  const [startSprintNum,   setStartSprintNum]   = useState(project?.sprintConfig.startSprintNumber ?? 1)
+  const [sprints,          setSprints]          = useState<Sprint[]>(project?.sprints ?? [])
 
   // New sprint form
   const [newSprintName, setNewSprintName] = useState('')
@@ -41,12 +42,15 @@ export function ProjectForm({ project, onSave, onClose }: Props) {
     }
     const end = new Date(start)
     end.setDate(end.getDate() + weeksPerSprint * 7 - 1)
-    const num = sprints.length + 1
+    const num = startSprintNum + sprints.length
+    function fmt(d: Date) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    }
     setSprints(prev => [...prev, {
       id: generateId(),
       name: `Sprint ${num}`,
-      startDate: start.toISOString().slice(0, 10),
-      endDate: end.toISOString().slice(0, 10),
+      startDate: fmt(start),
+      endDate: fmt(end),
       isManual: false,
     }])
   }
@@ -77,7 +81,7 @@ export function ProjectForm({ project, onSave, onClose }: Props) {
       id: project?.id ?? generateId(),
       name: name.trim(),
       description: description.trim() || undefined,
-      sprintConfig: { defaultStartDayOfWeek: startDayOfWeek, defaultWeeksPerSprint: weeksPerSprint },
+      sprintConfig: { defaultStartDayOfWeek: startDayOfWeek, defaultWeeksPerSprint: weeksPerSprint, startSprintNumber: startSprintNum },
       sprints,
       jiraConfig: project?.jiraConfig,
       createdAt: project?.createdAt ?? now,
@@ -136,13 +140,20 @@ export function ProjectForm({ project, onSave, onClose }: Props) {
               <div className="space-y-1.5">
                 <label className="text-xs text-muted">Weeks per Sprint</label>
                 <input
-                  type="number"
-                  min={1}
-                  max={8}
-                  value={weeksPerSprint}
+                  type="number" min={1} max={8} value={weeksPerSprint}
                   onChange={e => setWeeksPerSprint(Number(e.target.value))}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg font-mono focus:border-accent focus:outline-none"
                 />
+              </div>
+              <div className="space-y-1.5 col-span-2">
+                <label className="text-xs text-muted">Sprint bắt đầu từ số</label>
+                <input
+                  type="number" min={1} value={startSprintNum}
+                  onChange={e => setStartSprintNum(Number(e.target.value))}
+                  placeholder="1"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg font-mono focus:border-accent focus:outline-none"
+                />
+                <p className="text-[11px] text-muted">Auto-generate sẽ đặt tên Sprint {startSprintNum}, Sprint {startSprintNum + 1}, Sprint {startSprintNum + 2}…</p>
               </div>
             </div>
           </div>

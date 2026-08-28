@@ -120,6 +120,7 @@ interface Props {
   onDeleteEntry: (taskId: string, entryId: string) => void
   onEditTask: (task: Task) => void
   onDeleteTask?: (id: string) => void
+  onReorderTasks?: (tasks: Task[]) => void
   estimateMode?: boolean
   onExitEstimateMode?: () => void
 }
@@ -174,7 +175,7 @@ function QuickEstimateModal({ task, date, onSave, onClose }: {
 // ── Main component ────────────────────────────────────────────
 export function GanttChart({
   tasks, sprints, timelineStart, timelineEnd,
-  onUpdateTask, onUpdateEntry, onDeleteEntry, onEditTask, onDeleteTask,
+  onUpdateTask, onUpdateEntry, onDeleteEntry, onEditTask, onDeleteTask, onReorderTasks,
   estimateMode = false, onExitEstimateMode,
 }: Props) {
   const leftRef      = useRef<HTMLDivElement>(null)
@@ -194,6 +195,9 @@ export function GanttChart({
   const [estModal,     setEstModal]     = useState<{ task: Task; date: string } | null>(null)
   const [hoveredRow,   setHoveredRow]   = useState<string | null>(null)
   const [dragPreview,  setDragPreview]  = useState<DragPreview | null>(null)
+  // List reorder drag
+  const [listDragIdx,  setListDragIdx]  = useState<number | null>(null)
+  const [listDropIdx,  setListDropIdx]  = useState<number | null>(null)
 
   // Keep refs in sync so drag handlers always see latest values
   useEffect(() => { tasksRef.current = tasks }, [tasks])
@@ -408,6 +412,57 @@ export function GanttChart({
     return task.timeEntries.reduce((s, e) => s + e.hours, 0)
   }
 
+  // ── List reorder drag ────────────────────────────────────────
+  function isValidListDrop(dragIdx: number, dropIdx: number): boolean {
+    if (dragIdx === dropIdx || dropIdx === dragIdx - 1) return false
+    const dragged = displayRows[dragIdx]
+    const target  = displayRows[dropIdx]
+    if (!dragged || !target || dragged.type === 'header') return false
+    if (dragged.type === 'task' && dragged.isSubtask) {
+      // Subtasks: only within same parent group
+      if (target.type === 'header') return target.colorIdx === dragged.colorIdx
+      if (target.type === 'task' && target.isSubtask) return target.colorIdx === dragged.colorIdx
+      return false
+    }
+    // Standalone tasks: only among other standalone tasks or before a header group
+    if (target.type === 'task' && !target.isSubtask) return true
+    if (target.type === 'header') return true
+    return false
+  }
+
+  function handleListDrop(dropIdx: number) {
+    if (listDragIdx === null || !onReorderTasks) return
+    if (!isValidListDrop(listDragIdx, dropIdx)) { setListDragIdx(null); setListDropIdx(null); return }
+
+    const dragged = displayRows[listDragIdx]
+    if (dragged.type !== 'task') return
+
+    // Build new row order
+    const rows = [...displayRows]
+    const [removed] = rows.splice(listDragIdx, 1)
+    const adjustedDrop = dropIdx > listDragIdx ? dropIdx - 1 : dropIdx
+    rows.splice(adjustedDrop, 0, removed)
+
+    if (dragged.isSubtask) {
+      // Reassign order for this group's subtasks only
+      const groupRows = rows.filter(r => r.type === 'task' && r.isSubtask && r.colorIdx === dragged.colorIdx)
+      const updated = tasks.map(t => {
+        const idx = groupRows.findIndex(r => r.type === 'task' && r.task.id === t.id)
+        return idx >= 0 ? { ...t, order: idx } : t
+      })
+      onReorderTasks(updated)
+    } else {
+      // Reassign order for standalone tasks only
+      const standaloneRows = rows.filter(r => r.type === 'task' && !r.isSubtask)
+      const updated = tasks.map(t => {
+        const idx = standaloneRows.findIndex(r => r.type === 'task' && r.task.id === t.id)
+        return idx >= 0 ? { ...t, order: idx } : t
+      })
+      onReorderTasks(updated)
+    }
+    setListDragIdx(null); setListDropIdx(null)
+  }
+
   // ── Helpers ──────────────────────────────────────────────────
   function rowHeight(_row: DisplayRow) {
     return ROW_H
@@ -436,12 +491,18 @@ export function GanttChart({
           onScroll={() => syncScroll('left')}
           style={{ scrollbarWidth: 'none' }}>
           {displayRows.map((row, ri) => {
+            const isDragTarget = listDropIdx === ri && listDragIdx !== null && isValidListDrop(listDragIdx, ri)
+            const dropLineStyle = isDragTarget ? { boxShadow: 'inset 0 2px 0 #7C3AED' } : {}
+
             if (row.type === 'header') {
               const pal = GROUP_PALETTE[row.colorIdx % GROUP_PALETTE.length]
               return (
                 <div key={`gh-${row.parentKey}`}
-                  className="grid items-center border-b border-border/60 px-3"
-                  style={{ gridTemplateColumns: '16px 1fr 48px 52px', height: ROW_H, borderLeftWidth: 3, borderLeftColor: pal.border, background: pal.bg }}>
+                  className="grid items-center border-b border-border/60 px-3 transition-shadow duration-100"
+                  style={{ gridTemplateColumns: '16px 1fr 48px 52px', height: ROW_H, borderLeftWidth: 3, borderLeftColor: pal.border, background: pal.bg, ...dropLineStyle }}
+                  onDragOver={e => { e.preventDefault(); setListDropIdx(ri) }}
+                  onDragLeave={() => setListDropIdx(null)}
+                  onDrop={() => handleListDrop(ri)}>
                   <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: pal.border, opacity: 0.7 }} />
                   <div className="min-w-0 pr-1">
                     <span className="font-mono text-[10px]" style={{ color: pal.border }}>{row.parentKey}</span>
@@ -459,10 +520,13 @@ export function GanttChart({
             const logged = totalLogged(task)
             const isHovered = hoveredRow === task.id
             const pal = colorIdx >= 0 ? GROUP_PALETTE[colorIdx % GROUP_PALETTE.length] : null
+            const isBeingDragged = listDragIdx === ri
+            const canDrag = !!onReorderTasks
 
             return (
               <div key={task.id}
-                className={`group grid items-center border-b border-border/40 cursor-pointer transition-colors duration-100 ${isHovered ? 'bg-surface' : 'hover:bg-surface/60'}`}
+                draggable={canDrag}
+                className={`group grid items-center border-b border-border/40 cursor-pointer transition-all duration-150 ${isHovered && !isBeingDragged ? 'bg-surface' : 'hover:bg-surface/60'} ${isBeingDragged ? 'opacity-40 scale-[0.98]' : ''}`}
                 style={{
                   gridTemplateColumns: '16px 1fr 48px 52px',
                   height: ROW_H,
@@ -470,10 +534,17 @@ export function GanttChart({
                   paddingRight: 12,
                   borderLeftWidth: isSubtask && pal ? 3 : 0,
                   borderLeftColor: pal?.border,
+                  ...dropLineStyle,
                 }}
                 onMouseEnter={() => setHoveredRow(task.id)}
                 onMouseLeave={() => setHoveredRow(null)}
+                onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setListDragIdx(ri); setListDropIdx(null) }}
+                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setListDropIdx(ri) }}
+                onDragLeave={() => setListDropIdx(null)}
+                onDrop={() => handleListDrop(ri)}
+                onDragEnd={() => { setListDragIdx(null); setListDropIdx(null) }}
                 onClick={e => {
+                  if (listDragIdx !== null) return
                   if ((e.ctrlKey || e.metaKey) && task.link) {
                     window.open(task.link, '_blank', 'noopener,noreferrer')
                   } else {
@@ -482,8 +553,11 @@ export function GanttChart({
                 }}
                 onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, task }) }}
               >
-                {/* Status dot */}
-                <span className={`h-2 w-2 rounded-full shrink-0 ${STATUS_DOT[task.status]}`} />
+                {/* Drag handle / Status dot */}
+                {canDrag && isHovered && !isBeingDragged
+                  ? <GripVertical size={12} className="text-muted/60 cursor-grab shrink-0" />
+                  : <span className={`h-2 w-2 rounded-full shrink-0 ${STATUS_DOT[task.status]}`} />
+                }
 
                 {/* Title area */}
                 <div className="min-w-0 pr-1">

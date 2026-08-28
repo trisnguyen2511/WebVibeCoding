@@ -47,6 +47,7 @@ export interface Sprint {
 export interface SprintConfig {
   defaultStartDayOfWeek: number  // 0=Sun,1=Mon,...6=Sat
   defaultWeeksPerSprint: number
+  startSprintNumber?: number     // first sprint number for auto-generate (default 1)
 }
 
 export interface JiraConfig {

@@ -119,6 +119,7 @@ export default function ProjectPage({ params }: PageProps) {
   }
 
   function handleUpdateTask(task: Task)                         { saveTask(task); reload() }
+  function handleReorderTasks(reordered: Task[])                { for (const t of reordered) saveTask(t); reload() }
   function handleUpdateEntry(taskId: string, entry: TimeEntry)  { upsertTimeEntry(taskId, entry); reload() }
   function handleDeleteEntry(taskId: string, entryId: string)   { deleteTimeEntry(taskId, entryId); reload() }
 
@@ -275,6 +276,7 @@ export default function ProjectPage({ params }: PageProps) {
               onDeleteEntry={handleDeleteEntry}
               onEditTask={task => { setEditTask(task); setShowTaskForm(true) }}
               onDeleteTask={handleDeleteTask}
+              onReorderTasks={handleReorderTasks}
               estimateMode={estimateMode}
               onExitEstimateMode={() => setEstimateMode(false)}
             />
