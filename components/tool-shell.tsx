@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { SettingsMenu } from '@/components/settings-menu'
 import { recordToolVisit } from '@/lib/tool-history'
@@ -55,6 +55,7 @@ export function ToolShell({
 }: ToolShellProps) {
   const maxW = wide ? 'max-w-6xl' : 'max-w-4xl'
   const pathname = usePathname()
+  const router = useRouter()
 
   useEffect(() => {
     if (pathname) recordToolVisit(pathname)
@@ -79,16 +80,16 @@ export function ToolShell({
         style={headerStyle}
       >
         <div className={`mx-auto flex ${maxW} items-center gap-3 px-4 py-2.5`}>
-          <Link
-            href="/"
-            aria-label="Back to tools"
+          <button
+            onClick={() => router.back()}
+            aria-label="Back"
             className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-muted transition-all hover:border-accent/50 hover:text-fg"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M19 12H5M12 5l-7 7 7 7"/>
             </svg>
             <span className="hidden sm:inline">Back</span>
-          </Link>
+          </button>
 
           <div className="h-4 w-px shrink-0 bg-border" />
 
