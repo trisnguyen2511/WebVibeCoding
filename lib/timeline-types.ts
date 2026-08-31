@@ -73,6 +73,7 @@ export interface ExportData {
   exportedAt: string
   projects: Project[]
   tasks: Task[]
+  collapsedParents?: Record<string, string[]>  // projectId → collapsed parentKeys
 }
 
 export interface JiraSyncLog {

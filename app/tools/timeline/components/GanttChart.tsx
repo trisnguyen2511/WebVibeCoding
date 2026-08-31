@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
-import { GripVertical, ExternalLink, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
+import { GripVertical, ExternalLink, Trash2, ChevronDown } from 'lucide-react'
 import type { Task, Sprint, TimeEntry } from '@/lib/timeline-types'
 import { TimeEntryModal } from './TimeEntryModal'
 
@@ -92,7 +92,7 @@ type DisplayRow =
   | { type: 'header'; parentKey: string; parentTitle: string; count: number; colorIdx: number
       isCollapsed: boolean
       estStart?: string; estEnd?: string; actStart?: string; actEnd?: string }
-  | { type: 'task';   task: Task; isSubtask: boolean; colorIdx: number }
+  | { type: 'task';   task: Task; isSubtask: boolean; colorIdx: number; hiddenByCollapse?: boolean }
 
 interface Tooltip { x: number; y: number; task: Task; date?: string; entry?: TimeEntry }
 interface ContextMenu { x: number; y: number; task: Task; date?: string }
@@ -112,6 +112,7 @@ interface DragPreview {
 }
 
 interface Props {
+  projectId: string
   tasks: Task[]
   sprints: Sprint[]
   timelineStart: string
@@ -175,7 +176,7 @@ function QuickEstimateModal({ task, date, onSave, onClose }: {
 
 // ── Main component ────────────────────────────────────────────
 export function GanttChart({
-  tasks, sprints, timelineStart, timelineEnd,
+  projectId, tasks, sprints, timelineStart, timelineEnd,
   onUpdateTask, onUpdateEntry, onDeleteEntry, onEditTask, onDeleteTask, onReorderTasks,
   estimateMode = false, onExitEstimateMode,
 }: Props) {
@@ -199,8 +200,21 @@ export function GanttChart({
   // List reorder drag
   const [listDragIdx,  setListDragIdx]  = useState<number | null>(null)
   const [listDropIdx,  setListDropIdx]  = useState<number | null>(null)
-  // Collapse/expand parent groups
-  const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set())
+  // Collapse/expand parent groups — persisted to localStorage
+  const [collapsedParents, setCollapsedParents] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(`timeline:collapsed:${projectId}`)
+      return raw ? new Set<string>(JSON.parse(raw) as string[]) : new Set()
+    } catch { return new Set() }
+  })
+
+  // Re-load from localStorage when projectId changes (e.g. after navigation)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`timeline:collapsed:${projectId}`)
+      setCollapsedParents(raw ? new Set<string>(JSON.parse(raw) as string[]) : new Set())
+    } catch { setCollapsedParents(new Set()) }
+  }, [projectId])
 
   function toggleParent(key: string) {
     setCollapsedParents(prev => {
@@ -209,6 +223,13 @@ export function GanttChart({
       return s
     })
   }
+
+  // Persist collapsed state to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(`timeline:collapsed:${projectId}`, JSON.stringify([...collapsedParents]))
+    } catch { /* noop */ }
+  }, [collapsedParents, projectId])
 
   // Keep refs in sync so drag handlers always see latest values
   useEffect(() => { tasksRef.current = tasks }, [tasks])
@@ -245,9 +266,7 @@ export function GanttChart({
         actStart: actDates.length ? actDates.reduce((a, b) => a < b ? a : b) : undefined,
         actEnd:   actDates.length ? actDates.reduce((a, b) => a > b ? a : b) : undefined,
       })
-      if (!isCollapsed) {
-        for (const task of children) rows.push({ type: 'task', task, isSubtask: true, colorIdx })
-      }
+      for (const task of children) rows.push({ type: 'task', task, isSubtask: true, colorIdx, hiddenByCollapse: isCollapsed })
       colorIdx++
     }
     return rows
@@ -478,7 +497,8 @@ export function GanttChart({
   }
 
   // ── Helpers ──────────────────────────────────────────────────
-  function rowHeight(_row: DisplayRow) {
+  function rowHeight(row: DisplayRow) {
+    if (row.type === 'task' && row.hiddenByCollapse) return 0
     return ROW_H
   }
 
@@ -518,10 +538,9 @@ export function GanttChart({
                   onDragOver={e => { e.preventDefault(); setListDropIdx(ri) }}
                   onDragLeave={() => setListDropIdx(null)}
                   onDrop={() => handleListDrop(ri)}>
-                  <span className="shrink-0" style={{ color: pal.border }}>
-                    {row.isCollapsed
-                      ? <ChevronRight size={13} />
-                      : <ChevronDown size={13} />}
+                  <span className="shrink-0 transition-transform duration-200"
+                    style={{ color: pal.border, display: 'inline-flex', transform: row.isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>
+                    <ChevronDown size={13} />
                   </span>
                   <div className="min-w-0 pr-1">
                     <span className="font-mono text-[10px]" style={{ color: pal.border }}>{row.parentKey}</span>
@@ -542,21 +561,26 @@ export function GanttChart({
             const isBeingDragged = listDragIdx === ri
             const canDrag = !!onReorderTasks
 
+            const isHidden = !!row.hiddenByCollapse
             return (
               <div key={task.id}
-                draggable={canDrag}
-                className={`group relative grid items-center border-b border-border/40 cursor-pointer transition-all duration-150 ${isHovered && !isBeingDragged ? 'bg-surface' : 'hover:bg-surface/60'} ${isBeingDragged ? 'opacity-40 scale-[0.98]' : ''}`}
+                draggable={canDrag && !isHidden}
+                className={`group relative grid items-center border-b border-border/40 cursor-pointer ${isHidden ? '' : `transition-all duration-150 ${isHovered && !isBeingDragged ? 'bg-surface' : 'hover:bg-surface/60'}`} ${isBeingDragged ? 'opacity-40 scale-[0.98]' : ''}`}
                 style={{
                   gridTemplateColumns: '16px 1fr 48px 52px',
-                  height: ROW_H,
+                  height: isHidden ? 0 : ROW_H,
+                  opacity: isHidden ? 0 : 1,
+                  overflow: 'hidden',
+                  pointerEvents: isHidden ? 'none' : 'auto',
+                  transition: 'height 200ms ease, opacity 150ms ease',
                   paddingLeft: isSubtask ? 20 : 12,
                   paddingRight: 12,
                   borderLeftWidth: isSubtask && pal ? 3 : 0,
                   borderLeftColor: pal?.border,
                   ...dropLineStyle,
                 }}
-                onMouseEnter={e => { setHoveredRow(task.id); setTooltip({ x: e.clientX + 16, y: e.clientY, task }) }}
-                onMouseMove={e => setTooltip(prev => prev ? { ...prev, x: e.clientX + 16, y: e.clientY } : null)}
+                onMouseEnter={e => { if (isHidden) return; setHoveredRow(task.id); setTooltip({ x: e.clientX + 16, y: e.clientY, task }) }}
+                onMouseMove={e => { if (isHidden) return; setTooltip(prev => prev ? { ...prev, x: e.clientX + 16, y: e.clientY } : null) }}
                 onMouseLeave={() => { setHoveredRow(null); setTooltip(null) }}
                 onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setListDragIdx(ri); setListDropIdx(null) }}
                 onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setListDropIdx(ri) }}
@@ -802,18 +826,23 @@ export function GanttChart({
               const isHovered = hoveredRow === task.id
               const isDragging = dragPreview?.taskId === task.id
 
+              const isHiddenR = !!row.hiddenByCollapse
               return (
                 <div key={task.id}
-                  className={`relative border-b border-border/30 transition-colors duration-100 ${isHovered ? 'bg-surface/40' : ''}`}
+                  className={`relative border-b border-border/30 ${isHiddenR ? '' : `transition-colors duration-100 ${isHovered ? 'bg-surface/40' : ''}`}`}
                   style={{
-                    height: h,
+                    height: isHiddenR ? 0 : h,
+                    opacity: isHiddenR ? 0 : 1,
+                    overflow: 'hidden',
+                    pointerEvents: isHiddenR ? 'none' : 'auto',
+                    transition: 'height 200ms ease, opacity 150ms ease',
                     borderLeftWidth: isSubtask && pal ? 3 : 0,
                     borderLeftColor: pal?.border,
                     paddingLeft: isSubtask ? 4 : 0,
                   }}
-                  onMouseEnter={() => setHoveredRow(task.id)}
+                  onMouseEnter={() => { if (isHiddenR) return; setHoveredRow(task.id) }}
                   onMouseLeave={() => { setHoveredRow(null); setTooltip(null) }}
-                  onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, task }) }}>
+                  onContextMenu={e => { if (isHiddenR) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, task }) }}>
 
                   {/* Estimate mode hint overlay */}
                   {estimateMode && isHovered && (
