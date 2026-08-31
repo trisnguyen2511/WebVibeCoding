@@ -332,6 +332,7 @@ export default function ProjectPage({ params }: PageProps) {
           onUpdateConfig={handleUpdateJiraConfig}
           onSyncTasks={handleSyncTasks}
           onSyncTime={handleSyncTime}
+          onUpdateTask={handleUpdateTask}
           onClose={() => setShowJira(false)}
         />
       )}
