@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
-import { GripVertical, ExternalLink, Trash2 } from 'lucide-react'
+import { GripVertical, ExternalLink, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 import type { Task, Sprint, TimeEntry } from '@/lib/timeline-types'
 import { TimeEntryModal } from './TimeEntryModal'
 
@@ -90,6 +90,7 @@ function jiraStatusBadgeStyle(status: string): string {
 
 type DisplayRow =
   | { type: 'header'; parentKey: string; parentTitle: string; count: number; colorIdx: number
+      isCollapsed: boolean
       estStart?: string; estEnd?: string; actStart?: string; actEnd?: string }
   | { type: 'task';   task: Task; isSubtask: boolean; colorIdx: number }
 
@@ -198,6 +199,16 @@ export function GanttChart({
   // List reorder drag
   const [listDragIdx,  setListDragIdx]  = useState<number | null>(null)
   const [listDropIdx,  setListDropIdx]  = useState<number | null>(null)
+  // Collapse/expand parent groups
+  const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set())
+
+  function toggleParent(key: string) {
+    setCollapsedParents(prev => {
+      const s = new Set(prev)
+      if (s.has(key)) s.delete(key); else s.add(key)
+      return s
+    })
+  }
 
   // Keep refs in sync so drag handlers always see latest values
   useEffect(() => { tasksRef.current = tasks }, [tasks])
@@ -224,20 +235,23 @@ export function GanttChart({
     let colorIdx = 0
     for (const [parentKey, children] of Array.from(byParent)) {
       const parentTitle = children[0].parentTitle ?? parentKey
+      const isCollapsed = collapsedParents.has(parentKey)
       const estDates = children.flatMap(t => [t.estimateStartDate, t.estimateEndDate]).filter(Boolean) as string[]
       const actDates = children.flatMap(t => [t.actualStartDate,   t.actualEndDate  ]).filter(Boolean) as string[]
       rows.push({
-        type: 'header', parentKey, parentTitle, count: children.length, colorIdx,
+        type: 'header', parentKey, parentTitle, count: children.length, colorIdx, isCollapsed,
         estStart: estDates.length ? estDates.reduce((a, b) => a < b ? a : b) : undefined,
         estEnd:   estDates.length ? estDates.reduce((a, b) => a > b ? a : b) : undefined,
         actStart: actDates.length ? actDates.reduce((a, b) => a < b ? a : b) : undefined,
         actEnd:   actDates.length ? actDates.reduce((a, b) => a > b ? a : b) : undefined,
       })
-      for (const task of children) rows.push({ type: 'task', task, isSubtask: true, colorIdx })
+      if (!isCollapsed) {
+        for (const task of children) rows.push({ type: 'task', task, isSubtask: true, colorIdx })
+      }
       colorIdx++
     }
     return rows
-  }, [tasks])
+  }, [tasks, collapsedParents])
 
   // ── Scroll sync ──────────────────────────────────────────────
   const syncScroll = useCallback((from: 'left' | 'right') => {
@@ -498,12 +512,17 @@ export function GanttChart({
               const pal = GROUP_PALETTE[row.colorIdx % GROUP_PALETTE.length]
               return (
                 <div key={`gh-${row.parentKey}`}
-                  className="grid items-center border-b border-border/60 px-3 transition-shadow duration-100"
-                  style={{ gridTemplateColumns: '16px 1fr 48px 52px', height: ROW_H, borderLeftWidth: 3, borderLeftColor: pal.border, background: pal.bg, ...dropLineStyle }}
+                  className="grid items-center border-b border-border/60 transition-shadow duration-100 cursor-pointer hover:brightness-110"
+                  style={{ gridTemplateColumns: '20px 1fr 48px 52px', height: ROW_H, borderLeftWidth: 3, borderLeftColor: pal.border, background: pal.bg, paddingLeft: 8, paddingRight: 12, ...dropLineStyle }}
+                  onClick={() => toggleParent(row.parentKey)}
                   onDragOver={e => { e.preventDefault(); setListDropIdx(ri) }}
                   onDragLeave={() => setListDropIdx(null)}
                   onDrop={() => handleListDrop(ri)}>
-                  <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: pal.border, opacity: 0.7 }} />
+                  <span className="shrink-0" style={{ color: pal.border }}>
+                    {row.isCollapsed
+                      ? <ChevronRight size={13} />
+                      : <ChevronDown size={13} />}
+                  </span>
                   <div className="min-w-0 pr-1">
                     <span className="font-mono text-[10px]" style={{ color: pal.border }}>{row.parentKey}</span>
                     <p className="text-xs font-semibold text-fg truncate leading-snug">{row.parentTitle}</p>

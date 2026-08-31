@@ -1,11 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import {
-  X, Plug, RefreshCw, Upload, CheckCircle, AlertCircle, Loader2, RotateCcw,
-  Copy, Terminal, ChevronDown, ChevronRight, Clock, Pencil, Check, Plus,
-} from 'lucide-react'
-import type { Project, Task, TimeEntry, JiraConfig, JiraSyncLog, JiraUploadLog } from '@/lib/timeline-types'
+import { useState } from 'react'
+import { X, Plug, RefreshCw, Upload, CheckCircle, AlertCircle, Loader2, RotateCcw, Copy, Terminal } from 'lucide-react'
+import type { Project, Task, JiraConfig, JiraSyncLog, JiraUploadLog } from '@/lib/timeline-types'
 
 interface Props {
   project: Project
@@ -13,7 +10,6 @@ interface Props {
   onUpdateConfig: (config: JiraConfig) => void
   onSyncTasks: (tasks: Task[]) => void
   onSyncTime: (updates: { taskId: string; entries: Task['timeEntries'] }[]) => void
-  onUpdateTask?: (task: Task) => void
   onClose: () => void
 }
 
@@ -22,7 +18,7 @@ type SyncStep = 'idle' | 'syncing' | 'preview' | 'uploading' | 'done'
 const DEFAULT_JQL = 'issuetype = Sub-task AND assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC'
 const FIELDS = 'summary,status,parent,duedate,timeoriginalestimate,timespent'
 
-// ── Direct fetch ──────────────────────────────────────────────
+// ── Direct fetch (CORS must be handled by caller) ─────────────
 async function jiraRequest(
   config: JiraConfig, path: string, method = 'GET', data?: unknown, serverMode = false,
 ): Promise<unknown> {
@@ -58,11 +54,6 @@ function buildCurl(host: string, token: string, path: string, method = 'GET', bo
 
 function generateId() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
 
-function localToday(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 // ── UI helpers ────────────────────────────────────────────────
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
@@ -87,12 +78,8 @@ function CurlBlock({ label, curl }: { label: string; curl: string }) {
   )
 }
 
-const STATUS_DOT: Record<string, string> = {
-  todo: 'bg-zinc-500', 'in-progress': 'bg-blue-400', done: 'bg-emerald-400', blocked: 'bg-red-400',
-}
-
 // ── Main component ────────────────────────────────────────────
-export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncTime, onUpdateTask, onClose }: Props) {
+export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncTime, onClose }: Props) {
   const [host,  setHost]  = useState(project.jiraConfig?.host  ?? '')
   const [email, setEmail] = useState(project.jiraConfig?.email ?? '')
   const [token, setToken] = useState(project.jiraConfig?.token ?? '')
@@ -100,43 +87,23 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     const h = project.jiraConfig?.host ?? ''
     return h.length === 0 || !h.includes('atlassian.net')
   })
+  // curl/Postman = default for Server/DC; direct fetch for Cloud
   const [curlMode, setCurlMode] = useState(true)
 
   const [jql,      setJql]      = useState(DEFAULT_JQL)
   const [syncMode, setSyncMode] = useState<'merge' | 'replace' | 'clear'>('replace')
 
-  const [step,        setStep]        = useState<SyncStep>('idle')
-  const [error,       setError]       = useState('')
-  const [syncLogs,    setSyncLogs]    = useState<JiraSyncLog[]>([])
-  const [uploadLogs,  setUploadLogs]  = useState<JiraUploadLog[]>([])
-  const [pendingTasks, setPendingTasks] = useState<Task[]>([])
+  const [step,            setStep]            = useState<SyncStep>('idle')
+  const [error,           setError]           = useState('')
+  const [syncLogs,        setSyncLogs]        = useState<JiraSyncLog[]>([])
+  const [uploadLogs,      setUploadLogs]      = useState<JiraUploadLog[]>([])
+  const [pendingTasks,    setPendingTasks]    = useState<Task[]>([])
   const [selectedSprintIds, setSelectedSprintIds] = useState<string[]>([])
 
   // curl/Postman state
-  const [tasksCurl,       setTasksCurl]       = useState('')
-  const [tasksPaste,      setTasksPaste]      = useState('')
-  const [uploadCurls,     setUploadCurls]     = useState('')
-  // Pull by parent key
-  const [parentKey,       setParentKey]       = useState('')
-  const [parentKeyCurl,   setParentKeyCurl]   = useState('')
-  const [parentKeyPaste,  setParentKeyPaste]  = useState('')
-
-  // Task list expand/collapse
-  const [expandedParents,   setExpandedParents]   = useState<Set<string>>(new Set())
-  const [standaloneExpanded, setStandaloneExpanded] = useState(true)
-
-  // Inline edit state
-  const [editTaskId,   setEditTaskId]   = useState<string | null>(null)
-  const [editFields,   setEditFields]   = useState<{
-    estimateStartDate: string; estimateEndDate: string; estimateHours: string
-    actualStartDate: string; actualEndDate: string
-  }>({ estimateStartDate: '', estimateEndDate: '', estimateHours: '', actualStartDate: '', actualEndDate: '' })
-
-  // Log work state
-  const [logWorkId,   setLogWorkId]   = useState<string | null>(null)
-  const [logDate,     setLogDate]     = useState(localToday())
-  const [logHours,    setLogHours]    = useState('')
-  const [logNote,     setLogNote]     = useState('')
+  const [tasksCurl,   setTasksCurl]   = useState('')
+  const [tasksPaste,  setTasksPaste]  = useState('')
+  const [uploadCurls, setUploadCurls] = useState('')
 
   function getConfig(): JiraConfig { return { host: host.trim(), email: email.trim(), token: token.trim() } }
   function req(path: string, method = 'GET', data?: unknown) { return jiraRequest(getConfig(), path, method, data, serverMode) }
@@ -156,33 +123,9 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     try {
       const parsed = JSON.parse(tasksPaste) as { issues?: unknown[] }
       if (!Array.isArray(parsed.issues)) throw new Error('Expected {"issues": [...]} — paste full Jira search response')
+      // Parse subtasks
       const subtasks = parsed.issues as IssueRow[]
-      const parentMap: Record<string, string> = {}
-      for (const task of tasks) {
-        if (task.jiraKey && task.title && !task.parentKey) parentMap[task.jiraKey] = task.title
-      }
-      mergePulledIssues(subtasks, parentMap)
-    } catch (e) {
-      setError(`Parse error: ${e instanceof Error ? e.message : String(e)}`)
-    }
-  }
-
-  // ── Pull by parent key ──────────────────────────────────────
-  function generateParentKeyCurl() {
-    const k = parentKey.trim(); const h = host.trim(); const t = token.trim()
-    if (!k || !h || !t) { setError('Nhập host, token và parent key'); return }
-    const jqlForKey = `issuetype = Sub-task AND parent = ${k} ORDER BY updated DESC`
-    setParentKeyCurl(buildCurl(h, t, buildSearchPath(jqlForKey)))
-    setError('')
-    onUpdateConfig(getConfig())
-  }
-
-  function importParentKeyPaste() {
-    setError('')
-    try {
-      const parsed = JSON.parse(parentKeyPaste) as { issues?: unknown[] }
-      if (!Array.isArray(parsed.issues)) throw new Error('Expected {"issues": [...]}')
-      const subtasks = parsed.issues as IssueRow[]
+      // Extract parent keys and build parentMap from existing tasks
       const parentMap: Record<string, string> = {}
       for (const task of tasks) {
         if (task.jiraKey && task.title && !task.parentKey) parentMap[task.jiraKey] = task.title
@@ -289,58 +232,6 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     setSelectedSprintIds([])
   }
 
-  // ── Inline task edit ─────────────────────────────────────────
-  function openEdit(task: Task) {
-    setEditTaskId(task.id)
-    setEditFields({
-      estimateStartDate: task.estimateStartDate ?? '',
-      estimateEndDate:   task.estimateEndDate   ?? '',
-      estimateHours:     task.estimateHours != null ? String(task.estimateHours) : '',
-      actualStartDate:   task.actualStartDate   ?? '',
-      actualEndDate:     task.actualEndDate     ?? '',
-    })
-    setLogWorkId(null)
-  }
-
-  function saveEdit() {
-    if (!editTaskId || !onUpdateTask) return
-    const task = tasks.find(t => t.id === editTaskId)
-    if (!task) return
-    const h = parseFloat(editFields.estimateHours)
-    onUpdateTask({
-      ...task,
-      estimateStartDate: editFields.estimateStartDate || undefined,
-      estimateEndDate:   editFields.estimateEndDate   || undefined,
-      estimateHours:     !isNaN(h) && h > 0 ? h : undefined,
-      actualStartDate:   editFields.actualStartDate   || undefined,
-      actualEndDate:     editFields.actualEndDate     || undefined,
-      updatedAt: new Date().toISOString(),
-    })
-    setEditTaskId(null)
-  }
-
-  // ── Log work ─────────────────────────────────────────────────
-  function openLogWork(taskId: string) {
-    setLogWorkId(taskId)
-    setLogDate(localToday())
-    setLogHours('')
-    setLogNote('')
-    setEditTaskId(null)
-  }
-
-  function saveLogWork() {
-    if (!logWorkId || !onUpdateTask) return
-    const task = tasks.find(t => t.id === logWorkId)
-    if (!task) return
-    const hours = parseFloat(logHours)
-    if (!logDate || isNaN(hours) || hours <= 0) return
-    const entry: TimeEntry = {
-      id: generateId(), date: logDate, hours, source: 'manual', note: logNote || undefined,
-    }
-    onUpdateTask({ ...task, timeEntries: [...task.timeEntries, entry], updatedAt: new Date().toISOString() })
-    setLogWorkId(null)
-  }
-
   // ── Shared merge/replace logic ──────────────────────────────
   type IssueRow = {
     id: string; key: string
@@ -386,33 +277,10 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     setSyncLogs(logs); setPendingTasks(result); setStep('preview')
   }
 
-  // ── Group tasks for list view ─────────────────────────────────
-  const taskGroups = useMemo(() => {
-    const byParent = new Map<string, { key: string; title: string; tasks: Task[] }>()
-    const standalone: Task[] = []
-    for (const t of tasks) {
-      if (t.parentKey) {
-        const g = byParent.get(t.parentKey) ?? { key: t.parentKey, title: t.parentTitle ?? t.parentKey, tasks: [] }
-        g.tasks.push(t)
-        byParent.set(t.parentKey, g)
-      } else {
-        standalone.push(t)
-      }
-    }
-    return { groups: Array.from(byParent.values()), standalone }
-  }, [tasks])
-
-  function toggleParent(key: string) {
-    setExpandedParents(prev => {
-      const s = new Set(prev)
-      if (s.has(key)) s.delete(key); else s.add(key)
-      return s
-    })
-  }
-
   // ── Derived ─────────────────────────────────────────────────
   const hasCredentials = !!(host.trim() && token.trim())
   const manualEntryCount = tasks.filter(t => t.jiraId).reduce((n, t) => n + t.timeEntries.filter(e => e.source === 'manual').length, 0)
+  const isDirectMode = !curlMode  // true = direct fetch, false = curl/Postman
 
   return (
     <>
@@ -454,6 +322,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 placeholder={serverMode ? 'Personal Access Token (PAT)' : 'Jira API Token'}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none font-mono" />
 
+              {/* Mode toggle: curl/Postman vs direct fetch */}
               <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs">
                 <button onClick={() => setCurlMode(true)}
                   className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 transition-colors ${curlMode ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
@@ -465,9 +334,12 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 </button>
               </div>
 
+              {/* curl: test connection command */}
               {curlMode && host.trim() && token.trim() && (
                 <CurlBlock label="Test Connection:" curl={buildCurl(host.trim(), token.trim(), '/myself')} />
               )}
+
+              {/* direct: test button */}
               {!curlMode && (
                 <button onClick={testConnection} disabled={!hasCredentials}
                   className="w-full rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
@@ -488,7 +360,6 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-fg">Pull from Jira</h3>
 
-            {/* JQL */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-[11px] text-muted">JQL Query</label>
@@ -500,7 +371,6 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[11px] font-mono text-fg placeholder:text-muted focus:border-accent focus:outline-none resize-y" />
             </div>
 
-            {/* Sync mode */}
             <div className="space-y-1.5">
               <label className="text-[11px] text-muted">Sync mode</label>
               <div className="space-y-1">
@@ -526,7 +396,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
               <div className="space-y-3">
                 <button onClick={generateTasksCurl} disabled={!hasCredentials || !jql.trim()}
                   className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40">
-                  <Terminal size={13} />Generate curl — Pull Tasks (JQL)
+                  <Terminal size={13} />Generate curl — Pull Tasks
                 </button>
                 {tasksCurl && (
                   <div className="space-y-2">
@@ -541,33 +411,6 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                     </button>
                   </div>
                 )}
-
-                {/* Pull by parent key */}
-                <div className="rounded-xl border border-border/60 p-3 space-y-2 bg-background/40">
-                  <p className="text-[11px] font-medium text-fg">Pull subtasks theo parent key</p>
-                  <p className="text-[10px] text-muted">Nhập mã task cha để lấy toàn bộ subtasks (VD: ITMS-500)</p>
-                  <div className="flex gap-2">
-                    <input value={parentKey} onChange={e => setParentKey(e.target.value.toUpperCase())}
-                      placeholder="ITMS-500"
-                      className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg font-mono placeholder:text-muted focus:border-accent focus:outline-none" />
-                    <button onClick={generateParentKeyCurl} disabled={!hasCredentials || !parentKey.trim()}
-                      className="shrink-0 flex items-center gap-1.5 rounded-lg bg-accent/15 border border-accent/20 px-3 py-2 text-xs text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40">
-                      <Terminal size={11} />Generate
-                    </button>
-                  </div>
-                  {parentKeyCurl && (
-                    <div className="space-y-2">
-                      <CurlBlock label="Chạy lệnh:" curl={parentKeyCurl} />
-                      <textarea value={parentKeyPaste} onChange={e => setParentKeyPaste(e.target.value)} rows={4}
-                        placeholder={'{\n  "issues": [...]\n}'}
-                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-[11px] font-mono text-fg placeholder:text-muted focus:border-accent focus:outline-none resize-y" />
-                      <button onClick={importParentKeyPaste} disabled={!parentKeyPaste.trim()}
-                        className="w-full rounded-lg bg-accent/80 py-2 text-sm font-medium text-white hover:bg-accent transition-colors disabled:opacity-40">
-                        Import Subtasks
-                      </button>
-                    </div>
-                  )}
-                </div>
               </div>
             ) : (
               <>
@@ -674,7 +517,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 {uploadCurls && (
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <p className="text-[11px] text-muted">Chạy từng lệnh trong Postman:</p>
+                      <p className="text-[11px] text-muted">Chạy từng lệnh trong Postman để log time lên Jira:</p>
                       <CopyButton text={uploadCurls} />
                     </div>
                     <pre className="rounded-lg bg-background border border-border p-3 text-[10px] font-mono text-fg overflow-x-auto max-h-64 whitespace-pre-wrap">{uploadCurls}</pre>
@@ -707,259 +550,8 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
               </div>
             </div>
           )}
-
-          {/* ── Task list ── */}
-          {tasks.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-fg">Tasks ({tasks.length})</h3>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => {
-                    const allKeys = taskGroups.groups.map(g => g.key)
-                    if (expandedParents.size === allKeys.length) setExpandedParents(new Set())
-                    else setExpandedParents(new Set(allKeys))
-                  }} className="text-[10px] text-muted hover:text-fg transition-colors">
-                    {expandedParents.size === taskGroups.groups.length ? 'Collapse all' : 'Expand all'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                {/* Grouped by parent */}
-                {taskGroups.groups.map(group => {
-                  const expanded = expandedParents.has(group.key)
-                  return (
-                    <div key={group.key} className="rounded-xl border border-border overflow-hidden">
-                      {/* Group header */}
-                      <button
-                        onClick={() => toggleParent(group.key)}
-                        className="w-full flex items-center gap-2 px-3 py-2 bg-surface/80 hover:bg-surface transition-colors text-left">
-                        {expanded
-                          ? <ChevronDown size={12} className="text-muted shrink-0" />
-                          : <ChevronRight size={12} className="text-muted shrink-0" />}
-                        <span className="font-mono text-[10px] text-accent-soft shrink-0">{group.key}</span>
-                        <span className="text-xs font-medium text-fg truncate flex-1">{group.title}</span>
-                        <span className="text-[10px] text-muted shrink-0">{group.tasks.length}t</span>
-                      </button>
-
-                      {/* Subtasks */}
-                      {expanded && (
-                        <div className="divide-y divide-border/40">
-                          {group.tasks.map(task => (
-                            <TaskRow
-                              key={task.id}
-                              task={task}
-                              isEditing={editTaskId === task.id}
-                              isLogging={logWorkId === task.id}
-                              editFields={editFields}
-                              logDate={logDate} logHours={logHours} logNote={logNote}
-                              onOpenEdit={() => openEdit(task)}
-                              onCloseEdit={() => setEditTaskId(null)}
-                              onChangeEdit={setEditFields}
-                              onSaveEdit={saveEdit}
-                              onOpenLog={() => openLogWork(task.id)}
-                              onCloseLog={() => setLogWorkId(null)}
-                              onChangeLogDate={setLogDate}
-                              onChangeLogHours={setLogHours}
-                              onChangeLogNote={setLogNote}
-                              onSaveLog={saveLogWork}
-                              canEdit={!!onUpdateTask}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-
-                {/* Standalone tasks */}
-                {taskGroups.standalone.length > 0 && (
-                  <div className="rounded-xl border border-border overflow-hidden">
-                    <button
-                      onClick={() => setStandaloneExpanded(v => !v)}
-                      className="w-full flex items-center gap-2 px-3 py-2 bg-surface/80 hover:bg-surface transition-colors text-left">
-                      {standaloneExpanded
-                        ? <ChevronDown size={12} className="text-muted shrink-0" />
-                        : <ChevronRight size={12} className="text-muted shrink-0" />}
-                      <span className="text-xs font-medium text-fg flex-1">Standalone tasks</span>
-                      <span className="text-[10px] text-muted shrink-0">{taskGroups.standalone.length}t</span>
-                    </button>
-                    {standaloneExpanded && (
-                      <div className="divide-y divide-border/40">
-                        {taskGroups.standalone.map(task => (
-                          <TaskRow
-                            key={task.id}
-                            task={task}
-                            isEditing={editTaskId === task.id}
-                            isLogging={logWorkId === task.id}
-                            editFields={editFields}
-                            logDate={logDate} logHours={logHours} logNote={logNote}
-                            onOpenEdit={() => openEdit(task)}
-                            onCloseEdit={() => setEditTaskId(null)}
-                            onChangeEdit={setEditFields}
-                            onSaveEdit={saveEdit}
-                            onOpenLog={() => openLogWork(task.id)}
-                            onCloseLog={() => setLogWorkId(null)}
-                            onChangeLogDate={setLogDate}
-                            onChangeLogHours={setLogHours}
-                            onChangeLogNote={setLogNote}
-                            onSaveLog={saveLogWork}
-                            canEdit={!!onUpdateTask}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </>
-  )
-}
-
-// ── Task row sub-component ───────────────────────────────────
-type EditFields = {
-  estimateStartDate: string; estimateEndDate: string; estimateHours: string
-  actualStartDate: string; actualEndDate: string
-}
-
-function TaskRow({
-  task, isEditing, isLogging,
-  editFields, logDate, logHours, logNote,
-  onOpenEdit, onCloseEdit, onChangeEdit, onSaveEdit,
-  onOpenLog, onCloseLog, onChangeLogDate, onChangeLogHours, onChangeLogNote, onSaveLog,
-  canEdit,
-}: {
-  task: Task
-  isEditing: boolean; isLogging: boolean
-  editFields: EditFields
-  logDate: string; logHours: string; logNote: string
-  onOpenEdit: () => void; onCloseEdit: () => void
-  onChangeEdit: (f: EditFields) => void; onSaveEdit: () => void
-  onOpenLog: () => void; onCloseLog: () => void
-  onChangeLogDate: (v: string) => void; onChangeLogHours: (v: string) => void; onChangeLogNote: (v: string) => void
-  onSaveLog: () => void
-  canEdit: boolean
-}) {
-  const logged = task.timeEntries.reduce((s, e) => s + e.hours, 0)
-  const STATUS_DOT_CLS: Record<string, string> = {
-    todo: 'bg-zinc-500', 'in-progress': 'bg-blue-400', done: 'bg-emerald-400', blocked: 'bg-red-400',
-  }
-
-  return (
-    <div className="bg-background/60">
-      {/* Main row */}
-      <div className="flex items-center gap-2 px-3 py-2">
-        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT_CLS[task.status] ?? 'bg-zinc-500'}`} />
-        <div className="flex-1 min-w-0">
-          {task.jiraKey && <span className="font-mono text-[9px] text-accent-soft block leading-none mb-0.5">{task.jiraKey}</span>}
-          <p className="text-xs text-fg truncate leading-snug">{task.title}</p>
-        </div>
-        <div className="shrink-0 text-right">
-          <span className="font-mono text-[10px] text-fg">
-            {logged > 0 ? `${logged}h` : '—'}{task.estimateHours ? `/${task.estimateHours}h` : ''}
-          </span>
-        </div>
-        {canEdit && (
-          <div className="flex items-center gap-1 shrink-0">
-            <button onClick={isLogging ? onCloseLog : onOpenLog}
-              title="Log work"
-              className={`rounded p-1 transition-colors ${isLogging ? 'text-accent-soft bg-accent/10' : 'text-muted/50 hover:text-accent-soft hover:bg-accent/10'}`}>
-              <Plus size={11} />
-            </button>
-            <button onClick={isEditing ? onCloseEdit : onOpenEdit}
-              title="Edit estimate / actual"
-              className={`rounded p-1 transition-colors ${isEditing ? 'text-accent-soft bg-accent/10' : 'text-muted/50 hover:text-accent-soft hover:bg-accent/10'}`}>
-              <Pencil size={11} />
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Show current estimate/actual if set */}
-      {!isEditing && !isLogging && (task.estimateStartDate || task.actualStartDate) && (
-        <div className="px-3 pb-2 flex gap-3 flex-wrap">
-          {task.estimateStartDate && (
-            <span className="text-[9px] text-muted font-mono">Est: {task.estimateStartDate.slice(5)}→{task.estimateEndDate?.slice(5) ?? '?'}</span>
-          )}
-          {task.actualStartDate && (
-            <span className="text-[9px] text-blue-400/70 font-mono">Act: {task.actualStartDate.slice(5)}→{task.actualEndDate?.slice(5) ?? '…'}</span>
-          )}
-        </div>
-      )}
-
-      {/* Inline edit form */}
-      {isEditing && (
-        <div className="px-3 pb-3 space-y-2 border-t border-border/40 pt-2">
-          <p className="text-[10px] font-medium text-accent-soft">Edit estimate / actual</p>
-          <div className="space-y-1.5">
-            <p className="text-[10px] text-muted">Estimate</p>
-            <div className="grid grid-cols-3 gap-1.5">
-              <input type="date" value={editFields.estimateStartDate}
-                onChange={e => onChangeEdit({ ...editFields, estimateStartDate: e.target.value })}
-                className="col-span-1 rounded border border-border bg-background px-2 py-1 text-[10px] text-fg font-mono focus:border-accent focus:outline-none" />
-              <input type="date" value={editFields.estimateEndDate}
-                onChange={e => onChangeEdit({ ...editFields, estimateEndDate: e.target.value })}
-                className="col-span-1 rounded border border-border bg-background px-2 py-1 text-[10px] text-fg font-mono focus:border-accent focus:outline-none" />
-              <input type="number" min={0} step={0.5} value={editFields.estimateHours}
-                onChange={e => onChangeEdit({ ...editFields, estimateHours: e.target.value })}
-                placeholder="Hrs"
-                className="col-span-1 rounded border border-border bg-background px-2 py-1 text-[10px] text-fg font-mono focus:border-accent focus:outline-none" />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <p className="text-[10px] text-muted">Actual</p>
-            <div className="grid grid-cols-2 gap-1.5">
-              <input type="date" value={editFields.actualStartDate}
-                onChange={e => onChangeEdit({ ...editFields, actualStartDate: e.target.value })}
-                className="rounded border border-border bg-background px-2 py-1 text-[10px] text-fg font-mono focus:border-accent focus:outline-none" />
-              <input type="date" value={editFields.actualEndDate}
-                onChange={e => onChangeEdit({ ...editFields, actualEndDate: e.target.value })}
-                className="rounded border border-border bg-background px-2 py-1 text-[10px] text-fg font-mono focus:border-accent focus:outline-none" />
-            </div>
-          </div>
-          <div className="flex gap-2 pt-1">
-            <button onClick={onCloseEdit}
-              className="flex-1 rounded border border-border py-1.5 text-[11px] text-muted hover:text-fg transition-colors">
-              Cancel
-            </button>
-            <button onClick={onSaveEdit}
-              className="flex-1 rounded bg-accent py-1.5 text-[11px] font-medium text-white hover:bg-accent/90 transition-colors flex items-center justify-center gap-1">
-              <Check size={10} />Save
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Log work form */}
-      {isLogging && (
-        <div className="px-3 pb-3 space-y-2 border-t border-border/40 pt-2">
-          <p className="text-[10px] font-medium text-accent-soft flex items-center gap-1"><Clock size={10} />Log Work</p>
-          <div className="grid grid-cols-2 gap-1.5">
-            <input type="date" value={logDate} onChange={e => onChangeLogDate(e.target.value)}
-              className="rounded border border-border bg-background px-2 py-1.5 text-[10px] text-fg font-mono focus:border-accent focus:outline-none" />
-            <input type="number" min={0.25} step={0.25} value={logHours} onChange={e => onChangeLogHours(e.target.value)}
-              placeholder="Hours"
-              className="rounded border border-border bg-background px-2 py-1.5 text-[10px] text-fg font-mono focus:border-accent focus:outline-none" />
-          </div>
-          <input value={logNote} onChange={e => onChangeLogNote(e.target.value)}
-            placeholder="Note (optional)"
-            className="w-full rounded border border-border bg-background px-2 py-1.5 text-[10px] text-fg placeholder:text-muted focus:border-accent focus:outline-none" />
-          <div className="flex gap-2">
-            <button onClick={onCloseLog}
-              className="flex-1 rounded border border-border py-1.5 text-[11px] text-muted hover:text-fg transition-colors">
-              Cancel
-            </button>
-            <button onClick={onSaveLog} disabled={!logDate || !logHours || parseFloat(logHours) <= 0}
-              className="flex-1 rounded bg-accent py-1.5 text-[11px] font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-40 flex items-center justify-center gap-1">
-              <Check size={10} />Add
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
   )
 }
