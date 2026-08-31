@@ -90,7 +90,7 @@ function jiraStatusBadgeStyle(status: string): string {
 
 type DisplayRow =
   | { type: 'header'; parentKey: string; parentTitle: string; count: number; colorIdx: number
-      isCollapsed: boolean
+      isCollapsed: boolean; link?: string
       estStart?: string; estEnd?: string; actStart?: string; actEnd?: string }
   | { type: 'task';   task: Task; isSubtask: boolean; colorIdx: number; hiddenByCollapse?: boolean }
 
@@ -285,8 +285,14 @@ export function GanttChart({
       const isCollapsed = collapsedParents.has(parentKey)
       const estDates = children.flatMap(t => [t.estimateStartDate, t.estimateEndDate]).filter(Boolean) as string[]
       const actDates = children.flatMap(t => [t.actualStartDate,   t.actualEndDate  ]).filter(Boolean) as string[]
+      // Infer parent Jira link from first child that has a link (replace its key with parentKey)
+      const firstChildLink = children.find(t => t.link)?.link
+      const parentLink = firstChildLink
+        ? firstChildLink.replace(/\/browse\/[^/?#]+/, `/browse/${parentKey}`)
+        : undefined
       rows.push({
         type: 'header', parentKey, parentTitle, count: children.length, colorIdx, isCollapsed,
+        link: parentLink,
         estStart: estDates.length ? estDates.reduce((a, b) => a < b ? a : b) : undefined,
         estEnd:   estDates.length ? estDates.reduce((a, b) => a > b ? a : b) : undefined,
         actStart: actDates.length ? actDates.reduce((a, b) => a < b ? a : b) : undefined,
@@ -696,7 +702,13 @@ export function GanttChart({
                 <div key={`gh-${row.parentKey}`}
                   className="grid items-center border-b border-border/60 transition-shadow duration-100 cursor-pointer hover:brightness-110"
                   style={{ gridTemplateColumns: '20px 1fr 48px 52px', height: ROW_H, borderLeftWidth: 3, borderLeftColor: pal.border, background: pal.bg, paddingLeft: 8, paddingRight: 12, ...dropLineStyle }}
-                  onClick={() => toggleParent(row.parentKey)}
+                  onClick={e => {
+                    if ((e.ctrlKey || e.metaKey) && row.link) {
+                      window.open(row.link, '_blank', 'noopener,noreferrer')
+                    } else {
+                      toggleParent(row.parentKey)
+                    }
+                  }}
                   onMouseEnter={e => setTooltip({ x: e.clientX + 16, y: e.clientY, headerRow: row })}
                   onMouseMove={e => setTooltip(prev => prev ? { ...prev, x: e.clientX + 16, y: e.clientY } : null)}
                   onMouseLeave={() => setTooltip(null)}
@@ -708,7 +720,10 @@ export function GanttChart({
                     <ChevronDown size={13} />
                   </span>
                   <div className="min-w-0 pr-1">
-                    <span className="font-mono text-[10px]" style={{ color: pal.border }}>{row.parentKey}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="font-mono text-[10px]" style={{ color: pal.border }}>{row.parentKey}</span>
+                      {row.link && <ExternalLink size={9} className="text-muted/50" />}
+                    </div>
                     <p className="text-xs font-semibold text-fg truncate leading-snug">{row.parentTitle}</p>
                   </div>
                   <div className="text-right">
