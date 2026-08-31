@@ -89,12 +89,12 @@ export function exportData(projectId?: string): ExportData {
   const projectIds = new Set(projects.map(p => p.id))
   const tasks = getAllTasks().filter(t => projectIds.has(t.projectId))
   const collapsedParents: Record<string, string[]> = {}
-  for (const id of projectIds) {
+  Array.from(projectIds).forEach(id => {
     try {
       const raw = localStorage.getItem(`timeline:collapsed:${id}`)
       if (raw) collapsedParents[id] = JSON.parse(raw) as string[]
     } catch { /* noop */ }
-  }
+  })
   return { version: '1.0', exportedAt: new Date().toISOString(), projects, tasks, collapsedParents }
 }
 
