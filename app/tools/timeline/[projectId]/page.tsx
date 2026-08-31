@@ -266,21 +266,26 @@ export default function ProjectPage({ params }: PageProps) {
               </div>
             </div>
           ) : (
-            <GanttChart
-              projectId={project.id}
-              tasks={filteredTasks}
-              sprints={project.sprints}
-              timelineStart={timelineStart}
-              timelineEnd={timelineEnd}
-              onUpdateTask={handleUpdateTask}
-              onUpdateEntry={handleUpdateEntry}
-              onDeleteEntry={handleDeleteEntry}
-              onEditTask={task => { setEditTask(task); setShowTaskForm(true) }}
-              onDeleteTask={handleDeleteTask}
-              onReorderTasks={handleReorderTasks}
-              estimateMode={estimateMode}
-              onExitEstimateMode={() => setEstimateMode(false)}
-            />
+            <div className="relative flex-1 min-h-0">
+              <GanttChart
+                projectId={project.id}
+                tasks={filteredTasks}
+                sprints={project.sprints}
+                timelineStart={timelineStart}
+                timelineEnd={timelineEnd}
+                onUpdateTask={handleUpdateTask}
+                onUpdateEntry={handleUpdateEntry}
+                onDeleteEntry={handleDeleteEntry}
+                onEditTask={task => { setEditTask(task); setShowTaskForm(true) }}
+                onDeleteTask={handleDeleteTask}
+                onReorderTasks={handleReorderTasks}
+                estimateMode={estimateMode}
+                onExitEstimateMode={() => setEstimateMode(false)}
+              />
+              {(showTaskForm || showToday || showJira) && (
+                <div className="absolute inset-0 rounded-xl bg-black/30 backdrop-blur-[1px] z-10 pointer-events-none transition-opacity duration-200" />
+              )}
+            </div>
           )}
         </div>
 
