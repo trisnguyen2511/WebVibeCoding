@@ -91,7 +91,7 @@ export default function ProjectPage({ params }: PageProps) {
       case 'n': e.preventDefault(); setEditTask(null); setShowTaskForm(true);  break
       case 't': e.preventDefault(); setShowToday(true);  break
       case 'j': e.preventDefault(); setShowJira(true);   break
-      case 'e': e.preventDefault(); handleExport();       break
+      case 'x': e.preventDefault(); handleExport();       break
       case '?': e.preventDefault(); setShowShortcuts(v => !v); break
       case 'q': e.preventDefault(); setEstimateMode(v => !v); break
       case 'escape':
@@ -211,7 +211,7 @@ export default function ProjectPage({ params }: PageProps) {
           <div className="flex items-center gap-1.5 shrink-0 ml-2">
             <Kbd label="Today" shortcut="T" icon={<Calendar size={13} />} onClick={() => setShowToday(true)} />
             <Kbd label="Jira"  shortcut="J" icon={<RefreshCw size={13} />} onClick={() => setShowJira(true)} />
-            <Kbd label="Export" shortcut="E" icon={<Download size={13} />} onClick={handleExport} />
+            <Kbd label="Export" shortcut="X" icon={<Download size={13} />} onClick={handleExport} />
             <button
               onClick={() => setEstimateMode(v => !v)}
               className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-all duration-150 ${
@@ -281,6 +281,7 @@ export default function ProjectPage({ params }: PageProps) {
                 onReorderTasks={handleReorderTasks}
                 estimateMode={estimateMode}
                 onExitEstimateMode={() => setEstimateMode(false)}
+                onExport={handleExport}
               />
               {(showTaskForm || showToday || showJira) && (
                 <div className="absolute inset-0 rounded-xl bg-black/30 backdrop-blur-[1px] z-10 pointer-events-none transition-opacity duration-200" />
@@ -354,12 +355,24 @@ export default function ProjectPage({ params }: PageProps) {
                 ['N', 'New task'],
                 ['T', 'Today panel'],
                 ['J', 'Jira sync'],
-                ['E', 'Export JSON'],
+                ['X', 'Export JSON'],
                 ['Q', 'Estimate mode'],
                 ['?', 'This panel'],
                 ['Esc', 'Close panels'],
               ].map(([key, desc]) => (
                 <div key={key} className="flex items-center justify-between">
+                  <span className="text-sm text-muted">{desc}</span>
+                  <kbd className="rounded-md border border-border bg-background px-2 py-0.5 font-mono text-xs text-fg">{key}</kbd>
+                </div>
+              ))}
+              <p className="text-xs text-muted/60 pt-2 border-t border-border/40">While hovering a Gantt cell:</p>
+              {[
+                ['E', 'Set estimate dates'],
+                ['A', 'Log actual hours'],
+                ['D', 'Set due date here'],
+                ['X', 'Export JSON'],
+              ].map(([key, desc]) => (
+                <div key={`cell-${key}`} className="flex items-center justify-between">
                   <span className="text-sm text-muted">{desc}</span>
                   <kbd className="rounded-md border border-border bg-background px-2 py-0.5 font-mono text-xs text-fg">{key}</kbd>
                 </div>

@@ -125,6 +125,7 @@ interface Props {
   onReorderTasks?: (tasks: Task[]) => void
   estimateMode?: boolean
   onExitEstimateMode?: () => void
+  onExport?: () => void
 }
 
 // ── Quick Estimate Modal ──────────────────────────────────────
@@ -178,7 +179,7 @@ function QuickEstimateModal({ task, date, onSave, onClose }: {
 export function GanttChart({
   projectId, tasks, sprints, timelineStart, timelineEnd,
   onUpdateTask, onUpdateEntry, onDeleteEntry, onEditTask, onDeleteTask, onReorderTasks,
-  estimateMode = false, onExitEstimateMode,
+  estimateMode = false, onExitEstimateMode, onExport,
 }: Props) {
   const leftRef      = useRef<HTMLDivElement>(null)
   const rightRef     = useRef<HTMLDivElement>(null)
@@ -187,8 +188,10 @@ export function GanttChart({
   const dragRef      = useRef<DragState | null>(null)
   const panelDragRef = useRef<{ startX: number; startW: number } | null>(null)
   const rafRef       = useRef<number | null>(null)
-  const tasksRef     = useRef(tasks)
+  const tasksRef        = useRef(tasks)
   const onUpdateTaskRef = useRef(onUpdateTask)
+  const onExportRef     = useRef(onExport)
+  const hoveredCellRef  = useRef<{ task: Task; date: string } | null>(null)
 
   const [leftW,        setLeftW]        = useState(LEFT_DEFAULT)
   const [tooltip,      setTooltip]      = useState<Tooltip | null>(null)
@@ -231,9 +234,10 @@ export function GanttChart({
     } catch { /* noop */ }
   }, [collapsedParents, projectId])
 
-  // Keep refs in sync so drag handlers always see latest values
+  // Keep refs in sync so drag/keyboard handlers always see latest values
   useEffect(() => { tasksRef.current = tasks }, [tasks])
   useEffect(() => { onUpdateTaskRef.current = onUpdateTask }, [onUpdateTask])
+  useEffect(() => { onExportRef.current = onExport }, [onExport])
 
   const totalDays  = dateToIndex(timelineEnd, timelineStart) + 1
   const todayIndex = dateToIndex(localToday(), timelineStart)
@@ -425,6 +429,38 @@ export function GanttChart({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [estimateMode, onExitEstimateMode])
+
+  // ── Cell keyboard shortcuts (active while hovering a right-panel cell) ──
+  // x = export  |  e = set estimate  |  a = log actual  |  d = set due date
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const cell = hoveredCellRef.current
+      if (!cell) return
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      const { task, date } = cell
+      switch (e.key.toLowerCase()) {
+        case 'x':
+          e.preventDefault()
+          onExportRef.current?.()
+          break
+        case 'e':
+          e.preventDefault()
+          setEstModal({ task, date })
+          break
+        case 'a':
+          e.preventDefault()
+          setEntryModal({ task, date, entry: task.timeEntries.find(en => en.date === date) })
+          break
+        case 'd':
+          e.preventDefault()
+          onUpdateTaskRef.current({ ...task, dueDate: date, updatedAt: new Date().toISOString() })
+          break
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, []) // stable: reads task/date/handlers via refs
 
   // ── Month / Sprint header groups ─────────────────────────────
   const monthGroups = useMemo(() => {
@@ -866,10 +902,14 @@ export function GanttChart({
                           }
                         }}
                         onMouseEnter={e => {
+                          hoveredCellRef.current = { task, date: day }
                           if (!entry || estimateMode) return
                           setTooltip({ x: e.clientX, y: e.clientY, task, date: day, entry })
                         }}
-                        onMouseLeave={() => setTooltip(null)} />
+                        onMouseLeave={() => {
+                          hoveredCellRef.current = null
+                          setTooltip(null)
+                        }} />
                     )
                   })}
 
@@ -982,7 +1022,7 @@ export function GanttChart({
                 <span>Due date</span>
               </div>
               <div className="ml-auto text-[10px] text-fg/40 hidden lg:block">
-                Click cell to log hours · Drag bar to move · Right-click for more
+                Click cell to log hours · Drag bar to move · Right-click for more · Hover cell: <kbd className="font-mono bg-border/40 px-0.5 rounded">E</kbd> estimate <kbd className="font-mono bg-border/40 px-0.5 rounded">A</kbd> actual <kbd className="font-mono bg-border/40 px-0.5 rounded">D</kbd> due <kbd className="font-mono bg-border/40 px-0.5 rounded">X</kbd> export
               </div>
             </>
           )}
