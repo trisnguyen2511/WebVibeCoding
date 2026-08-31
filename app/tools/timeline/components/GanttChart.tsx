@@ -555,8 +555,9 @@ export function GanttChart({
                   borderLeftColor: pal?.border,
                   ...dropLineStyle,
                 }}
-                onMouseEnter={() => setHoveredRow(task.id)}
-                onMouseLeave={() => setHoveredRow(null)}
+                onMouseEnter={e => { setHoveredRow(task.id); setTooltip({ x: e.clientX + 16, y: e.clientY, task }) }}
+                onMouseMove={e => setTooltip(prev => prev ? { ...prev, x: e.clientX + 16, y: e.clientY } : null)}
+                onMouseLeave={() => { setHoveredRow(null); setTooltip(null) }}
                 onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setListDragIdx(ri); setListDropIdx(null) }}
                 onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setListDropIdx(ri) }}
                 onDragLeave={() => setListDropIdx(null)}
