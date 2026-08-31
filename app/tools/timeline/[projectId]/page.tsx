@@ -228,7 +228,7 @@ export default function ProjectPage({ params }: PageProps) {
         </div>
 
         {/* ── GANTT ─────────────────────────────────────────── */}
-        <div className="flex-1 min-h-0 overflow-hidden p-3 flex">
+        <div className="flex-1 min-h-0 p-3 flex">
           {filteredTasks.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center space-y-3">
