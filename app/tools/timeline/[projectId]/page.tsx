@@ -267,6 +267,7 @@ export default function ProjectPage({ params }: PageProps) {
             </div>
           ) : (
             <GanttChart
+              projectId={project.id}
               tasks={filteredTasks}
               sprints={project.sprints}
               timelineStart={timelineStart}

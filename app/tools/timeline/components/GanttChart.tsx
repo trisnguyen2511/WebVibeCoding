@@ -112,6 +112,7 @@ interface DragPreview {
 }
 
 interface Props {
+  projectId: string
   tasks: Task[]
   sprints: Sprint[]
   timelineStart: string
@@ -175,10 +176,11 @@ function QuickEstimateModal({ task, date, onSave, onClose }: {
 
 // ── Main component ────────────────────────────────────────────
 export function GanttChart({
-  tasks, sprints, timelineStart, timelineEnd,
+  projectId, tasks, sprints, timelineStart, timelineEnd,
   onUpdateTask, onUpdateEntry, onDeleteEntry, onEditTask, onDeleteTask, onReorderTasks,
   estimateMode = false, onExitEstimateMode,
 }: Props) {
+  const collapsedKey = `timeline:collapsed:${projectId}`
   const leftRef      = useRef<HTMLDivElement>(null)
   const rightRef     = useRef<HTMLDivElement>(null)
   const headerRef    = useRef<HTMLDivElement>(null)
@@ -199,13 +201,20 @@ export function GanttChart({
   // List reorder drag
   const [listDragIdx,  setListDragIdx]  = useState<number | null>(null)
   const [listDropIdx,  setListDropIdx]  = useState<number | null>(null)
-  // Collapse/expand parent groups
-  const [collapsedParents, setCollapsedParents] = useState<Set<string>>(new Set())
+  // Collapse/expand parent groups — persisted to localStorage
+  const [collapsedParents, setCollapsedParents] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    try {
+      const raw = localStorage.getItem(`timeline:collapsed:${projectId}`)
+      return raw ? new Set<string>(JSON.parse(raw) as string[]) : new Set()
+    } catch { return new Set() }
+  })
 
   function toggleParent(key: string) {
     setCollapsedParents(prev => {
       const s = new Set(prev)
       if (s.has(key)) s.delete(key); else s.add(key)
+      try { localStorage.setItem(`timeline:collapsed:${projectId}`, JSON.stringify([...s])) } catch { /* noop */ }
       return s
     })
   }
@@ -555,8 +564,9 @@ export function GanttChart({
                   borderLeftColor: pal?.border,
                   ...dropLineStyle,
                 }}
-                onMouseEnter={() => setHoveredRow(task.id)}
-                onMouseLeave={() => setHoveredRow(null)}
+                onMouseEnter={e => { setHoveredRow(task.id); setTooltip({ x: e.clientX + 16, y: e.clientY, task }) }}
+                onMouseMove={e => setTooltip(prev => prev ? { ...prev, x: e.clientX + 16, y: e.clientY } : null)}
+                onMouseLeave={() => { setHoveredRow(null); setTooltip(null) }}
                 onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setListDragIdx(ri); setListDropIdx(null) }}
                 onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setListDropIdx(ri) }}
                 onDragLeave={() => setListDropIdx(null)}

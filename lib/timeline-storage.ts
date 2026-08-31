@@ -88,7 +88,14 @@ export function exportData(projectId?: string): ExportData {
   const projects = projectId ? getProjects().filter(p => p.id === projectId) : getProjects()
   const projectIds = new Set(projects.map(p => p.id))
   const tasks = getAllTasks().filter(t => projectIds.has(t.projectId))
-  return { version: '1.0', exportedAt: new Date().toISOString(), projects, tasks }
+  const collapsedParents: Record<string, string[]> = {}
+  for (const id of projectIds) {
+    try {
+      const raw = localStorage.getItem(`timeline:collapsed:${id}`)
+      if (raw) collapsedParents[id] = JSON.parse(raw) as string[]
+    } catch { /* noop */ }
+  }
+  return { version: '1.0', exportedAt: new Date().toISOString(), projects, tasks, collapsedParents }
 }
 
 export function importData(data: ExportData): void {
@@ -107,4 +114,10 @@ export function importData(data: ExportData): void {
     else existingTasks.push(t)
   }
   write(TASKS_KEY, existingTasks)
+
+  if (data.collapsedParents) {
+    for (const [id, keys] of Object.entries(data.collapsedParents)) {
+      try { localStorage.setItem(`timeline:collapsed:${id}`, JSON.stringify(keys)) } catch { /* noop */ }
+    }
+  }
 }
