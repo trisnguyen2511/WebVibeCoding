@@ -458,7 +458,7 @@ export function GanttChart({
           break
         case 'd':
           e.preventDefault()
-          onUpdateTaskRef.current({ ...task, dueDate: date, updatedAt: new Date().toISOString() })
+          onUpdateTaskRef.current({ ...task, dueDate: task.dueDate === date ? undefined : date, updatedAt: new Date().toISOString() })
           break
       }
     }
@@ -903,15 +903,7 @@ export function GanttChart({
                           hoveredCellRef.current = null
                           setHoveredCellDate(null)
                           setTooltip(null)
-                        }}>
-                        {isCellHovered && (
-                          <div className="absolute inset-0 flex items-end justify-center gap-px pb-0.5 pointer-events-none z-20">
-                            {(['E','A','D'] as const).map(k => (
-                              <span key={k} className="text-[7px] font-mono font-bold bg-white/15 text-white/70 px-0.5 rounded leading-tight">{k}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                        }} />
                     )
                   })}
 
