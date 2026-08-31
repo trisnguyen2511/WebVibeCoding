@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Plus, Calendar, RefreshCw, Download, ChevronRight,
-  ListTodo, Clock, Flag, Keyboard, Pencil,
+  ListTodo, Clock, Flag, Keyboard,
 } from 'lucide-react'
 import { ToolShell } from '@/components/tool-shell'
 import {
@@ -65,7 +65,6 @@ export default function ProjectPage({ params }: PageProps) {
   const [showToday,       setShowToday]       = useState(false)
   const [showJira,        setShowJira]        = useState(false)
   const [showShortcuts,   setShowShortcuts]   = useState(false)
-  const [estimateMode,    setEstimateMode]    = useState(false)
 
   useEffect(() => {
     const p = getProject(projectId)
@@ -93,11 +92,9 @@ export default function ProjectPage({ params }: PageProps) {
       case 'j': e.preventDefault(); setShowJira(true);   break
       case 'x': e.preventDefault(); handleExport();       break
       case '?': e.preventDefault(); setShowShortcuts(v => !v); break
-      case 'q': e.preventDefault(); setEstimateMode(v => !v); break
       case 'escape':
         setShowTaskForm(false); setEditTask(null)
         setShowToday(false); setShowJira(false); setShowShortcuts(false)
-        setEstimateMode(false)
         break
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -213,19 +210,6 @@ export default function ProjectPage({ params }: PageProps) {
             <Kbd label="Jira"  shortcut="J" icon={<RefreshCw size={13} />} onClick={() => setShowJira(true)} />
             <Kbd label="Export" shortcut="X" icon={<Download size={13} />} onClick={handleExport} />
             <button
-              onClick={() => setEstimateMode(v => !v)}
-              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-all duration-150 ${
-                estimateMode
-                  ? 'border-accent bg-accent/10 text-accent-soft'
-                  : 'border-border text-muted hover:text-fg hover:border-accent/50 hover:bg-surface'
-              }`}
-              title="Estimate mode (Q)"
-            >
-              <Pencil size={13} />
-              <span className="hidden sm:inline">Estimate</span>
-              <kbd className={`hidden sm:block rounded px-1 font-mono text-[10px] ${estimateMode ? 'bg-accent/20' : 'bg-border/60'}`}>Q</kbd>
-            </button>
-            <button
               onClick={() => { setEditTask(null); setShowTaskForm(true) }}
               className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 transition-colors"
             >
@@ -279,8 +263,6 @@ export default function ProjectPage({ params }: PageProps) {
                 onEditTask={task => { setEditTask(task); setShowTaskForm(true) }}
                 onDeleteTask={handleDeleteTask}
                 onReorderTasks={handleReorderTasks}
-                estimateMode={estimateMode}
-                onExitEstimateMode={() => setEstimateMode(false)}
                 onExport={handleExport}
               />
               {(showTaskForm || showToday || showJira) && (
@@ -356,7 +338,6 @@ export default function ProjectPage({ params }: PageProps) {
                 ['T', 'Today panel'],
                 ['J', 'Jira sync'],
                 ['X', 'Export JSON'],
-                ['Q', 'Estimate mode'],
                 ['?', 'This panel'],
                 ['Esc', 'Close panels'],
               ].map(([key, desc]) => (
@@ -365,11 +346,11 @@ export default function ProjectPage({ params }: PageProps) {
                   <kbd className="rounded-md border border-border bg-background px-2 py-0.5 font-mono text-xs text-fg">{key}</kbd>
                 </div>
               ))}
-              <p className="text-xs text-muted/60 pt-2 border-t border-border/40">While hovering a Gantt cell:</p>
+              <p className="text-xs text-muted/60 pt-2 border-t border-border/40">Hover a Gantt cell then press:</p>
               {[
-                ['E', 'Set estimate dates'],
+                ['E', 'Set estimate dates + hours'],
                 ['A', 'Log actual hours'],
-                ['D', 'Set due date here'],
+                ['D', 'Set due date to that day'],
                 ['X', 'Export JSON'],
               ].map(([key, desc]) => (
                 <div key={`cell-${key}`} className="flex items-center justify-between">

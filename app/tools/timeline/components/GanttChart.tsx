@@ -123,19 +123,25 @@ interface Props {
   onEditTask: (task: Task) => void
   onDeleteTask?: (id: string) => void
   onReorderTasks?: (tasks: Task[]) => void
-  estimateMode?: boolean
-  onExitEstimateMode?: () => void
   onExport?: () => void
 }
 
 // ── Quick Estimate Modal ──────────────────────────────────────
 function QuickEstimateModal({ task, date, onSave, onClose }: {
   task: Task; date: string
-  onSave: (start: string, end: string) => void
+  onSave: (start: string, end: string, hours?: number) => void
   onClose: () => void
 }) {
   const [startDate, setStartDate] = useState(task.estimateStartDate ?? date)
   const [endDate,   setEndDate]   = useState(task.estimateEndDate   ?? addDays(date, 6))
+  const [hours,     setHours]     = useState(task.estimateHours?.toString() ?? '')
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}>
@@ -158,13 +164,19 @@ function QuickEstimateModal({ task, date, onSave, onClose }: {
               className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none" />
           </div>
         </div>
+        <div>
+          <label className="text-xs text-muted block mb-1">Est. Hours</label>
+          <input type="number" min={0} step={0.5} value={hours} onChange={e => setHours(e.target.value)}
+            placeholder="0"
+            className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-fg font-mono focus:border-accent focus:outline-none" />
+        </div>
         <div className="flex gap-2">
           <button onClick={onClose}
             className="flex-1 rounded-lg border border-border py-2 text-xs text-muted hover:text-fg transition-colors">
             Cancel
           </button>
           <button
-            onClick={() => { if (startDate && endDate && startDate <= endDate) onSave(startDate, endDate) }}
+            onClick={() => { if (startDate && endDate && startDate <= endDate) onSave(startDate, endDate, hours ? Number(hours) : undefined) }}
             disabled={!startDate || !endDate || startDate > endDate}
             className="flex-1 rounded-lg bg-accent py-2 text-xs font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-40">
             Save
@@ -179,7 +191,7 @@ function QuickEstimateModal({ task, date, onSave, onClose }: {
 export function GanttChart({
   projectId, tasks, sprints, timelineStart, timelineEnd,
   onUpdateTask, onUpdateEntry, onDeleteEntry, onEditTask, onDeleteTask, onReorderTasks,
-  estimateMode = false, onExitEstimateMode, onExport,
+  onExport,
 }: Props) {
   const leftRef      = useRef<HTMLDivElement>(null)
   const rightRef     = useRef<HTMLDivElement>(null)
@@ -198,8 +210,9 @@ export function GanttChart({
   const [ctxMenu,      setCtxMenu]      = useState<ContextMenu | null>(null)
   const [entryModal,   setEntryModal]   = useState<{ task: Task; date: string; entry?: TimeEntry } | null>(null)
   const [estModal,     setEstModal]     = useState<{ task: Task; date: string } | null>(null)
-  const [hoveredRow,   setHoveredRow]   = useState<string | null>(null)
-  const [dragPreview,  setDragPreview]  = useState<DragPreview | null>(null)
+  const [hoveredRow,      setHoveredRow]      = useState<string | null>(null)
+  const [hoveredCellDate, setHoveredCellDate] = useState<string | null>(null)
+  const [dragPreview,     setDragPreview]     = useState<DragPreview | null>(null)
   // List reorder drag
   const [listDragIdx,  setListDragIdx]  = useState<number | null>(null)
   const [listDropIdx,  setListDropIdx]  = useState<number | null>(null)
@@ -420,15 +433,6 @@ export function GanttChart({
     window.addEventListener('click', close)
     return () => window.removeEventListener('click', close)
   }, [ctxMenu])
-
-  // ── Escape exits estimate mode ───────────────────────────────
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && estimateMode) onExitEstimateMode?.()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [estimateMode, onExitEstimateMode])
 
   // ── Cell keyboard shortcuts (active while hovering a right-panel cell) ──
   // x = export  |  e = set estimate  |  a = log actual  |  d = set due date
@@ -741,7 +745,7 @@ export function GanttChart({
 
         {/* Timeline body */}
         <div ref={rightRef} className="flex-1 overflow-auto"
-          style={{ cursor: dragPreview ? 'grabbing' : estimateMode ? 'crosshair' : 'default', userSelect: dragPreview ? 'none' : undefined }}
+          style={{ cursor: dragPreview ? 'grabbing' : 'default', userSelect: dragPreview ? 'none' : undefined }}
           onScroll={e => {
             const el = e.target as HTMLDivElement
             syncScroll('right')
@@ -880,36 +884,34 @@ export function GanttChart({
                   onMouseLeave={() => { setHoveredRow(null); setTooltip(null) }}
                   onContextMenu={e => { if (isHiddenR) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, task }) }}>
 
-                  {/* Estimate mode hint overlay */}
-                  {estimateMode && isHovered && (
-                    <div className="absolute inset-0 bg-accent/5 pointer-events-none z-10 flex items-center justify-center">
-                      <span className="text-[10px] text-accent-soft/70">Click to set estimate</span>
-                    </div>
-                  )}
-
-                  {/* Click cells */}
+                  {/* Click cells + shortcut hint */}
                   {days.map((day, i) => {
                     const entry = task.timeEntries.find(e => e.date === day)
+                    const isCellHovered = isHovered && hoveredCellDate === day
                     return (
                       <div key={day}
                         className="absolute top-0 bottom-0 cursor-pointer"
                         style={{ left: i * DAY_W, width: DAY_W }}
-                        onClick={() => {
-                          if (estimateMode) {
-                            setEstModal({ task, date: day })
-                          } else {
-                            setEntryModal({ task, date: day, entry })
-                          }
-                        }}
+                        onClick={() => setEntryModal({ task, date: day, entry })}
                         onMouseEnter={e => {
                           hoveredCellRef.current = { task, date: day }
-                          if (!entry || estimateMode) return
+                          setHoveredCellDate(day)
+                          if (!entry) return
                           setTooltip({ x: e.clientX, y: e.clientY, task, date: day, entry })
                         }}
                         onMouseLeave={() => {
                           hoveredCellRef.current = null
+                          setHoveredCellDate(null)
                           setTooltip(null)
-                        }} />
+                        }}>
+                        {isCellHovered && (
+                          <div className="absolute inset-0 flex items-end justify-center gap-px pb-0.5 pointer-events-none z-20">
+                            {(['E','A','D'] as const).map(k => (
+                              <span key={k} className="text-[7px] font-mono font-bold bg-white/15 text-white/70 px-0.5 rounded leading-tight">{k}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )
                   })}
 
@@ -999,38 +1001,30 @@ export function GanttChart({
 
         {/* Legend */}
         <div className="flex items-center gap-4 px-4 py-2 border-t border-border/50 bg-surface/50 shrink-0">
-          {estimateMode ? (
-            <span className="text-[11px] text-accent-soft font-medium animate-pulse">
-              ✏ Estimate mode — click on any task row to set estimate dates · Esc to exit
-            </span>
-          ) : (
-            <>
-              <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
-                <div className="w-6 h-2 rounded-sm bg-accent/15 border border-accent/25" />
-                <span>Estimate (drag)</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
-                <div className="w-5 h-2.5 rounded bg-blue-500/70 border border-blue-400" />
-                <span>Actual</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
-                <div className="w-5 h-1 rounded-sm bg-accent/70" />
-                <span>Hours logged</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
-                <div className="w-2 h-2 rotate-45 rounded-sm bg-yellow-400" />
-                <span>Due date</span>
-              </div>
-              <div className="ml-auto text-[10px] text-fg/40 hidden lg:block">
-                Click cell to log hours · Drag bar to move · Right-click for more · Hover cell: <kbd className="font-mono bg-border/40 px-0.5 rounded">E</kbd> estimate <kbd className="font-mono bg-border/40 px-0.5 rounded">A</kbd> actual <kbd className="font-mono bg-border/40 px-0.5 rounded">D</kbd> due <kbd className="font-mono bg-border/40 px-0.5 rounded">X</kbd> export
-              </div>
-            </>
-          )}
+          <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
+            <div className="w-6 h-2 rounded-sm bg-accent/15 border border-accent/25" />
+            <span>Estimate (drag)</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
+            <div className="w-5 h-2.5 rounded bg-blue-500/70 border border-blue-400" />
+            <span>Actual</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
+            <div className="w-5 h-1 rounded-sm bg-accent/70" />
+            <span>Hours logged</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
+            <div className="w-2 h-2 rotate-45 rounded-sm bg-yellow-400" />
+            <span>Due date</span>
+          </div>
+          <div className="ml-auto text-[10px] text-fg/40 hidden lg:block">
+            Click to log · Hover cell: <kbd className="font-mono bg-border/40 px-0.5 rounded">E</kbd> estimate <kbd className="font-mono bg-border/40 px-0.5 rounded">A</kbd> actual <kbd className="font-mono bg-border/40 px-0.5 rounded">D</kbd> due date · Right-click for more
+          </div>
         </div>
       </div>
 
       {/* ─── HOVER TOOLTIP ─── */}
-      {tooltip && !estimateMode && (
+      {tooltip && (
         <div
           className="fixed z-50 pointer-events-none rounded-xl border border-border bg-surface shadow-2xl p-3 w-64 text-xs"
           style={{
@@ -1171,10 +1165,9 @@ export function GanttChart({
         <QuickEstimateModal
           task={estModal.task}
           date={estModal.date}
-          onSave={(startDate, endDate) => {
-            onUpdateTask({ ...estModal.task, estimateStartDate: startDate, estimateEndDate: endDate, updatedAt: new Date().toISOString() })
+          onSave={(startDate, endDate, hours) => {
+            onUpdateTask({ ...estModal.task, estimateStartDate: startDate, estimateEndDate: endDate, estimateHours: hours, updatedAt: new Date().toISOString() })
             setEstModal(null)
-            onExitEstimateMode?.()
           }}
           onClose={() => setEstModal(null)}
         />
