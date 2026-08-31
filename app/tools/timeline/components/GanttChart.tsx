@@ -210,9 +210,8 @@ export function GanttChart({
   const [ctxMenu,      setCtxMenu]      = useState<ContextMenu | null>(null)
   const [entryModal,   setEntryModal]   = useState<{ task: Task; date: string; entry?: TimeEntry } | null>(null)
   const [estModal,     setEstModal]     = useState<{ task: Task; date: string } | null>(null)
-  const [hoveredRow,      setHoveredRow]      = useState<string | null>(null)
-  const [hoveredCellDate, setHoveredCellDate] = useState<string | null>(null)
-  const [dragPreview,     setDragPreview]     = useState<DragPreview | null>(null)
+  const [hoveredRow,   setHoveredRow]   = useState<string | null>(null)
+  const [dragPreview,  setDragPreview]  = useState<DragPreview | null>(null)
   // List reorder drag
   const [listDragIdx,  setListDragIdx]  = useState<number | null>(null)
   const [listDropIdx,  setListDropIdx]  = useState<number | null>(null)
@@ -699,7 +698,7 @@ export function GanttChart({
       </div>
 
       {/* ─── RIGHT PANEL ─── */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0">
 
         {/* Timeline header */}
         <div ref={headerRef} className="overflow-x-hidden border-b border-border bg-surface shrink-0"
@@ -887,7 +886,6 @@ export function GanttChart({
                   {/* Click cells + shortcut hint */}
                   {days.map((day, i) => {
                     const entry = task.timeEntries.find(e => e.date === day)
-                    const isCellHovered = isHovered && hoveredCellDate === day
                     return (
                       <div key={day}
                         className="absolute top-0 bottom-0 cursor-pointer"
@@ -895,13 +893,11 @@ export function GanttChart({
                         onClick={() => setEntryModal({ task, date: day, entry })}
                         onMouseEnter={e => {
                           hoveredCellRef.current = { task, date: day }
-                          setHoveredCellDate(day)
                           if (!entry) return
                           setTooltip({ x: e.clientX, y: e.clientY, task, date: day, entry })
                         }}
                         onMouseLeave={() => {
                           hoveredCellRef.current = null
-                          setHoveredCellDate(null)
                           setTooltip(null)
                         }} />
                     )
