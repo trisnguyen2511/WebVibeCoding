@@ -8,7 +8,7 @@ import { TimeEntryModal } from './TimeEntryModal'
 const DAY_W       = 38
 const ROW_H       = 52    // task row height (slightly taller to fit jiraStatus badge)
 const GROUP_H     = 32    // group header row height
-const HEADER_H    = 64
+const HEADER_H    = 78
 const LEFT_MIN    = 260
 const LEFT_DEFAULT = 360
 
@@ -869,16 +869,26 @@ export function GanttChart({
               const dow       = getDayOfWeek(day)
               const isWeekend = dow === 0 || dow === 6
               const isToday   = i === todayIndex
+              const dayLetter = ['S', 'M', 'T', 'W', 'T', 'F', 'S'][dow]
               return (
                 <div key={day}
-                  className={`absolute bottom-0 flex flex-col items-center justify-end border-r border-border/20 font-mono ${
-                    isToday ? 'text-red-400' : isWeekend ? 'text-muted/60' : 'text-fg/70'
+                  className={`absolute border-r border-border/20 font-mono ${
+                    isToday ? 'text-red-400' : isWeekend ? 'text-muted/50' : 'text-fg/60'
                   }`}
-                  style={{ left: i * DAY_W, width: DAY_W, height: 24 }}>
-                  {isToday && (
-                    <span className="text-[8px] font-bold leading-none mb-0.5 tracking-wider text-red-400">TODAY</span>
-                  )}
-                  <span className={`text-[11px] leading-none mb-1 ${isToday ? 'font-bold' : ''}`}>{fmtDay(day)}</span>
+                  style={{ left: i * DAY_W, width: DAY_W, bottom: 0, height: 38 }}>
+                  {/* Weekday letter */}
+                  <div className={`flex items-center justify-center text-[9px] font-semibold tracking-wider leading-none ${
+                    isToday ? 'text-red-400' : isWeekend ? 'text-muted/40' : 'text-fg/40'
+                  }`} style={{ height: 14, paddingTop: 2 }}>
+                    {dayLetter}
+                  </div>
+                  {/* Day number */}
+                  <div className="flex flex-col items-center justify-end" style={{ height: 24 }}>
+                    {isToday && (
+                      <span className="text-[8px] font-bold leading-none mb-0.5 tracking-wider text-red-400">TODAY</span>
+                    )}
+                    <span className={`text-[11px] leading-none mb-1 ${isToday ? 'font-bold' : ''}`}>{fmtDay(day)}</span>
+                  </div>
                 </div>
               )
             })}
