@@ -1119,9 +1119,9 @@ export function GanttChart({
                         style={{
                           left:   idx * DAY_W + 3,
                           width:  DAY_W - 6,
-                          bottom: 4,
-                          height: 4,
-                          background: `rgba(124,58,237,${0.35 + Math.min(0.65, entry.hours / 8 * 0.65)})`,
+                          bottom: 5,
+                          height: 6,
+                          background: `rgba(124,58,237,${0.50 + Math.min(0.50, entry.hours / 8 * 0.50)})`,
                         }} />
                     )
                   })}
@@ -1149,16 +1149,22 @@ export function GanttChart({
         {/* Legend */}
         <div className="flex items-center gap-4 px-4 py-2 border-t border-border/50 bg-surface/50 shrink-0">
           <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
-            <div className="w-6 h-2 rounded-sm bg-accent/15 border border-accent/25" />
+            <div className="w-7 h-3.5 rounded" style={{ background: 'rgba(124,58,237,0.18)', border: '1px solid rgba(124,58,237,0.40)' }} />
             <span>Estimate (drag)</span>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
-            <div className="w-5 h-2.5 rounded bg-blue-500/70 border border-blue-400" />
-            <span>Actual</span>
+            <div className="w-7 h-3.5 rounded overflow-hidden" style={{ background: 'rgba(124,58,237,0.18)', border: '1px solid rgba(124,58,237,0.40)' }}>
+              <div className="h-full w-3/5" style={{ background: 'rgba(124,58,237,0.45)' }} />
+            </div>
+            <span>Worklog progress</span>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
-            <div className="w-5 h-1 rounded-sm bg-accent/70" />
-            <span>Hours logged</span>
+            <div className="w-5 h-1.5 rounded-sm bg-accent/75" />
+            <span>Daily log</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
+            <div className="w-5 h-1 rounded-sm bg-blue-500/75" />
+            <span>Actual</span>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
             <div className="w-2 h-2 rotate-45 rounded-sm bg-yellow-400" />
