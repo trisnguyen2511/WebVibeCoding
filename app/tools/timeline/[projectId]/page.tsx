@@ -65,6 +65,7 @@ export default function ProjectPage({ params }: PageProps) {
   const [showToday,       setShowToday]       = useState(false)
   const [showJira,        setShowJira]        = useState(false)
   const [showShortcuts,   setShowShortcuts]   = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
 
   useEffect(() => {
     const p = getProject(projectId)
@@ -146,7 +147,17 @@ export default function ProjectPage({ params }: PageProps) {
 
   function handleExport() {
     if (!project) return
-    const data = exportData(projectId)
+    // If project has a Jira token, show confirmation modal first
+    if (project.jiraConfig?.token) {
+      setShowExportModal(true)
+    } else {
+      doExport(false)
+    }
+  }
+
+  function doExport(includeSensitive: boolean) {
+    if (!project) return
+    const data = exportData(projectId, { includeSensitive })
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
@@ -154,6 +165,7 @@ export default function ProjectPage({ params }: PageProps) {
     a.download = `timeline-${project.name}-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
+    setShowExportModal(false)
   }
 
   if (!project) return null
@@ -314,6 +326,13 @@ export default function ProjectPage({ params }: PageProps) {
         />
       )}
 
+      {showExportModal && (
+        <ExportModal
+          onExport={doExport}
+          onClose={() => setShowExportModal(false)}
+        />
+      )}
+
       {showJira && (
         <JiraPanel
           project={project}
@@ -365,6 +384,82 @@ export default function ProjectPage({ params }: PageProps) {
         </div>
       )}
     </ToolShell>
+  )
+}
+
+// ── Export Modal ───────────────────────────────────────────────
+
+function ExportModal({ onExport, onClose }: {
+  onExport: (includeSensitive: boolean) => void
+  onClose: () => void
+}) {
+  const [includeSensitive, setIncludeSensitive] = useState(false)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={onClose}>
+      <div className="rounded-2xl border border-border bg-surface p-6 w-96 shadow-2xl"
+        onClick={e => e.stopPropagation()}>
+        <h3 className="font-display font-semibold text-fg mb-1">Export Timeline</h3>
+        <p className="text-sm text-muted mb-5">Download project data as JSON for backup or sharing.</p>
+
+        {/* Sensitive data section */}
+        <div className="rounded-xl border border-border bg-background p-4 mb-5">
+          <p className="text-xs font-semibold text-fg/70 uppercase tracking-wider mb-3">Sensitive Data</p>
+
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <div className="mt-0.5 relative shrink-0">
+              <input
+                type="checkbox"
+                checked={includeSensitive}
+                onChange={e => setIncludeSensitive(e.target.checked)}
+                className="sr-only"
+              />
+              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                includeSensitive ? 'bg-accent border-accent' : 'border-border group-hover:border-accent/50'
+              }`}>
+                {includeSensitive && (
+                  <svg viewBox="0 0 10 8" className="w-2.5 h-2 fill-none stroke-white stroke-2">
+                    <polyline points="1,4 3.5,6.5 9,1" />
+                  </svg>
+                )}
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-fg leading-snug">Include Jira token</p>
+              <p className="text-xs text-muted mt-0.5">
+                {includeSensitive
+                  ? 'Token sẽ được ghi vào file — không chia sẻ file này công khai.'
+                  : 'Token sẽ bị xóa khỏi file (mặc định an toàn).'}
+              </p>
+            </div>
+          </label>
+        </div>
+
+        {/* Warning when sensitive is on */}
+        {includeSensitive && (
+          <div className="flex items-start gap-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 px-3 py-2.5 mb-5">
+            <span className="text-yellow-400 text-sm leading-none mt-px">⚠</span>
+            <p className="text-xs text-yellow-300/90">
+              File export sẽ chứa Jira API token. Hãy bảo mật file và không commit lên git.
+            </p>
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-border py-2.5 text-sm text-muted hover:text-fg transition-colors">
+            Hủy
+          </button>
+          <button
+            onClick={() => onExport(includeSensitive)}
+            className="flex-1 rounded-xl bg-accent py-2.5 text-sm font-medium text-white hover:bg-accent/90 transition-colors">
+            Export JSON
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

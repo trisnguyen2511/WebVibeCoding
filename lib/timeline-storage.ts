@@ -88,8 +88,13 @@ export function deleteTimeEntry(taskId: string, entryId: string): void {
   write(TASKS_KEY, all)
 }
 
-export function exportData(projectId?: string): ExportData {
-  const projects = projectId ? getProjects().filter(p => p.id === projectId) : getProjects()
+export function exportData(projectId?: string, opts?: { includeSensitive?: boolean }): ExportData {
+  const rawProjects = projectId ? getProjects().filter(p => p.id === projectId) : getProjects()
+  const projects: Project[] = rawProjects.map(p => {
+    if (opts?.includeSensitive || !p.jiraConfig) return p
+    // Strip token when not explicitly included
+    return { ...p, jiraConfig: { ...p.jiraConfig, token: '' } }
+  })
   const projectIds = new Set(projects.map(p => p.id))
   const tasks = getAllTasks().filter(t => projectIds.has(t.projectId))
   const collapsedParents: Record<string, string[]> = {}
