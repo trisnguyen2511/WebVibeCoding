@@ -94,7 +94,12 @@ type DisplayRow =
       estStart?: string; estEnd?: string; actStart?: string; actEnd?: string }
   | { type: 'task';   task: Task; isSubtask: boolean; colorIdx: number; hiddenByCollapse?: boolean }
 
-interface Tooltip { x: number; y: number; task: Task; date?: string; entry?: TimeEntry }
+interface Tooltip {
+  x: number; y: number
+  task?: Task
+  headerRow?: { parentKey: string; parentTitle: string; count: number; colorIdx: number; estStart?: string; estEnd?: string; actStart?: string; actEnd?: string }
+  date?: string; entry?: TimeEntry
+}
 interface ContextMenu { x: number; y: number; task: Task; date?: string }
 
 interface DragState {
@@ -123,18 +128,27 @@ interface Props {
   onEditTask: (task: Task) => void
   onDeleteTask?: (id: string) => void
   onReorderTasks?: (tasks: Task[]) => void
-  estimateMode?: boolean
-  onExitEstimateMode?: () => void
+  onExport?: () => void
 }
 
 // ── Quick Estimate Modal ──────────────────────────────────────
 function QuickEstimateModal({ task, date, onSave, onClose }: {
   task: Task; date: string
-  onSave: (start: string, end: string) => void
+  onSave: (start: string, end: string, hours?: number) => void
   onClose: () => void
 }) {
   const [startDate, setStartDate] = useState(task.estimateStartDate ?? date)
   const [endDate,   setEndDate]   = useState(task.estimateEndDate   ?? addDays(date, 6))
+  const [hours,     setHours]     = useState(task.estimateHours?.toString() ?? '')
+
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onCloseRef.current() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, []) // stable: reads onClose through ref
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}>
@@ -157,14 +171,20 @@ function QuickEstimateModal({ task, date, onSave, onClose }: {
               className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-fg focus:border-accent focus:outline-none" />
           </div>
         </div>
+        <div>
+          <label className="text-xs text-muted block mb-1">Est. Hours</label>
+          <input type="number" min={0} step={0.5} value={hours} onChange={e => setHours(e.target.value)}
+            placeholder="0"
+            className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-fg font-mono focus:border-accent focus:outline-none" />
+        </div>
         <div className="flex gap-2">
           <button onClick={onClose}
             className="flex-1 rounded-lg border border-border py-2 text-xs text-muted hover:text-fg transition-colors">
             Cancel
           </button>
           <button
-            onClick={() => { if (startDate && endDate && startDate <= endDate) onSave(startDate, endDate) }}
-            disabled={!startDate || !endDate || startDate > endDate}
+            onClick={() => { if (startDate && endDate && startDate <= endDate) onSave(startDate, endDate, hours && Number(hours) > 0 ? Number(hours) : undefined) }}
+            disabled={!startDate || !endDate || startDate > endDate || (hours !== '' && Number(hours) < 0)}
             className="flex-1 rounded-lg bg-accent py-2 text-xs font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-40">
             Save
           </button>
@@ -178,7 +198,7 @@ function QuickEstimateModal({ task, date, onSave, onClose }: {
 export function GanttChart({
   projectId, tasks, sprints, timelineStart, timelineEnd,
   onUpdateTask, onUpdateEntry, onDeleteEntry, onEditTask, onDeleteTask, onReorderTasks,
-  estimateMode = false, onExitEstimateMode,
+  onExport,
 }: Props) {
   const leftRef      = useRef<HTMLDivElement>(null)
   const rightRef     = useRef<HTMLDivElement>(null)
@@ -187,8 +207,10 @@ export function GanttChart({
   const dragRef      = useRef<DragState | null>(null)
   const panelDragRef = useRef<{ startX: number; startW: number } | null>(null)
   const rafRef       = useRef<number | null>(null)
-  const tasksRef     = useRef(tasks)
+  const tasksRef        = useRef(tasks)
   const onUpdateTaskRef = useRef(onUpdateTask)
+  const onExportRef     = useRef(onExport)
+  const hoveredCellRef  = useRef<{ task: Task; date: string } | null>(null)
 
   const [leftW,        setLeftW]        = useState(LEFT_DEFAULT)
   const [tooltip,      setTooltip]      = useState<Tooltip | null>(null)
@@ -227,13 +249,14 @@ export function GanttChart({
   // Persist collapsed state to localStorage whenever it changes
   useEffect(() => {
     try {
-      localStorage.setItem(`timeline:collapsed:${projectId}`, JSON.stringify([...collapsedParents]))
+      localStorage.setItem(`timeline:collapsed:${projectId}`, JSON.stringify(Array.from(collapsedParents)))
     } catch { /* noop */ }
   }, [collapsedParents, projectId])
 
-  // Keep refs in sync so drag handlers always see latest values
+  // Keep refs in sync so drag/keyboard handlers always see latest values
   useEffect(() => { tasksRef.current = tasks }, [tasks])
   useEffect(() => { onUpdateTaskRef.current = onUpdateTask }, [onUpdateTask])
+  useEffect(() => { onExportRef.current = onExport }, [onExport])
 
   const totalDays  = dateToIndex(timelineEnd, timelineStart) + 1
   const todayIndex = dateToIndex(localToday(), timelineStart)
@@ -407,7 +430,21 @@ export function GanttChart({
       rightRef.current.scrollLeft = targetScroll
       if (headerRef.current) headerRef.current.scrollLeft = targetScroll
     }
-  }, [todayIndex, tasks.length])
+  }, [todayIndex])
+
+  // ── Wheel → horizontal scroll (mouse wheel scrolls timeline left/right) ──
+  useEffect(() => {
+    const el = rightRef.current
+    if (!el) return
+    function onWheel(e: WheelEvent) {
+      // Let natural horizontal scroll (trackpad swipe) pass through
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
+      e.preventDefault()
+      el!.scrollLeft += e.deltaY
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
 
   // ── Close context menu ───────────────────────────────────────
   useEffect(() => {
@@ -417,14 +454,33 @@ export function GanttChart({
     return () => window.removeEventListener('click', close)
   }, [ctxMenu])
 
-  // ── Escape exits estimate mode ───────────────────────────────
+  // ── Cell keyboard shortcuts (active while hovering a right-panel cell) ──
+  // x = export  |  e = set estimate  |  a = log actual  |  d = set due date
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && estimateMode) onExitEstimateMode?.()
+      const cell = hoveredCellRef.current
+      if (!cell) return
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      const { task, date } = cell
+      switch (e.key.toLowerCase()) {
+        case 'e':
+          e.preventDefault()
+          setEstModal({ task, date })
+          break
+        case 'a':
+          e.preventDefault()
+          setEntryModal({ task, date, entry: task.timeEntries.find(en => en.date === date) })
+          break
+        case 'd':
+          e.preventDefault()
+          onUpdateTaskRef.current({ ...task, dueDate: task.dueDate === date ? undefined : date, updatedAt: new Date().toISOString() })
+          break
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [estimateMode, onExitEstimateMode])
+  }, []) // stable: reads task/date/handlers via refs
 
   // ── Month / Sprint header groups ─────────────────────────────
   const monthGroups = useMemo(() => {
@@ -444,6 +500,13 @@ export function GanttChart({
   function totalLogged(task: Task) {
     return task.timeEntries.reduce((s, e) => s + e.hours, 0)
   }
+
+  const rowTops = useMemo(() => {
+    const tops: number[] = []
+    let acc = 0
+    for (const r of displayRows) { tops.push(acc); acc += rowHeight(r) }
+    return tops
+  }, [displayRows]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── List reorder drag ────────────────────────────────────────
   function isValidListDrop(dragIdx: number, dropIdx: number): boolean {
@@ -535,6 +598,9 @@ export function GanttChart({
                   className="grid items-center border-b border-border/60 transition-shadow duration-100 cursor-pointer hover:brightness-110"
                   style={{ gridTemplateColumns: '20px 1fr 48px 52px', height: ROW_H, borderLeftWidth: 3, borderLeftColor: pal.border, background: pal.bg, paddingLeft: 8, paddingRight: 12, ...dropLineStyle }}
                   onClick={() => toggleParent(row.parentKey)}
+                  onMouseEnter={e => setTooltip({ x: e.clientX + 16, y: e.clientY, headerRow: row })}
+                  onMouseMove={e => setTooltip(prev => prev ? { ...prev, x: e.clientX + 16, y: e.clientY } : null)}
+                  onMouseLeave={() => setTooltip(null)}
                   onDragOver={e => { e.preventDefault(); setListDropIdx(ri) }}
                   onDragLeave={() => setListDropIdx(null)}
                   onDrop={() => handleListDrop(ri)}>
@@ -659,7 +725,7 @@ export function GanttChart({
       </div>
 
       {/* ─── RIGHT PANEL ─── */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0">
 
         {/* Timeline header */}
         <div ref={headerRef} className="overflow-x-hidden border-b border-border bg-surface shrink-0"
@@ -685,7 +751,8 @@ export function GanttChart({
               )
             })}
             {days.map((day, i) => {
-              const isWeekend = getDayOfWeek(day) === 0 || getDayOfWeek(day) === 6
+              const dow       = getDayOfWeek(day)
+              const isWeekend = dow === 0 || dow === 6
               const isToday   = i === todayIndex
               return (
                 <div key={day}
@@ -705,7 +772,7 @@ export function GanttChart({
 
         {/* Timeline body */}
         <div ref={rightRef} className="flex-1 overflow-auto"
-          style={{ cursor: dragPreview ? 'grabbing' : estimateMode ? 'crosshair' : 'default', userSelect: dragPreview ? 'none' : undefined }}
+          style={{ cursor: dragPreview ? 'grabbing' : 'default', userSelect: dragPreview ? 'none' : undefined }}
           onScroll={e => {
             const el = e.target as HTMLDivElement
             syncScroll('right')
@@ -720,10 +787,10 @@ export function GanttChart({
             )}
 
             {/* Background: weekends */}
-            {days.map((day, i) => getDayOfWeek(day) === 0 || getDayOfWeek(day) === 6 ? (
+            {days.map((day, i) => { const dow = getDayOfWeek(day); return dow === 0 || dow === 6 ? (
               <div key={day} className="absolute top-0 bottom-0 pointer-events-none"
                 style={{ left: i * DAY_W, width: DAY_W, background: 'rgba(255,255,255,0.03)' }} />
-            ) : null)}
+            ) : null; })}
 
             {/* Vertical day lines */}
             {days.map((_, i) => (
@@ -732,13 +799,10 @@ export function GanttChart({
             ))}
 
             {/* Horizontal row lines */}
-            {displayRows.map((row, ri) => {
-              const top = displayRows.slice(0, ri).reduce((sum, r) => sum + rowHeight(r), 0)
-              return (
-                <div key={`hl-${ri}`} className="absolute left-0 right-0 pointer-events-none"
-                  style={{ top, height: 1, background: 'rgba(255,255,255,0.05)' }} />
-              )
-            })}
+            {displayRows.map((row, ri) => (
+              <div key={`hl-${ri}`} className="absolute left-0 right-0 pointer-events-none"
+                style={{ top: rowTops[ri], height: 1, background: 'rgba(255,255,255,0.05)' }} />
+            ))}
 
             {/* Background: sprint separators */}
             {sprints.map(sprint => {
@@ -826,50 +890,42 @@ export function GanttChart({
               const isHovered = hoveredRow === task.id
               const isDragging = dragPreview?.taskId === task.id
 
-              const isHiddenR = !!row.hiddenByCollapse
+              const isHidden = !!row.hiddenByCollapse
+              const entryByDate = new Map(task.timeEntries.map(e => [e.date, e]))
               return (
                 <div key={task.id}
-                  className={`relative border-b border-border/30 ${isHiddenR ? '' : `transition-colors duration-100 ${isHovered ? 'bg-surface/40' : ''}`}`}
+                  className={`relative border-b border-border/30 ${isHidden ? '' : `transition-colors duration-100 ${isHovered ? 'bg-surface/40' : ''}`}`}
                   style={{
-                    height: isHiddenR ? 0 : h,
-                    opacity: isHiddenR ? 0 : 1,
+                    height: isHidden ? 0 : h,
+                    opacity: isHidden ? 0 : 1,
                     overflow: 'hidden',
-                    pointerEvents: isHiddenR ? 'none' : 'auto',
+                    pointerEvents: isHidden ? 'none' : 'auto',
                     transition: 'height 200ms ease, opacity 150ms ease',
                     borderLeftWidth: isSubtask && pal ? 3 : 0,
                     borderLeftColor: pal?.border,
                     paddingLeft: isSubtask ? 4 : 0,
                   }}
-                  onMouseEnter={() => { if (isHiddenR) return; setHoveredRow(task.id) }}
+                  onMouseEnter={() => { if (isHidden) return; setHoveredRow(task.id) }}
                   onMouseLeave={() => { setHoveredRow(null); setTooltip(null) }}
-                  onContextMenu={e => { if (isHiddenR) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, task }) }}>
+                  onContextMenu={e => { if (isHidden) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, task }) }}>
 
-                  {/* Estimate mode hint overlay */}
-                  {estimateMode && isHovered && (
-                    <div className="absolute inset-0 bg-accent/5 pointer-events-none z-10 flex items-center justify-center">
-                      <span className="text-[10px] text-accent-soft/70">Click to set estimate</span>
-                    </div>
-                  )}
-
-                  {/* Click cells */}
+                  {/* Click cells + shortcut hint */}
                   {days.map((day, i) => {
-                    const entry = task.timeEntries.find(e => e.date === day)
+                    const entry = entryByDate.get(day)
                     return (
                       <div key={day}
-                        className="absolute top-0 bottom-0 cursor-pointer"
+                        className="absolute top-0 bottom-0 cursor-pointer group"
                         style={{ left: i * DAY_W, width: DAY_W }}
-                        onClick={() => {
-                          if (estimateMode) {
-                            setEstModal({ task, date: day })
-                          } else {
-                            setEntryModal({ task, date: day, entry })
-                          }
-                        }}
+                        onClick={() => setEntryModal({ task, date: day, entry })}
                         onMouseEnter={e => {
-                          if (!entry || estimateMode) return
+                          hoveredCellRef.current = { task, date: day }
+                          if (!entry) return
                           setTooltip({ x: e.clientX, y: e.clientY, task, date: day, entry })
                         }}
-                        onMouseLeave={() => setTooltip(null)} />
+                        onMouseLeave={() => {
+                          hoveredCellRef.current = null
+                          setTooltip(null)
+                        }} />
                     )
                   })}
 
@@ -959,119 +1015,157 @@ export function GanttChart({
 
         {/* Legend */}
         <div className="flex items-center gap-4 px-4 py-2 border-t border-border/50 bg-surface/50 shrink-0">
-          {estimateMode ? (
-            <span className="text-[11px] text-accent-soft font-medium animate-pulse">
-              ✏ Estimate mode — click on any task row to set estimate dates · Esc to exit
-            </span>
-          ) : (
-            <>
-              <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
-                <div className="w-6 h-2 rounded-sm bg-accent/15 border border-accent/25" />
-                <span>Estimate (drag)</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
-                <div className="w-5 h-2.5 rounded bg-blue-500/70 border border-blue-400" />
-                <span>Actual</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
-                <div className="w-5 h-1 rounded-sm bg-accent/70" />
-                <span>Hours logged</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
-                <div className="w-2 h-2 rotate-45 rounded-sm bg-yellow-400" />
-                <span>Due date</span>
-              </div>
-              <div className="ml-auto text-[10px] text-fg/40 hidden lg:block">
-                Click cell to log hours · Drag bar to move · Right-click for more
-              </div>
-            </>
-          )}
+          <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
+            <div className="w-6 h-2 rounded-sm bg-accent/15 border border-accent/25" />
+            <span>Estimate (drag)</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
+            <div className="w-5 h-2.5 rounded bg-blue-500/70 border border-blue-400" />
+            <span>Actual</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
+            <div className="w-5 h-1 rounded-sm bg-accent/70" />
+            <span>Hours logged</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] text-fg/60">
+            <div className="w-2 h-2 rotate-45 rounded-sm bg-yellow-400" />
+            <span>Due date</span>
+          </div>
+          <div className="ml-auto text-[10px] text-fg/40 hidden lg:block">
+            Click to log · Hover cell: <kbd className="font-mono bg-border/40 px-0.5 rounded">E</kbd> estimate <kbd className="font-mono bg-border/40 px-0.5 rounded">A</kbd> actual <kbd className="font-mono bg-border/40 px-0.5 rounded">D</kbd> due date · Right-click for more
+          </div>
         </div>
       </div>
 
       {/* ─── HOVER TOOLTIP ─── */}
-      {tooltip && !estimateMode && (
+      {tooltip && (
         <div
           className="fixed z-50 pointer-events-none rounded-xl border border-border bg-surface shadow-2xl p-3 w-64 text-xs"
           style={{
             left: Math.min(tooltip.x + 14, window.innerWidth - 280),
             top:  Math.min(tooltip.y - 8,  window.innerHeight - 200),
           }}>
-          <div className="flex items-start gap-2 mb-2">
-            <span className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${STATUS_DOT[tooltip.task.status]}`} />
-            <div className="min-w-0">
-              {tooltip.task.jiraKey && (
-                <div className="flex items-center gap-1">
-                  <p className="font-mono text-[10px] text-accent-soft">{tooltip.task.jiraKey}</p>
-                  {tooltip.task.jiraStatus && (
-                    <span className={`text-[9px] px-1 rounded ${jiraStatusBadgeStyle(tooltip.task.jiraStatus)}`}>
-                      {tooltip.task.jiraStatus}
-                    </span>
+          {tooltip.headerRow ? (
+            /* ── Header row tooltip ── */
+            (() => {
+              const h = tooltip.headerRow
+              const pal = GROUP_PALETTE[h.colorIdx % GROUP_PALETTE.length]
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <span className="mt-0.5 h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: pal.border }} />
+                    <div className="min-w-0">
+                      <p className="font-mono text-[10px]" style={{ color: pal.border }}>{h.parentKey}</p>
+                      <p className="font-medium text-fg leading-snug">{h.parentTitle}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-background px-3 py-2 space-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-muted">Subtasks</span>
+                      <span className="font-mono text-fg">{h.count}</span>
+                    </div>
+                    {h.estStart && (
+                      <div className="flex justify-between">
+                        <span className="text-muted">Estimate</span>
+                        <span className="font-mono text-fg">{fmtDate(h.estStart)} → {h.estEnd ? fmtDate(h.estEnd) : '?'}</span>
+                      </div>
+                    )}
+                    {h.actStart && (
+                      <div className="flex justify-between">
+                        <span className="text-muted">Actual</span>
+                        <span className="font-mono text-fg">{fmtDate(h.actStart)} → {h.actEnd ? fmtDate(h.actEnd) : 'ongoing'}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()
+          ) : tooltip.task ? (
+            /* ── Task row tooltip ── */
+            <>
+              <div className="flex items-start gap-2 mb-2">
+                <span className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${STATUS_DOT[tooltip.task.status]}`} />
+                <div className="min-w-0">
+                  {tooltip.task.jiraKey && (
+                    <div className="flex items-center gap-1">
+                      <p className="font-mono text-[10px] text-accent-soft">{tooltip.task.jiraKey}</p>
+                      {tooltip.task.jiraStatus && (
+                        <span className={`text-[9px] px-1 rounded ${jiraStatusBadgeStyle(tooltip.task.jiraStatus)}`}>
+                          {tooltip.task.jiraStatus}
+                        </span>
+                      )}
+                    </div>
                   )}
+                  <p className="font-medium text-fg leading-snug">{tooltip.task.title}</p>
                 </div>
-              )}
-              <p className="font-medium text-fg leading-snug">{tooltip.task.title}</p>
-            </div>
-          </div>
-
-          {tooltip.date && tooltip.entry ? (
-            <div className="rounded-lg bg-background px-3 py-2 space-y-1">
-              <p className="text-muted">{fmtDate(tooltip.date)}</p>
-              <p className="font-mono text-lg font-bold text-accent-soft">{tooltip.entry.hours}h</p>
-              {tooltip.entry.note && <p className="text-muted truncate">{tooltip.entry.note}</p>}
-              <p className="text-[10px] text-muted/60">{tooltip.entry.source === 'jira' ? 'from Jira' : 'manual'}</p>
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {tooltip.task.estimateStartDate && (
-                <div className="flex justify-between">
-                  <span className="text-muted">Estimate</span>
-                  <span className="font-mono text-fg">
-                    {fmtDate(tooltip.task.estimateStartDate)} → {tooltip.task.estimateEndDate ? fmtDate(tooltip.task.estimateEndDate) : '?'}
-                  </span>
-                </div>
-              )}
-              {tooltip.task.actualStartDate && (
-                <div className="flex justify-between">
-                  <span className="text-muted">Actual</span>
-                  <span className="font-mono text-fg">
-                    {fmtDate(tooltip.task.actualStartDate)} → {tooltip.task.actualEndDate ? fmtDate(tooltip.task.actualEndDate) : 'ongoing'}
-                  </span>
-                </div>
-              )}
-              {tooltip.task.estimateHours && (
-                <div className="flex justify-between">
-                  <span className="text-muted">Hours</span>
-                  <span className="font-mono text-fg">{totalLogged(tooltip.task)}h / {tooltip.task.estimateHours}h</span>
-                </div>
-              )}
-              {tooltip.task.estimateHours && totalLogged(tooltip.task) > 0 && (
-                <div>
-                  <div className="flex justify-between text-[10px] text-muted mb-1">
-                    <span>Progress</span>
-                    <span>{Math.round(Math.min(100, totalLogged(tooltip.task) / tooltip.task.estimateHours * 100))}%</span>
-                  </div>
-                  <div className="h-1 rounded-full bg-border overflow-hidden">
-                    <div className="h-full rounded-full bg-accent"
-                      style={{ width: `${Math.min(100, totalLogged(tooltip.task) / tooltip.task.estimateHours * 100)}%` }} />
-                  </div>
-                </div>
-              )}
-              <div className="flex justify-between pt-1">
-                <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                  tooltip.task.status === 'done'        ? 'bg-emerald-500/20 text-emerald-400' :
-                  tooltip.task.status === 'in-progress' ? 'bg-blue-500/20 text-blue-400' :
-                  tooltip.task.status === 'blocked'     ? 'bg-red-500/20 text-red-400' :
-                                                          'bg-muted/20 text-muted'
-                }`}>
-                  {STATUS_LABEL[tooltip.task.status]}
-                </span>
-                {tooltip.task.dueDate && (
-                  <span className="text-muted font-mono text-[10px]">due {tooltip.task.dueDate.slice(5)}</span>
-                )}
               </div>
-            </div>
-          )}
+
+              {tooltip.date && tooltip.entry ? (
+                <div className="rounded-lg bg-background px-3 py-2 space-y-1">
+                  <p className="text-muted">{fmtDate(tooltip.date)}</p>
+                  <p className="font-mono text-lg font-bold text-accent-soft">{tooltip.entry.hours}h</p>
+                  {tooltip.entry.note && <p className="text-muted truncate">{tooltip.entry.note}</p>}
+                  <p className="text-[10px] text-muted/60">{tooltip.entry.source === 'jira' ? 'from Jira' : 'manual'}</p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {(() => {
+                    const logged = totalLogged(tooltip.task!)
+                    const estHours = (tooltip.task?.estimateHours ?? 0)
+                    return (<>
+                      {tooltip.task?.estimateStartDate && (
+                        <div className="flex justify-between">
+                          <span className="text-muted">Estimate</span>
+                          <span className="font-mono text-fg">
+                            {fmtDate(tooltip.task.estimateStartDate)} → {tooltip.task.estimateEndDate ? fmtDate(tooltip.task.estimateEndDate) : '?'}
+                          </span>
+                        </div>
+                      )}
+                      {tooltip.task?.actualStartDate && (
+                        <div className="flex justify-between">
+                          <span className="text-muted">Actual</span>
+                          <span className="font-mono text-fg">
+                            {fmtDate(tooltip.task.actualStartDate)} → {tooltip.task.actualEndDate ? fmtDate(tooltip.task.actualEndDate) : 'ongoing'}
+                          </span>
+                        </div>
+                      )}
+                      {estHours > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted">Hours</span>
+                          <span className="font-mono text-fg">{logged}h / {estHours}h</span>
+                        </div>
+                      )}
+                      {estHours > 0 && logged > 0 && (
+                        <div>
+                          <div className="flex justify-between text-[10px] text-muted mb-1">
+                            <span>Progress</span>
+                            <span>{Math.round(Math.min(100, logged / estHours * 100))}%</span>
+                          </div>
+                          <div className="h-1 rounded-full bg-border overflow-hidden">
+                            <div className="h-full rounded-full bg-accent"
+                              style={{ width: `${Math.min(100, logged / estHours * 100)}%` }} />
+                          </div>
+                        </div>
+                      )}
+                    </>)
+                  })()}
+                  <div className="flex justify-between pt-1">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                      tooltip.task?.status === 'done'        ? 'bg-emerald-500/20 text-emerald-400' :
+                      tooltip.task?.status === 'in-progress' ? 'bg-blue-500/20 text-blue-400' :
+                      tooltip.task?.status === 'blocked'     ? 'bg-red-500/20 text-red-400' :
+                                                               'bg-muted/20 text-muted'
+                    }`}>
+                      {tooltip.task?.status ? STATUS_LABEL[tooltip.task.status] : ''}
+                    </span>
+                    {tooltip.task?.dueDate && (
+                      <span className="text-muted font-mono text-[10px]">due {tooltip.task.dueDate.slice(5)}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : null}
         </div>
       )}
 
@@ -1131,10 +1225,9 @@ export function GanttChart({
         <QuickEstimateModal
           task={estModal.task}
           date={estModal.date}
-          onSave={(startDate, endDate) => {
-            onUpdateTask({ ...estModal.task, estimateStartDate: startDate, estimateEndDate: endDate, updatedAt: new Date().toISOString() })
+          onSave={(startDate, endDate, hours) => {
+            onUpdateTask({ ...estModal.task, estimateStartDate: startDate, estimateEndDate: endDate, estimateHours: hours, updatedAt: new Date().toISOString() })
             setEstModal(null)
-            onExitEstimateMode?.()
           }}
           onClose={() => setEstModal(null)}
         />

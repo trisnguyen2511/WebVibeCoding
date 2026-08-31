@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import type { Task, Sprint, TaskStatus } from '@/lib/timeline-types'
+import { generateId } from '@/lib/timeline-storage'
 
 const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
   { value: 'todo', label: 'To Do' },
@@ -9,10 +10,6 @@ const STATUS_OPTIONS: { value: TaskStatus; label: string }[] = [
   { value: 'done', label: 'Done' },
   { value: 'blocked', label: 'Blocked' },
 ]
-
-function generateId() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36)
-}
 
 interface Props {
   task: Task | null

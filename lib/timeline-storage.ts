@@ -1,5 +1,9 @@
 import type { Project, Task, TimeEntry, ExportData } from './timeline-types'
 
+export function generateId(): string {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36)
+}
+
 const PROJECTS_KEY = 'timeline:projects'
 const TASKS_KEY = 'timeline:tasks'
 
@@ -89,12 +93,12 @@ export function exportData(projectId?: string): ExportData {
   const projectIds = new Set(projects.map(p => p.id))
   const tasks = getAllTasks().filter(t => projectIds.has(t.projectId))
   const collapsedParents: Record<string, string[]> = {}
-  for (const id of projectIds) {
+  Array.from(projectIds).forEach(id => {
     try {
       const raw = localStorage.getItem(`timeline:collapsed:${id}`)
       if (raw) collapsedParents[id] = JSON.parse(raw) as string[]
     } catch { /* noop */ }
-  }
+  })
   return { version: '1.0', exportedAt: new Date().toISOString(), projects, tasks, collapsedParents }
 }
 
