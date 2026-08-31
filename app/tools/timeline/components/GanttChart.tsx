@@ -216,7 +216,6 @@ export function GanttChart({
 
   const [leftW,        setLeftW]        = useState(LEFT_DEFAULT)
   const [searchQuery,  setSearchQuery]  = useState('')
-  const [searchActive, setSearchActive] = useState(false)
   const [tooltip,      setTooltip]      = useState<Tooltip | null>(null)
   const [ctxMenu,      setCtxMenu]      = useState<ContextMenu | null>(null)
   const [entryModal,   setEntryModal]   = useState<{ task: Task; date: string; entry?: TimeEntry } | null>(null)
@@ -529,15 +528,14 @@ export function GanttChart({
     return () => window.removeEventListener('keydown', onKey)
   }, []) // stable: reads task/date/handlers via refs
 
-  // ── F key → open search ──────────────────────────────────────
+  // ── F key → focus search ─────────────────────────────────────
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key.toLowerCase() !== 'f') return
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       e.preventDefault()
-      setSearchActive(true)
-      setTimeout(() => searchInputRef.current?.focus(), 50)
+      searchInputRef.current?.focus()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -633,47 +631,22 @@ export function GanttChart({
       {/* ─── LEFT PANEL ─── */}
       <div className="flex flex-col shrink-0 border-r border-border" style={{ width: leftW }}>
 
-        {/* Left header */}
-        <div className="flex items-end px-3 pb-2 bg-surface border-b border-border shrink-0"
-          style={{ height: HEADER_H }}>
-          <div className="grid w-full gap-1 text-[10px] font-semibold uppercase tracking-wider text-fg/60"
-            style={{ gridTemplateColumns: '16px 1fr 48px 52px' }}>
-            <button
-              onClick={() => { setSearchActive(true); setTimeout(() => searchInputRef.current?.focus(), 50) }}
-              className="flex items-center justify-center text-muted/50 hover:text-accent-soft transition-colors"
-              title="Search tasks (F)">
-              <Search size={10} />
-            </button>
-            <span>Task</span>
-            <span className="text-right">Hrs</span>
-            <span className="text-right">Due</span>
-          </div>
-        </div>
+        {/* Left header — search + column labels, same height as right timeline header */}
+        <div className="flex flex-col bg-surface border-b border-border shrink-0" style={{ height: HEADER_H }}>
 
-        {/* Animated search bar */}
-        <div
-          className="shrink-0 overflow-hidden bg-surface/80"
-          style={{
-            height: searchActive ? 40 : 0,
-            transition: 'height 200ms cubic-bezier(0.4,0,0.2,1)',
-            borderBottom: searchActive ? '1px solid rgba(26,26,46,0.8)' : 'none',
-          }}>
-          <div className="px-3 py-2 flex items-center gap-2">
-            <Search size={11} className={`shrink-0 transition-colors duration-150 ${searchQuery ? 'text-accent-soft' : 'text-muted/60'}`} />
+          {/* Search row */}
+          <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
+            <Search size={11} className={`shrink-0 transition-colors duration-150 ${searchQuery ? 'text-accent-soft' : 'text-muted/35'}`} />
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               onKeyDown={e => {
-                if (e.key === 'Escape') {
-                  setSearchQuery('')
-                  searchInputRef.current?.blur()
-                  setSearchActive(false)
-                }
+                if (e.key === 'Escape') { setSearchQuery(''); searchInputRef.current?.blur() }
               }}
               placeholder="Filter by key or name…"
-              className="flex-1 min-w-0 bg-transparent text-[11px] text-fg placeholder:text-muted/40 outline-none"
+              className="flex-1 min-w-0 bg-transparent text-[11px] text-fg placeholder:text-muted/30 outline-none"
             />
             {searchQuery ? (
               <>
@@ -687,8 +660,18 @@ export function GanttChart({
                 </button>
               </>
             ) : (
-              <kbd className="text-[9px] font-mono text-muted/30 rounded bg-border/40 px-1 shrink-0">esc</kbd>
+              <kbd className="text-[9px] font-mono text-muted/25 rounded bg-border/30 px-1 shrink-0">F</kbd>
             )}
+          </div>
+
+          {/* Column labels */}
+          <div className="flex items-end px-3 pb-2 flex-1">
+            <div className="grid w-full gap-1 text-[10px] font-semibold uppercase tracking-wider text-fg/60"
+              style={{ gridTemplateColumns: '16px 1fr 48px 52px' }}>
+              <span /><span>Task</span>
+              <span className="text-right">Hrs</span>
+              <span className="text-right">Due</span>
+            </div>
           </div>
         </div>
 
