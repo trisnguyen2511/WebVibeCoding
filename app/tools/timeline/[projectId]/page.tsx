@@ -335,6 +335,7 @@ export default function ProjectPage({ params }: PageProps) {
             <div className="space-y-2">
               {[
                 ['N', 'New task'],
+                ['F', 'Filter tasks'],
                 ['T', 'Today panel'],
                 ['J', 'Jira sync'],
                 ['X', 'Export JSON'],

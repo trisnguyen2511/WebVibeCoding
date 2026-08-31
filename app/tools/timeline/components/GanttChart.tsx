@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
-import { GripVertical, ExternalLink, Trash2, ChevronDown } from 'lucide-react'
+import { GripVertical, ExternalLink, Trash2, ChevronDown, Search, X } from 'lucide-react'
 import type { Task, Sprint, TimeEntry } from '@/lib/timeline-types'
 import { TimeEntryModal } from './TimeEntryModal'
 
@@ -212,7 +212,11 @@ export function GanttChart({
   const onExportRef     = useRef(onExport)
   const hoveredCellRef  = useRef<{ task: Task; date: string } | null>(null)
 
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
   const [leftW,        setLeftW]        = useState(LEFT_DEFAULT)
+  const [searchQuery,  setSearchQuery]  = useState('')
+  const [searchActive, setSearchActive] = useState(false)
   const [tooltip,      setTooltip]      = useState<Tooltip | null>(null)
   const [ctxMenu,      setCtxMenu]      = useState<ContextMenu | null>(null)
   const [entryModal,   setEntryModal]   = useState<{ task: Task; date: string; entry?: TimeEntry } | null>(null)
@@ -294,6 +298,49 @@ export function GanttChart({
     }
     return rows
   }, [tasks, collapsedParents])
+
+  // ── Search filter ────────────────────────────────────────────
+  const filteredDisplayRows = useMemo<DisplayRow[]>(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return displayRows
+
+    const matchingTaskIds   = new Set<string>()
+    const matchingParentKeys = new Set<string>()
+
+    // Tasks whose key, title, parentKey or parentTitle matches
+    for (const task of tasks) {
+      if (
+        task.title.toLowerCase().includes(q) ||
+        (task.jiraKey     ?? '').toLowerCase().includes(q) ||
+        (task.parentKey   ?? '').toLowerCase().includes(q) ||
+        (task.parentTitle ?? '').toLowerCase().includes(q)
+      ) {
+        matchingTaskIds.add(task.id)
+        if (task.parentKey) matchingParentKeys.add(task.parentKey)
+      }
+    }
+
+    // If a group header key/title matches, include all its children
+    for (const row of displayRows) {
+      if (row.type === 'header') {
+        if (row.parentKey.toLowerCase().includes(q) || row.parentTitle.toLowerCase().includes(q)) {
+          matchingParentKeys.add(row.parentKey)
+          for (const task of tasks) {
+            if (task.parentKey === row.parentKey) matchingTaskIds.add(task.id)
+          }
+        }
+      }
+    }
+
+    return displayRows
+      .filter(row => {
+        if (row.type === 'header') return matchingParentKeys.has(row.parentKey)
+        return matchingTaskIds.has(row.task.id)
+      })
+      .map(row =>
+        row.type === 'task' && row.hiddenByCollapse ? { ...row, hiddenByCollapse: false } : row
+      )
+  }, [displayRows, searchQuery, tasks])
 
   // ── Scroll sync ──────────────────────────────────────────────
   const syncScroll = useCallback((from: 'left' | 'right') => {
@@ -482,6 +529,20 @@ export function GanttChart({
     return () => window.removeEventListener('keydown', onKey)
   }, []) // stable: reads task/date/handlers via refs
 
+  // ── F key → open search ──────────────────────────────────────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key.toLowerCase() !== 'f') return
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      e.preventDefault()
+      setSearchActive(true)
+      setTimeout(() => searchInputRef.current?.focus(), 50)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   // ── Month / Sprint header groups ─────────────────────────────
   const monthGroups = useMemo(() => {
     const groups: { label: string; start: number; count: number }[] = []
@@ -504,9 +565,9 @@ export function GanttChart({
   const rowTops = useMemo(() => {
     const tops: number[] = []
     let acc = 0
-    for (const r of displayRows) { tops.push(acc); acc += rowHeight(r) }
+    for (const r of filteredDisplayRows) { tops.push(acc); acc += rowHeight(r) }
     return tops
-  }, [displayRows]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filteredDisplayRows]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── List reorder drag ────────────────────────────────────────
   function isValidListDrop(dragIdx: number, dropIdx: number): boolean {
@@ -577,9 +638,57 @@ export function GanttChart({
           style={{ height: HEADER_H }}>
           <div className="grid w-full gap-1 text-[10px] font-semibold uppercase tracking-wider text-fg/60"
             style={{ gridTemplateColumns: '16px 1fr 48px 52px' }}>
-            <span /><span>Task</span>
+            <button
+              onClick={() => { setSearchActive(true); setTimeout(() => searchInputRef.current?.focus(), 50) }}
+              className="flex items-center justify-center text-muted/50 hover:text-accent-soft transition-colors"
+              title="Search tasks (F)">
+              <Search size={10} />
+            </button>
+            <span>Task</span>
             <span className="text-right">Hrs</span>
             <span className="text-right">Due</span>
+          </div>
+        </div>
+
+        {/* Animated search bar */}
+        <div
+          className="shrink-0 overflow-hidden bg-surface/80"
+          style={{
+            height: searchActive ? 40 : 0,
+            transition: 'height 200ms cubic-bezier(0.4,0,0.2,1)',
+            borderBottom: searchActive ? '1px solid rgba(26,26,46,0.8)' : 'none',
+          }}>
+          <div className="px-3 py-2 flex items-center gap-2">
+            <Search size={11} className={`shrink-0 transition-colors duration-150 ${searchQuery ? 'text-accent-soft' : 'text-muted/60'}`} />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Escape') {
+                  setSearchQuery('')
+                  searchInputRef.current?.blur()
+                  setSearchActive(false)
+                }
+              }}
+              placeholder="Filter by key or name…"
+              className="flex-1 min-w-0 bg-transparent text-[11px] text-fg placeholder:text-muted/40 outline-none"
+            />
+            {searchQuery ? (
+              <>
+                <span className="text-[10px] text-muted/50 font-mono shrink-0">
+                  {filteredDisplayRows.filter(r => r.type === 'task').length}
+                </span>
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="text-muted/50 hover:text-fg transition-colors shrink-0">
+                  <X size={10} />
+                </button>
+              </>
+            ) : (
+              <kbd className="text-[9px] font-mono text-muted/30 rounded bg-border/40 px-1 shrink-0">esc</kbd>
+            )}
           </div>
         </div>
 
@@ -588,8 +697,14 @@ export function GanttChart({
         <div ref={leftRef} className="absolute inset-0 overflow-y-auto overflow-x-hidden"
           onScroll={() => syncScroll('left')}
           style={{ scrollbarWidth: 'none' }}>
-          {displayRows.map((row, ri) => {
-            const isDragTarget = listDropIdx === ri && listDragIdx !== null && isValidListDrop(listDragIdx, ri)
+          {filteredDisplayRows.length === 0 && searchQuery.trim() && (
+            <div className="flex flex-col items-center justify-center py-12 gap-2">
+              <Search size={18} className="text-muted/30" />
+              <p className="text-xs text-muted/50">No matches</p>
+            </div>
+          )}
+          {filteredDisplayRows.map((row, ri) => {
+            const isDragTarget = !searchQuery && listDropIdx === ri && listDragIdx !== null && isValidListDrop(listDragIdx, ri)
             const dropLineStyle = isDragTarget ? { boxShadow: 'inset 0 2px 0 #7C3AED' } : {}
 
             if (row.type === 'header') {
@@ -625,8 +740,8 @@ export function GanttChart({
             const logged = totalLogged(task)
             const isHovered = hoveredRow === task.id
             const pal = colorIdx >= 0 ? GROUP_PALETTE[colorIdx % GROUP_PALETTE.length] : null
-            const isBeingDragged = listDragIdx === ri
-            const canDrag = !!onReorderTasks
+            const isBeingDragged = !searchQuery && listDragIdx === ri
+            const canDrag = !!onReorderTasks && !searchQuery
 
             const isHidden = !!row.hiddenByCollapse
             return (
@@ -802,7 +917,7 @@ export function GanttChart({
             ))}
 
             {/* Horizontal row lines */}
-            {displayRows.map((row, ri) => (
+            {filteredDisplayRows.map((row, ri) => (
               <div key={`hl-${ri}`} className="absolute left-0 right-0 pointer-events-none"
                 style={{ top: rowTops[ri], height: 1, background: 'rgba(255,255,255,0.05)' }} />
             ))}
@@ -825,7 +940,7 @@ export function GanttChart({
             )}
 
             {/* Rows */}
-            {displayRows.map(row => {
+            {filteredDisplayRows.map(row => {
               const h = rowHeight(row)
 
               if (row.type === 'header') {
@@ -1036,7 +1151,7 @@ export function GanttChart({
             <span>Due date</span>
           </div>
           <div className="ml-auto text-[10px] text-fg/40 hidden lg:block">
-            Click to log · Hover cell: <kbd className="font-mono bg-border/40 px-0.5 rounded">E</kbd> estimate <kbd className="font-mono bg-border/40 px-0.5 rounded">A</kbd> actual <kbd className="font-mono bg-border/40 px-0.5 rounded">D</kbd> due date · Right-click for more
+            <kbd className="font-mono bg-border/40 px-0.5 rounded">F</kbd> filter · Hover cell: <kbd className="font-mono bg-border/40 px-0.5 rounded">E</kbd> estimate <kbd className="font-mono bg-border/40 px-0.5 rounded">A</kbd> actual <kbd className="font-mono bg-border/40 px-0.5 rounded">D</kbd> due date · Right-click for more
           </div>
         </div>
       </div>
