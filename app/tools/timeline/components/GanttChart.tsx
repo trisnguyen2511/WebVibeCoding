@@ -584,7 +584,8 @@ export function GanttChart({
         </div>
 
         {/* Left rows */}
-        <div ref={leftRef} className="flex-1 overflow-y-auto overflow-x-hidden"
+        <div className="relative flex-1 min-h-0">
+        <div ref={leftRef} className="absolute inset-0 overflow-y-auto overflow-x-hidden"
           onScroll={() => syncScroll('left')}
           style={{ scrollbarWidth: 'none' }}>
           {displayRows.map((row, ri) => {
@@ -715,6 +716,7 @@ export function GanttChart({
           })}
           <div style={{ height: 48 }} />
         </div>
+        </div>
       </div>
 
       {/* ─── RESIZE HANDLE ─── */}
@@ -771,7 +773,8 @@ export function GanttChart({
         </div>
 
         {/* Timeline body */}
-        <div ref={rightRef} className="flex-1 overflow-auto"
+        <div className="relative flex-1 min-h-0">
+        <div ref={rightRef} className="absolute inset-0 overflow-auto"
           style={{ cursor: dragPreview ? 'grabbing' : 'default', userSelect: dragPreview ? 'none' : undefined }}
           onScroll={e => {
             const el = e.target as HTMLDivElement
@@ -1011,6 +1014,7 @@ export function GanttChart({
 
             <div style={{ height: 48 }} />
           </div>
+        </div>
         </div>
 
         {/* Legend */}
