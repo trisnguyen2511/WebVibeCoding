@@ -90,11 +90,9 @@
   animation: shimmer 4s linear infinite;
 }
 
-/* ── Timeline dark-mode color overrides ────────────────────────
-   Softer palette scoped only to the /tools/timeline route tree.
-   Keeps global palette untouched.  Contrast ratios (on #0D1117):
-     muted  #8B949E  ≈ 6.1:1 ✓  (was #52525B ≈ 2.3:1 ✗)
-     fg     #E6EDF3  ≈ 15.9:1 ✓
+/* ── Timeline color overrides ───────────────────────────────────
+   Scoped to /tools/timeline. Dark variant uses GitHub-dark navy for
+   better contrast. Light variant uses a clean cool-white palette.
    ─────────────────────────────────────────────────────────────── */
 .tl-theme {
   --color-bg:      13 17 23;      /* #0D1117  GitHub-dark navy  */
@@ -102,7 +100,17 @@
   --color-border:  48 54 61;      /* #30363D  visible separator */
   --color-muted:   139 148 158;   /* #8B949E  comfortable secondary text */
   --color-fg:      230 237 243;   /* #E6EDF3  softer-than-white primary */
-  /* accent & overlay unchanged — matches global design tokens */
+  color-scheme: dark;
+}
+
+[data-theme='light'] .tl-theme {
+  --color-bg:      246 247 250;   /* #F6F7FA  cool off-white bg */
+  --color-surface: 255 255 255;   /* #FFFFFF  card/panel surface */
+  --color-border:  218 220 228;   /* #DAE0E4  subtle separator */
+  --color-muted:   99  105 117;   /* #636975  readable secondary */
+  --color-fg:      15  17  23;    /* #0F1117  near-black text */
+  --color-overlay: 10 10 15;
+  color-scheme: light;
 }
 
 /* Blocks the iOS/Android long-press "select / copy" callout on touch
