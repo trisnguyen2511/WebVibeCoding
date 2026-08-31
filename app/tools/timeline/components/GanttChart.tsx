@@ -1055,46 +1055,52 @@ export function GanttChart({
                     )
                   })}
 
-                  {/* Estimate bar (draggable) */}
-                  {estS !== null && estE !== null && estS < totalDays && estE >= 0 && (
-                    <div
-                      className={`absolute rounded-sm border cursor-move transition-opacity ${
-                        isDragging
-                          ? 'bg-accent/35 border-accent/60 shadow-lg shadow-accent/20'
-                          : 'bg-accent/15 border-accent/25'
-                      }`}
-                      style={{
-                        left:   Math.max(0, estS) * DAY_W + 1,
-                        width:  (Math.min(totalDays - 1, estE) - Math.max(0, estS) + 1) * DAY_W - 2,
-                        top:    h / 2 - 14,
-                        height: 8,
-                      }}
-                      onMouseDown={e => startBarDrag(e, task, 'move-est')}
-                      onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, task })}
-                      onMouseLeave={() => setTooltip(null)}>
-                      {/* Estimate resize handles */}
-                      <div className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize"
-                        onMouseDown={e => startBarDrag(e, task, 'resize-est-start')} />
-                      <div className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize"
-                        onMouseDown={e => startBarDrag(e, task, 'resize-est-end')} />
-                    </div>
-                  )}
-
-                  {/* Actual bar */}
-                  {actS !== null && actE !== null && actS < totalDays && actE >= 0 && (() => {
-                    const barL = Math.max(0, actS) * DAY_W + 4
-                    const barW = (Math.min(totalDays - 1, actE) - Math.max(0, actS) + 1) * DAY_W - 8
+                  {/* Estimate bar — primary bar (draggable) */}
+                  {estS !== null && estE !== null && estS < totalDays && estE >= 0 && (() => {
+                    const estL = Math.max(0, estS) * DAY_W + 1
+                    const estW = (Math.min(totalDays - 1, estE) - Math.max(0, estS) + 1) * DAY_W - 2
                     return (
                       <div
-                        className={`absolute rounded border cursor-move transition-shadow ${bars.actual} ${bars.border} ${isDragging ? 'shadow-lg brightness-125' : ''}`}
-                        style={{ left: barL, width: barW, top: h / 2 - 6, height: 12 }}
+                        className={`absolute rounded cursor-move transition-opacity ${
+                          isDragging
+                            ? 'shadow-lg shadow-accent/20'
+                            : ''
+                        }`}
+                        style={{
+                          left:   estL,
+                          width:  estW,
+                          top:    h / 2 - 7,
+                          height: 14,
+                          background: isDragging ? 'rgba(124,58,237,0.35)' : 'rgba(124,58,237,0.18)',
+                          border: `1px solid ${isDragging ? 'rgba(124,58,237,0.70)' : 'rgba(124,58,237,0.40)'}`,
+                        }}
+                        onMouseDown={e => startBarDrag(e, task, 'move-est')}
+                        onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, task })}
+                        onMouseLeave={() => setTooltip(null)}>
+                        {/* worklog progress fill inside estimate bar */}
+                        {progress > 0 && (
+                          <div className="absolute inset-y-0 left-0 rounded pointer-events-none"
+                            style={{ width: `${Math.min(1, progress) * 100}%`, background: 'rgba(124,58,237,0.45)' }} />
+                        )}
+                        <div className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize"
+                          onMouseDown={e => startBarDrag(e, task, 'resize-est-start')} />
+                        <div className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize"
+                          onMouseDown={e => startBarDrag(e, task, 'resize-est-end')} />
+                      </div>
+                    )
+                  })()}
+
+                  {/* Actual bar — thin secondary strip at top (only when set) */}
+                  {actS !== null && actE !== null && actS < totalDays && actE >= 0 && (() => {
+                    const barL = Math.max(0, actS) * DAY_W + 2
+                    const barW = (Math.min(totalDays - 1, actE) - Math.max(0, actS) + 1) * DAY_W - 4
+                    return (
+                      <div
+                        className={`absolute rounded-sm cursor-move transition-shadow ${bars.actual} ${isDragging ? 'brightness-125' : ''}`}
+                        style={{ left: barL, width: barW, top: 5, height: 5 }}
                         onMouseDown={e => startBarDrag(e, task, 'move')}
                         onMouseEnter={e => setTooltip({ x: e.clientX, y: e.clientY, task })}
                         onMouseLeave={() => setTooltip(null)}>
-                        {progress > 0 && (
-                          <div className="absolute inset-y-0 left-0 rounded bg-white/20 pointer-events-none"
-                            style={{ width: `${progress * 100}%` }} />
-                        )}
                         <div className="absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize"
                           onMouseDown={e => startBarDrag(e, task, 'resize-start')} />
                         <div className="absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize"
