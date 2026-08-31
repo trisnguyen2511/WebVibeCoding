@@ -94,7 +94,12 @@ type DisplayRow =
       estStart?: string; estEnd?: string; actStart?: string; actEnd?: string }
   | { type: 'task';   task: Task; isSubtask: boolean; colorIdx: number; hiddenByCollapse?: boolean }
 
-interface Tooltip { x: number; y: number; task: Task; date?: string; entry?: TimeEntry }
+interface Tooltip {
+  x: number; y: number
+  task?: Task
+  headerRow?: { parentKey: string; parentTitle: string; count: number; colorIdx: number; estStart?: string; estEnd?: string; actStart?: string; actEnd?: string }
+  date?: string; entry?: TimeEntry
+}
 interface ContextMenu { x: number; y: number; task: Task; date?: string }
 
 interface DragState {
@@ -574,6 +579,9 @@ export function GanttChart({
                   className="grid items-center border-b border-border/60 transition-shadow duration-100 cursor-pointer hover:brightness-110"
                   style={{ gridTemplateColumns: '20px 1fr 48px 52px', height: ROW_H, borderLeftWidth: 3, borderLeftColor: pal.border, background: pal.bg, paddingLeft: 8, paddingRight: 12, ...dropLineStyle }}
                   onClick={() => toggleParent(row.parentKey)}
+                  onMouseEnter={e => setTooltip({ x: e.clientX + 16, y: e.clientY, headerRow: row })}
+                  onMouseMove={e => setTooltip(prev => prev ? { ...prev, x: e.clientX + 16, y: e.clientY } : null)}
+                  onMouseLeave={() => setTooltip(null)}
                   onDragOver={e => { e.preventDefault(); setListDropIdx(ri) }}
                   onDragLeave={() => setListDropIdx(null)}
                   onDrop={() => handleListDrop(ri)}>
@@ -1019,81 +1027,121 @@ export function GanttChart({
             left: Math.min(tooltip.x + 14, window.innerWidth - 280),
             top:  Math.min(tooltip.y - 8,  window.innerHeight - 200),
           }}>
-          <div className="flex items-start gap-2 mb-2">
-            <span className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${STATUS_DOT[tooltip.task.status]}`} />
-            <div className="min-w-0">
-              {tooltip.task.jiraKey && (
-                <div className="flex items-center gap-1">
-                  <p className="font-mono text-[10px] text-accent-soft">{tooltip.task.jiraKey}</p>
-                  {tooltip.task.jiraStatus && (
-                    <span className={`text-[9px] px-1 rounded ${jiraStatusBadgeStyle(tooltip.task.jiraStatus)}`}>
-                      {tooltip.task.jiraStatus}
-                    </span>
+          {tooltip.headerRow ? (
+            /* ── Header row tooltip ── */
+            (() => {
+              const h = tooltip.headerRow
+              const pal = GROUP_PALETTE[h.colorIdx % GROUP_PALETTE.length]
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <span className="mt-0.5 h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: pal.border }} />
+                    <div className="min-w-0">
+                      <p className="font-mono text-[10px]" style={{ color: pal.border }}>{h.parentKey}</p>
+                      <p className="font-medium text-fg leading-snug">{h.parentTitle}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-background px-3 py-2 space-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-muted">Subtasks</span>
+                      <span className="font-mono text-fg">{h.count}</span>
+                    </div>
+                    {h.estStart && (
+                      <div className="flex justify-between">
+                        <span className="text-muted">Estimate</span>
+                        <span className="font-mono text-fg">{fmtDate(h.estStart)} → {h.estEnd ? fmtDate(h.estEnd) : '?'}</span>
+                      </div>
+                    )}
+                    {h.actStart && (
+                      <div className="flex justify-between">
+                        <span className="text-muted">Actual</span>
+                        <span className="font-mono text-fg">{fmtDate(h.actStart)} → {h.actEnd ? fmtDate(h.actEnd) : 'ongoing'}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()
+          ) : tooltip.task ? (
+            /* ── Task row tooltip ── */
+            <>
+              <div className="flex items-start gap-2 mb-2">
+                <span className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${STATUS_DOT[tooltip.task.status]}`} />
+                <div className="min-w-0">
+                  {tooltip.task.jiraKey && (
+                    <div className="flex items-center gap-1">
+                      <p className="font-mono text-[10px] text-accent-soft">{tooltip.task.jiraKey}</p>
+                      {tooltip.task.jiraStatus && (
+                        <span className={`text-[9px] px-1 rounded ${jiraStatusBadgeStyle(tooltip.task.jiraStatus)}`}>
+                          {tooltip.task.jiraStatus}
+                        </span>
+                      )}
+                    </div>
                   )}
+                  <p className="font-medium text-fg leading-snug">{tooltip.task.title}</p>
                 </div>
-              )}
-              <p className="font-medium text-fg leading-snug">{tooltip.task.title}</p>
-            </div>
-          </div>
-
-          {tooltip.date && tooltip.entry ? (
-            <div className="rounded-lg bg-background px-3 py-2 space-y-1">
-              <p className="text-muted">{fmtDate(tooltip.date)}</p>
-              <p className="font-mono text-lg font-bold text-accent-soft">{tooltip.entry.hours}h</p>
-              {tooltip.entry.note && <p className="text-muted truncate">{tooltip.entry.note}</p>}
-              <p className="text-[10px] text-muted/60">{tooltip.entry.source === 'jira' ? 'from Jira' : 'manual'}</p>
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {tooltip.task.estimateStartDate && (
-                <div className="flex justify-between">
-                  <span className="text-muted">Estimate</span>
-                  <span className="font-mono text-fg">
-                    {fmtDate(tooltip.task.estimateStartDate)} → {tooltip.task.estimateEndDate ? fmtDate(tooltip.task.estimateEndDate) : '?'}
-                  </span>
-                </div>
-              )}
-              {tooltip.task.actualStartDate && (
-                <div className="flex justify-between">
-                  <span className="text-muted">Actual</span>
-                  <span className="font-mono text-fg">
-                    {fmtDate(tooltip.task.actualStartDate)} → {tooltip.task.actualEndDate ? fmtDate(tooltip.task.actualEndDate) : 'ongoing'}
-                  </span>
-                </div>
-              )}
-              {tooltip.task.estimateHours && (
-                <div className="flex justify-between">
-                  <span className="text-muted">Hours</span>
-                  <span className="font-mono text-fg">{totalLogged(tooltip.task)}h / {tooltip.task.estimateHours}h</span>
-                </div>
-              )}
-              {tooltip.task.estimateHours && totalLogged(tooltip.task) > 0 && (
-                <div>
-                  <div className="flex justify-between text-[10px] text-muted mb-1">
-                    <span>Progress</span>
-                    <span>{Math.round(Math.min(100, totalLogged(tooltip.task) / tooltip.task.estimateHours * 100))}%</span>
-                  </div>
-                  <div className="h-1 rounded-full bg-border overflow-hidden">
-                    <div className="h-full rounded-full bg-accent"
-                      style={{ width: `${Math.min(100, totalLogged(tooltip.task) / tooltip.task.estimateHours * 100)}%` }} />
-                  </div>
-                </div>
-              )}
-              <div className="flex justify-between pt-1">
-                <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                  tooltip.task.status === 'done'        ? 'bg-emerald-500/20 text-emerald-400' :
-                  tooltip.task.status === 'in-progress' ? 'bg-blue-500/20 text-blue-400' :
-                  tooltip.task.status === 'blocked'     ? 'bg-red-500/20 text-red-400' :
-                                                          'bg-muted/20 text-muted'
-                }`}>
-                  {STATUS_LABEL[tooltip.task.status]}
-                </span>
-                {tooltip.task.dueDate && (
-                  <span className="text-muted font-mono text-[10px]">due {tooltip.task.dueDate.slice(5)}</span>
-                )}
               </div>
-            </div>
-          )}
+
+              {tooltip.date && tooltip.entry ? (
+                <div className="rounded-lg bg-background px-3 py-2 space-y-1">
+                  <p className="text-muted">{fmtDate(tooltip.date)}</p>
+                  <p className="font-mono text-lg font-bold text-accent-soft">{tooltip.entry.hours}h</p>
+                  {tooltip.entry.note && <p className="text-muted truncate">{tooltip.entry.note}</p>}
+                  <p className="text-[10px] text-muted/60">{tooltip.entry.source === 'jira' ? 'from Jira' : 'manual'}</p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {tooltip.task.estimateStartDate && (
+                    <div className="flex justify-between">
+                      <span className="text-muted">Estimate</span>
+                      <span className="font-mono text-fg">
+                        {fmtDate(tooltip.task.estimateStartDate)} → {tooltip.task.estimateEndDate ? fmtDate(tooltip.task.estimateEndDate) : '?'}
+                      </span>
+                    </div>
+                  )}
+                  {tooltip.task.actualStartDate && (
+                    <div className="flex justify-between">
+                      <span className="text-muted">Actual</span>
+                      <span className="font-mono text-fg">
+                        {fmtDate(tooltip.task.actualStartDate)} → {tooltip.task.actualEndDate ? fmtDate(tooltip.task.actualEndDate) : 'ongoing'}
+                      </span>
+                    </div>
+                  )}
+                  {tooltip.task.estimateHours && (
+                    <div className="flex justify-between">
+                      <span className="text-muted">Hours</span>
+                      <span className="font-mono text-fg">{totalLogged(tooltip.task)}h / {tooltip.task.estimateHours}h</span>
+                    </div>
+                  )}
+                  {tooltip.task.estimateHours && totalLogged(tooltip.task) > 0 && (
+                    <div>
+                      <div className="flex justify-between text-[10px] text-muted mb-1">
+                        <span>Progress</span>
+                        <span>{Math.round(Math.min(100, totalLogged(tooltip.task) / tooltip.task.estimateHours * 100))}%</span>
+                      </div>
+                      <div className="h-1 rounded-full bg-border overflow-hidden">
+                        <div className="h-full rounded-full bg-accent"
+                          style={{ width: `${Math.min(100, totalLogged(tooltip.task) / tooltip.task.estimateHours * 100)}%` }} />
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex justify-between pt-1">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                      tooltip.task.status === 'done'        ? 'bg-emerald-500/20 text-emerald-400' :
+                      tooltip.task.status === 'in-progress' ? 'bg-blue-500/20 text-blue-400' :
+                      tooltip.task.status === 'blocked'     ? 'bg-red-500/20 text-red-400' :
+                                                              'bg-muted/20 text-muted'
+                    }`}>
+                      {STATUS_LABEL[tooltip.task.status]}
+                    </span>
+                    {tooltip.task.dueDate && (
+                      <span className="text-muted font-mono text-[10px]">due {tooltip.task.dueDate.slice(5)}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : null}
         </div>
       )}
 
