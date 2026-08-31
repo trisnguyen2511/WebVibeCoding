@@ -250,7 +250,7 @@ export default function ProjectPage({ params }: PageProps) {
               </div>
             </div>
           ) : (
-            <div className="relative flex-1 min-h-0">
+            <div className="relative flex-1 min-h-0 min-w-0 overflow-hidden">
               <GanttChart
                 projectId={project.id}
                 tasks={filteredTasks}
