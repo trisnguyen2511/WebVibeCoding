@@ -14,6 +14,7 @@ export interface Task {
   id: string
   projectId: string
   sprintId?: string
+  sprintIds?: string[]
   jiraId?: string
   jiraKey?: string
   jiraStatus?: string   // original Jira status label e.g. "In Progress"

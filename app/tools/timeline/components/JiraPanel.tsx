@@ -15,7 +15,7 @@ interface Props {
 
 type SyncStep = 'idle' | 'syncing' | 'preview' | 'uploading' | 'done'
 
-const DEFAULT_JQL = 'issuetype = Sub-task AND assignee = currentUser() ORDER BY updated DESC'
+const DEFAULT_JQL = 'issuetype = Sub-task AND assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC'
 const FIELDS = 'summary,status,parent,duedate,timeoriginalestimate,timespent'
 
 // ── Direct fetch (CORS must be handled by caller) ─────────────
@@ -93,11 +93,12 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   const [jql,      setJql]      = useState(DEFAULT_JQL)
   const [syncMode, setSyncMode] = useState<'merge' | 'replace' | 'clear'>('replace')
 
-  const [step,        setStep]        = useState<SyncStep>('idle')
-  const [error,       setError]       = useState('')
-  const [syncLogs,    setSyncLogs]    = useState<JiraSyncLog[]>([])
-  const [uploadLogs,  setUploadLogs]  = useState<JiraUploadLog[]>([])
-  const [pendingTasks, setPendingTasks] = useState<Task[]>([])
+  const [step,            setStep]            = useState<SyncStep>('idle')
+  const [error,           setError]           = useState('')
+  const [syncLogs,        setSyncLogs]        = useState<JiraSyncLog[]>([])
+  const [uploadLogs,      setUploadLogs]      = useState<JiraUploadLog[]>([])
+  const [pendingTasks,    setPendingTasks]    = useState<Task[]>([])
+  const [selectedSprintIds, setSelectedSprintIds] = useState<string[]>([])
 
   // curl/Postman state
   const [tasksCurl,   setTasksCurl]   = useState('')
@@ -219,7 +220,17 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     setUploadLogs(logs); setStep('done')
   }
 
-  function confirmSync() { onSyncTasks(pendingTasks); setStep('idle'); setSyncLogs([]) }
+  function confirmSync() {
+    const tasksWithSprints = pendingTasks.map(t => ({
+      ...t,
+      sprintId: selectedSprintIds[0] ?? t.sprintId,
+      sprintIds: selectedSprintIds.length > 0 ? selectedSprintIds : t.sprintIds,
+    }))
+    onSyncTasks(tasksWithSprints)
+    setStep('idle')
+    setSyncLogs([])
+    setSelectedSprintIds([])
+  }
 
   // ── Shared merge/replace logic ──────────────────────────────
   type IssueRow = {
@@ -424,11 +435,57 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 <h3 className="text-sm font-medium text-fg">Preview ({syncLogs.filter(l => l.action !== 'skip').length} tasks)</h3>
                 {syncMode === 'clear' && <span className="text-[10px] font-medium text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">⚠ Clear All</span>}
               </div>
-              <div className="max-h-48 overflow-y-auto space-y-1">
+
+              {/* Sprint assignment */}
+              {project.sprints.length > 0 && (
+                <div className="rounded-xl border border-border bg-background/60 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-medium text-fg">Assign to Sprint(s)</p>
+                    {selectedSprintIds.length > 0 && (
+                      <button onClick={() => setSelectedSprintIds([])}
+                        className="text-[10px] text-muted hover:text-fg transition-colors">Clear</button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted">Chọn một hoặc nhiều sprint — task có thể span 2–3 sprint</p>
+                  <div className="space-y-1 max-h-36 overflow-y-auto">
+                    {project.sprints.map(sprint => {
+                      const checked = selectedSprintIds.includes(sprint.id)
+                      return (
+                        <button key={sprint.id}
+                          onClick={() => setSelectedSprintIds(prev =>
+                            checked ? prev.filter(id => id !== sprint.id) : [...prev, sprint.id]
+                          )}
+                          className={`w-full flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${
+                            checked ? 'border-accent/50 bg-accent/10' : 'border-border hover:border-border/80 hover:bg-surface/60'
+                          }`}>
+                          <span className={`w-3.5 h-3.5 rounded border-2 shrink-0 flex items-center justify-center transition-colors ${
+                            checked ? 'border-accent bg-accent' : 'border-muted/50'
+                          }`}>
+                            {checked && <span className="text-white text-[9px] leading-none font-bold">✓</span>}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-xs font-medium text-fg">{sprint.name}</span>
+                            <span className="text-[10px] text-muted ml-2 font-mono">
+                              {sprint.startDate.slice(5)} → {sprint.endDate.slice(5)}
+                            </span>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {selectedSprintIds.length > 0 && (
+                    <p className="text-[10px] text-accent-soft">
+                      {selectedSprintIds.length} sprint được chọn — sẽ gán cho {syncLogs.filter(l => l.action !== 'skip').length} tasks
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="max-h-40 overflow-y-auto space-y-1">
                 {syncLogs.map((log, i) => (
                   <div key={i} className="flex items-center gap-2 rounded-lg bg-background px-3 py-2 text-xs">
                     <span className={`font-medium shrink-0 ${log.action === 'add' ? 'text-green-400' : log.action === 'update' ? 'text-blue-400' : 'text-red-400/70'}`}>
-                      {log.action === 'add' ? '+add' : log.action === 'update' ? '~update' : '−remove'}
+                      {log.action === 'add' ? '+add' : log.action === 'update' ? '~upd' : '−rem'}
                     </span>
                     <span className="font-mono text-accent-soft shrink-0">{log.jiraKey}</span>
                     <span className="text-muted truncate">{log.title}</span>
@@ -436,8 +493,10 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 ))}
               </div>
               <div className="flex gap-2">
-                <button onClick={() => { setStep('idle'); setSyncLogs([]) }} className="flex-1 rounded-lg border border-border py-2 text-sm text-muted">Cancel</button>
-                <button onClick={confirmSync} className="flex-1 rounded-lg bg-accent py-2 text-sm font-medium text-white">Apply</button>
+                <button onClick={() => { setStep('idle'); setSyncLogs([]); setSelectedSprintIds([]) }}
+                  className="flex-1 rounded-lg border border-border py-2 text-sm text-muted">Cancel</button>
+                <button onClick={confirmSync}
+                  className="flex-1 rounded-lg bg-accent py-2 text-sm font-medium text-white">Apply</button>
               </div>
             </div>
           )}
