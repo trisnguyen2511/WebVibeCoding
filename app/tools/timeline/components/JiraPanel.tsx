@@ -235,7 +235,13 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   // ── Shared merge/replace logic ──────────────────────────────
   type IssueRow = {
     id: string; key: string
-    fields: { summary: string; status: { name: string }; parent?: { key: string }; duedate?: string; timeoriginalestimate?: number }
+    fields: {
+      summary: string
+      status: { name: string }
+      parent?: { key: string; fields?: { summary?: string } }
+      duedate?: string
+      timeoriginalestimate?: number
+    }
   }
 
   function buildIssueLink(key: string): string | undefined {
@@ -244,6 +250,13 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   }
 
   function mergePulledIssues(issues: IssueRow[], parentMap: Record<string, string>) {
+    // Extract parent names embedded in each subtask's parent field (avoids a second query)
+    for (const issue of issues) {
+      const pk = issue.fields.parent?.key
+      const ps = issue.fields.parent?.fields?.summary
+      if (pk && ps && !parentMap[pk]) parentMap[pk] = ps
+    }
+
     const logs: JiraSyncLog[] = []
     const base: Task[] = syncMode === 'clear' ? [] : syncMode === 'replace' ? tasks.filter(t => !t.jiraId) : [...tasks]
     const result: Task[] = [...base]
