@@ -432,6 +432,20 @@ export function GanttChart({
     }
   }, [todayIndex])
 
+  // ── Wheel → horizontal scroll (mouse wheel scrolls timeline left/right) ──
+  useEffect(() => {
+    const el = rightRef.current
+    if (!el) return
+    function onWheel(e: WheelEvent) {
+      // Let natural horizontal scroll (trackpad swipe) pass through
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
+      e.preventDefault()
+      el!.scrollLeft += e.deltaY
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+
   // ── Close context menu ───────────────────────────────────────
   useEffect(() => {
     if (!ctxMenu) return
