@@ -227,7 +227,7 @@ export function GanttChart({
   // Persist collapsed state to localStorage whenever it changes
   useEffect(() => {
     try {
-      localStorage.setItem(`timeline:collapsed:${projectId}`, JSON.stringify([...collapsedParents]))
+      localStorage.setItem(`timeline:collapsed:${projectId}`, JSON.stringify(Array.from(collapsedParents)))
     } catch { /* noop */ }
   }, [collapsedParents, projectId])
 
