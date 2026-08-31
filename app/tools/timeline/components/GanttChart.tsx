@@ -180,7 +180,6 @@ export function GanttChart({
   onUpdateTask, onUpdateEntry, onDeleteEntry, onEditTask, onDeleteTask, onReorderTasks,
   estimateMode = false, onExitEstimateMode,
 }: Props) {
-  const collapsedKey = `timeline:collapsed:${projectId}`
   const leftRef      = useRef<HTMLDivElement>(null)
   const rightRef     = useRef<HTMLDivElement>(null)
   const headerRef    = useRef<HTMLDivElement>(null)
@@ -203,21 +202,34 @@ export function GanttChart({
   const [listDropIdx,  setListDropIdx]  = useState<number | null>(null)
   // Collapse/expand parent groups — persisted to localStorage
   const [collapsedParents, setCollapsedParents] = useState<Set<string>>(() => {
-    if (typeof window === 'undefined') return new Set()
     try {
       const raw = localStorage.getItem(`timeline:collapsed:${projectId}`)
       return raw ? new Set<string>(JSON.parse(raw) as string[]) : new Set()
     } catch { return new Set() }
   })
 
+  // Re-load from localStorage when projectId changes (e.g. after navigation)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`timeline:collapsed:${projectId}`)
+      setCollapsedParents(raw ? new Set<string>(JSON.parse(raw) as string[]) : new Set())
+    } catch { setCollapsedParents(new Set()) }
+  }, [projectId])
+
   function toggleParent(key: string) {
     setCollapsedParents(prev => {
       const s = new Set(prev)
       if (s.has(key)) s.delete(key); else s.add(key)
-      try { localStorage.setItem(`timeline:collapsed:${projectId}`, JSON.stringify([...s])) } catch { /* noop */ }
       return s
     })
   }
+
+  // Persist collapsed state to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(`timeline:collapsed:${projectId}`, JSON.stringify([...collapsedParents]))
+    } catch { /* noop */ }
+  }, [collapsedParents, projectId])
 
   // Keep refs in sync so drag handlers always see latest values
   useEffect(() => { tasksRef.current = tasks }, [tasks])

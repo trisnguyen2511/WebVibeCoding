@@ -90,6 +90,21 @@
   animation: shimmer 4s linear infinite;
 }
 
+/* ── Timeline dark-mode color overrides ────────────────────────
+   Softer palette scoped only to the /tools/timeline route tree.
+   Keeps global palette untouched.  Contrast ratios (on #0D1117):
+     muted  #8B949E  ≈ 6.1:1 ✓  (was #52525B ≈ 2.3:1 ✗)
+     fg     #E6EDF3  ≈ 15.9:1 ✓
+   ─────────────────────────────────────────────────────────────── */
+.tl-theme {
+  --color-bg:      13 17 23;      /* #0D1117  GitHub-dark navy  */
+  --color-surface: 22 27 34;      /* #161B22  clear depth layer */
+  --color-border:  48 54 61;      /* #30363D  visible separator */
+  --color-muted:   139 148 158;   /* #8B949E  comfortable secondary text */
+  --color-fg:      230 237 243;   /* #E6EDF3  softer-than-white primary */
+  /* accent & overlay unchanged — matches global design tokens */
+}
+
 /* Blocks the iOS/Android long-press "select / copy" callout on touch
    controllers — user-select:none alone isn't enough to suppress it. */
 .no-callout {
