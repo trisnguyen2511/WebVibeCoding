@@ -2,12 +2,9 @@
 
 import { useState } from 'react'
 import type { Project, Sprint } from '@/lib/timeline-types'
+import { generateId } from '@/lib/timeline-storage'
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-
-function generateId() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36)
-}
 
 interface Props {
   project: Project | null

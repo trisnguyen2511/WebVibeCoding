@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { X, Plug, RefreshCw, Upload, CheckCircle, AlertCircle, Loader2, RotateCcw, Copy, Terminal } from 'lucide-react'
 import type { Project, Task, JiraConfig, JiraSyncLog, JiraUploadLog } from '@/lib/timeline-types'
+import { generateId } from '@/lib/timeline-storage'
 
 interface Props {
   project: Project
@@ -51,8 +52,6 @@ function buildCurl(host: string, token: string, path: string, method = 'GET', bo
   lines.push(`  "${url}"`)
   return lines.join(' \\\n')
 }
-
-function generateId() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
 
 // ── UI helpers ────────────────────────────────────────────────
 function CopyButton({ text }: { text: string }) {

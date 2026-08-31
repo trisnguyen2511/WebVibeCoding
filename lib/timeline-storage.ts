@@ -1,5 +1,9 @@
 import type { Project, Task, TimeEntry, ExportData } from './timeline-types'
 
+export function generateId(): string {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36)
+}
+
 const PROJECTS_KEY = 'timeline:projects'
 const TASKS_KEY = 'timeline:tasks'
 

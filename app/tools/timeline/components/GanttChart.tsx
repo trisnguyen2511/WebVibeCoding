@@ -136,11 +136,13 @@ function QuickEstimateModal({ task, date, onSave, onClose }: {
   const [endDate,   setEndDate]   = useState(task.estimateEndDate   ?? addDays(date, 6))
   const [hours,     setHours]     = useState(task.estimateHours?.toString() ?? '')
 
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
   useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onCloseRef.current() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, []) // stable: reads onClose through ref
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -176,8 +178,8 @@ function QuickEstimateModal({ task, date, onSave, onClose }: {
             Cancel
           </button>
           <button
-            onClick={() => { if (startDate && endDate && startDate <= endDate) onSave(startDate, endDate, hours ? Number(hours) : undefined) }}
-            disabled={!startDate || !endDate || startDate > endDate}
+            onClick={() => { if (startDate && endDate && startDate <= endDate) onSave(startDate, endDate, hours && Number(hours) > 0 ? Number(hours) : undefined) }}
+            disabled={!startDate || !endDate || startDate > endDate || (hours !== '' && Number(hours) < 0)}
             className="flex-1 rounded-lg bg-accent py-2 text-xs font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-40">
             Save
           </button>
@@ -210,9 +212,8 @@ export function GanttChart({
   const [ctxMenu,      setCtxMenu]      = useState<ContextMenu | null>(null)
   const [entryModal,   setEntryModal]   = useState<{ task: Task; date: string; entry?: TimeEntry } | null>(null)
   const [estModal,     setEstModal]     = useState<{ task: Task; date: string } | null>(null)
-  const [hoveredRow,      setHoveredRow]      = useState<string | null>(null)
-  const [hoveredCellDate, setHoveredCellDate] = useState<string | null>(null)
-  const [dragPreview,     setDragPreview]     = useState<DragPreview | null>(null)
+  const [hoveredRow,   setHoveredRow]   = useState<string | null>(null)
+  const [dragPreview,  setDragPreview]  = useState<DragPreview | null>(null)
   // List reorder drag
   const [listDragIdx,  setListDragIdx]  = useState<number | null>(null)
   const [listDropIdx,  setListDropIdx]  = useState<number | null>(null)
@@ -424,7 +425,7 @@ export function GanttChart({
       rightRef.current.scrollLeft = targetScroll
       if (headerRef.current) headerRef.current.scrollLeft = targetScroll
     }
-  }, [todayIndex, tasks.length])
+  }, [todayIndex])
 
   // ── Close context menu ───────────────────────────────────────
   useEffect(() => {
@@ -444,10 +445,6 @@ export function GanttChart({
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       const { task, date } = cell
       switch (e.key.toLowerCase()) {
-        case 'x':
-          e.preventDefault()
-          onExportRef.current?.()
-          break
         case 'e':
           e.preventDefault()
           setEstModal({ task, date })
@@ -484,6 +481,13 @@ export function GanttChart({
   function totalLogged(task: Task) {
     return task.timeEntries.reduce((s, e) => s + e.hours, 0)
   }
+
+  const rowTops = useMemo(() => {
+    const tops: number[] = []
+    let acc = 0
+    for (const r of displayRows) { tops.push(acc); acc += rowHeight(r) }
+    return tops
+  }, [displayRows]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── List reorder drag ────────────────────────────────────────
   function isValidListDrop(dragIdx: number, dropIdx: number): boolean {
@@ -725,7 +729,8 @@ export function GanttChart({
               )
             })}
             {days.map((day, i) => {
-              const isWeekend = getDayOfWeek(day) === 0 || getDayOfWeek(day) === 6
+              const dow       = getDayOfWeek(day)
+              const isWeekend = dow === 0 || dow === 6
               const isToday   = i === todayIndex
               return (
                 <div key={day}
@@ -760,10 +765,10 @@ export function GanttChart({
             )}
 
             {/* Background: weekends */}
-            {days.map((day, i) => getDayOfWeek(day) === 0 || getDayOfWeek(day) === 6 ? (
+            {days.map((day, i) => { const dow = getDayOfWeek(day); return dow === 0 || dow === 6 ? (
               <div key={day} className="absolute top-0 bottom-0 pointer-events-none"
                 style={{ left: i * DAY_W, width: DAY_W, background: 'rgba(255,255,255,0.03)' }} />
-            ) : null)}
+            ) : null; })}
 
             {/* Vertical day lines */}
             {days.map((_, i) => (
@@ -772,13 +777,10 @@ export function GanttChart({
             ))}
 
             {/* Horizontal row lines */}
-            {displayRows.map((row, ri) => {
-              const top = displayRows.slice(0, ri).reduce((sum, r) => sum + rowHeight(r), 0)
-              return (
-                <div key={`hl-${ri}`} className="absolute left-0 right-0 pointer-events-none"
-                  style={{ top, height: 1, background: 'rgba(255,255,255,0.05)' }} />
-              )
-            })}
+            {displayRows.map((row, ri) => (
+              <div key={`hl-${ri}`} className="absolute left-0 right-0 pointer-events-none"
+                style={{ top: rowTops[ri], height: 1, background: 'rgba(255,255,255,0.05)' }} />
+            ))}
 
             {/* Background: sprint separators */}
             {sprints.map(sprint => {
@@ -866,51 +868,47 @@ export function GanttChart({
               const isHovered = hoveredRow === task.id
               const isDragging = dragPreview?.taskId === task.id
 
-              const isHiddenR = !!row.hiddenByCollapse
+              const isHidden = !!row.hiddenByCollapse
+              const entryByDate = new Map(task.timeEntries.map(e => [e.date, e]))
               return (
                 <div key={task.id}
-                  className={`relative border-b border-border/30 ${isHiddenR ? '' : `transition-colors duration-100 ${isHovered ? 'bg-surface/40' : ''}`}`}
+                  className={`relative border-b border-border/30 ${isHidden ? '' : `transition-colors duration-100 ${isHovered ? 'bg-surface/40' : ''}`}`}
                   style={{
-                    height: isHiddenR ? 0 : h,
-                    opacity: isHiddenR ? 0 : 1,
+                    height: isHidden ? 0 : h,
+                    opacity: isHidden ? 0 : 1,
                     overflow: 'hidden',
-                    pointerEvents: isHiddenR ? 'none' : 'auto',
+                    pointerEvents: isHidden ? 'none' : 'auto',
                     transition: 'height 200ms ease, opacity 150ms ease',
                     borderLeftWidth: isSubtask && pal ? 3 : 0,
                     borderLeftColor: pal?.border,
                     paddingLeft: isSubtask ? 4 : 0,
                   }}
-                  onMouseEnter={() => { if (isHiddenR) return; setHoveredRow(task.id) }}
+                  onMouseEnter={() => { if (isHidden) return; setHoveredRow(task.id) }}
                   onMouseLeave={() => { setHoveredRow(null); setTooltip(null) }}
-                  onContextMenu={e => { if (isHiddenR) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, task }) }}>
+                  onContextMenu={e => { if (isHidden) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, task }) }}>
 
                   {/* Click cells + shortcut hint */}
                   {days.map((day, i) => {
-                    const entry = task.timeEntries.find(e => e.date === day)
-                    const isCellHovered = isHovered && hoveredCellDate === day
+                    const entry = entryByDate.get(day)
                     return (
                       <div key={day}
-                        className="absolute top-0 bottom-0 cursor-pointer"
+                        className="absolute top-0 bottom-0 cursor-pointer group"
                         style={{ left: i * DAY_W, width: DAY_W }}
                         onClick={() => setEntryModal({ task, date: day, entry })}
                         onMouseEnter={e => {
                           hoveredCellRef.current = { task, date: day }
-                          setHoveredCellDate(day)
                           if (!entry) return
                           setTooltip({ x: e.clientX, y: e.clientY, task, date: day, entry })
                         }}
                         onMouseLeave={() => {
                           hoveredCellRef.current = null
-                          setHoveredCellDate(null)
                           setTooltip(null)
                         }}>
-                        {isCellHovered && (
-                          <div className="absolute inset-0 flex items-end justify-center gap-px pb-0.5 pointer-events-none z-20">
-                            {(['E','A','D'] as const).map(k => (
-                              <span key={k} className="text-[7px] font-mono font-bold bg-white/15 text-white/70 px-0.5 rounded leading-tight">{k}</span>
-                            ))}
-                          </div>
-                        )}
+                        <div className="absolute inset-0 hidden group-hover:flex items-end justify-center gap-px pb-0.5 pointer-events-none z-20">
+                          {(['E','A','D'] as const).map(k => (
+                            <span key={k} className="text-[7px] font-mono font-bold bg-white/15 text-white/70 px-0.5 rounded leading-tight">{k}</span>
+                          ))}
+                        </div>
                       </div>
                     )
                   })}
@@ -1057,40 +1055,46 @@ export function GanttChart({
             </div>
           ) : (
             <div className="space-y-1.5">
-              {tooltip.task.estimateStartDate && (
-                <div className="flex justify-between">
-                  <span className="text-muted">Estimate</span>
-                  <span className="font-mono text-fg">
-                    {fmtDate(tooltip.task.estimateStartDate)} → {tooltip.task.estimateEndDate ? fmtDate(tooltip.task.estimateEndDate) : '?'}
-                  </span>
-                </div>
-              )}
-              {tooltip.task.actualStartDate && (
-                <div className="flex justify-between">
-                  <span className="text-muted">Actual</span>
-                  <span className="font-mono text-fg">
-                    {fmtDate(tooltip.task.actualStartDate)} → {tooltip.task.actualEndDate ? fmtDate(tooltip.task.actualEndDate) : 'ongoing'}
-                  </span>
-                </div>
-              )}
-              {tooltip.task.estimateHours && (
-                <div className="flex justify-between">
-                  <span className="text-muted">Hours</span>
-                  <span className="font-mono text-fg">{totalLogged(tooltip.task)}h / {tooltip.task.estimateHours}h</span>
-                </div>
-              )}
-              {tooltip.task.estimateHours && totalLogged(tooltip.task) > 0 && (
-                <div>
-                  <div className="flex justify-between text-[10px] text-muted mb-1">
-                    <span>Progress</span>
-                    <span>{Math.round(Math.min(100, totalLogged(tooltip.task) / tooltip.task.estimateHours * 100))}%</span>
-                  </div>
-                  <div className="h-1 rounded-full bg-border overflow-hidden">
-                    <div className="h-full rounded-full bg-accent"
-                      style={{ width: `${Math.min(100, totalLogged(tooltip.task) / tooltip.task.estimateHours * 100)}%` }} />
-                  </div>
-                </div>
-              )}
+              {(() => {
+                const logged = totalLogged(tooltip.task)
+                const estHours = tooltip.task.estimateHours ?? 0
+                return (<>
+                  {tooltip.task.estimateStartDate && (
+                    <div className="flex justify-between">
+                      <span className="text-muted">Estimate</span>
+                      <span className="font-mono text-fg">
+                        {fmtDate(tooltip.task.estimateStartDate)} → {tooltip.task.estimateEndDate ? fmtDate(tooltip.task.estimateEndDate) : '?'}
+                      </span>
+                    </div>
+                  )}
+                  {tooltip.task.actualStartDate && (
+                    <div className="flex justify-between">
+                      <span className="text-muted">Actual</span>
+                      <span className="font-mono text-fg">
+                        {fmtDate(tooltip.task.actualStartDate)} → {tooltip.task.actualEndDate ? fmtDate(tooltip.task.actualEndDate) : 'ongoing'}
+                      </span>
+                    </div>
+                  )}
+                  {estHours > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted">Hours</span>
+                      <span className="font-mono text-fg">{logged}h / {estHours}h</span>
+                    </div>
+                  )}
+                  {estHours > 0 && logged > 0 && (
+                    <div>
+                      <div className="flex justify-between text-[10px] text-muted mb-1">
+                        <span>Progress</span>
+                        <span>{Math.round(Math.min(100, logged / estHours * 100))}%</span>
+                      </div>
+                      <div className="h-1 rounded-full bg-border overflow-hidden">
+                        <div className="h-full rounded-full bg-accent"
+                          style={{ width: `${Math.min(100, logged / estHours * 100)}%` }} />
+                      </div>
+                    </div>
+                  )}
+                </>)
+              })()}
               <div className="flex justify-between pt-1">
                 <span className={`px-2 py-0.5 rounded-full text-[10px] ${
                   tooltip.task.status === 'done'        ? 'bg-emerald-500/20 text-emerald-400' :
