@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Plug, RefreshCw, Upload, CheckCircle, AlertCircle, Loader2, RotateCcw, Copy, Terminal } from 'lucide-react'
+import { X, Plug, RefreshCw, Upload, CheckCircle, AlertCircle, Loader2, RotateCcw, Copy, Terminal, Download, MonitorDot } from 'lucide-react'
 import type { Project, Task, JiraConfig, JiraSyncLog, JiraUploadLog } from '@/lib/timeline-types'
 import { generateId } from '@/lib/timeline-storage'
 
@@ -86,8 +86,9 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     const h = project.jiraConfig?.host ?? ''
     return h.length === 0 || !h.includes('atlassian.net')
   })
-  // curl/Postman = default for Server/DC; direct fetch for Cloud
-  const [curlMode, setCurlMode] = useState(true)
+  // 'curl' | 'direct' | 'local-proxy'
+  type FetchMode = 'curl' | 'direct' | 'local-proxy'
+  const [fetchMode, setFetchMode] = useState<FetchMode>('curl')
 
   const [jql,      setJql]      = useState(DEFAULT_JQL)
   const [syncMode, setSyncMode] = useState<'merge' | 'replace' | 'clear'>('replace')
@@ -105,6 +106,8 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   const [uploadCurls, setUploadCurls] = useState('')
 
   function getConfig(): JiraConfig { return { host: host.trim(), email: email.trim(), token: token.trim() } }
+  const isDirectMode = fetchMode === 'direct' || fetchMode === 'local-proxy'
+  const curlMode = fetchMode === 'curl'
   function req(path: string, method = 'GET', data?: unknown) { return jiraRequest(getConfig(), path, method, data, serverMode) }
   function buildSearchPath(jqlStr: string) { return `/search?jql=${encodeURIComponent(jqlStr.trim())}&maxResults=100&fields=${FIELDS}` }
 
@@ -292,7 +295,6 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   // ── Derived ─────────────────────────────────────────────────
   const hasCredentials = !!(host.trim() && token.trim())
   const manualEntryCount = tasks.filter(t => t.jiraId).reduce((n, t) => n + t.timeEntries.filter(e => e.source === 'manual').length, 0)
-  const isDirectMode = !curlMode  // true = direct fetch, false = curl/Postman
 
   return (
     <>
@@ -315,9 +317,9 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium text-fg">Connection</h3>
               <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs">
-                <button onClick={() => { setServerMode(false); setCurlMode(false) }}
+                <button onClick={() => { setServerMode(false); setFetchMode('direct') }}
                   className={`px-3 py-1 transition-colors ${!serverMode ? 'bg-accent text-white' : 'text-muted hover:text-fg'}`}>Cloud</button>
-                <button onClick={() => { setServerMode(true); setCurlMode(true) }}
+                <button onClick={() => { setServerMode(true); setFetchMode('curl') }}
                   className={`px-3 py-1 transition-colors ${serverMode ? 'bg-accent text-white' : 'text-muted hover:text-fg'}`}>Server / DC</button>
               </div>
             </div>
@@ -334,29 +336,60 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 placeholder={serverMode ? 'Personal Access Token (PAT)' : 'Jira API Token'}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none font-mono" />
 
-              {/* Mode toggle: curl/Postman vs direct fetch */}
+              {/* Mode toggle: curl / direct / local-proxy */}
               <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs">
-                <button onClick={() => setCurlMode(true)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 transition-colors ${curlMode ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
-                  <Terminal size={11} />curl / Postman
+                <button onClick={() => setFetchMode('curl')}
+                  className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 transition-colors ${fetchMode === 'curl' ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
+                  <Terminal size={11} />curl
                 </button>
-                <button onClick={() => setCurlMode(false)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 transition-colors ${!curlMode ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
-                  <Plug size={11} />Direct fetch
+                <button onClick={() => setFetchMode('direct')}
+                  className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 border-x border-border transition-colors ${fetchMode === 'direct' ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
+                  <Plug size={11} />Direct
+                </button>
+                <button onClick={() => setFetchMode('local-proxy')}
+                  className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 transition-colors ${fetchMode === 'local-proxy' ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
+                  <MonitorDot size={11} />Local Proxy
                 </button>
               </div>
 
               {/* curl: test connection command */}
-              {curlMode && host.trim() && token.trim() && (
+              {fetchMode === 'curl' && host.trim() && token.trim() && (
                 <CurlBlock label="Test Connection:" curl={buildCurl(host.trim(), token.trim(), '/myself')} />
               )}
 
               {/* direct: test button */}
-              {!curlMode && (
+              {fetchMode === 'direct' && (
                 <button onClick={testConnection} disabled={!hasCredentials}
                   className="w-full rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
                   Test Connection
                 </button>
+              )}
+
+              {/* local-proxy: download + setup card */}
+              {fetchMode === 'local-proxy' && (
+                <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <MonitorDot size={14} className="text-accent-soft shrink-0 mt-0.5" />
+                    <div className="space-y-1 text-xs text-muted leading-relaxed">
+                      <p className="text-fg font-medium">Local Proxy (VPN / nội bộ)</p>
+                      <p>Chạy proxy trên máy bạn để bypass CORS khi Jira nằm trong mạng nội bộ.</p>
+                    </div>
+                  </div>
+                  <a href="/jira-proxy.zip" download
+                    className="flex items-center justify-center gap-2 w-full rounded-lg bg-accent py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors">
+                    <Download size={13} />Tải jira-proxy.zip
+                  </a>
+                  <ol className="space-y-1 text-[11px] text-muted list-decimal list-inside leading-relaxed">
+                    <li>Giải nén → mở <span className="font-mono text-fg">config.json</span> → sửa URL Jira</li>
+                    <li>Bật VPN → double-click <span className="font-mono text-fg">run.bat</span></li>
+                    <li>Set <span className="font-mono text-fg">Host</span> bên trên thành <span className="font-mono text-accent-soft">http://localhost:8765</span></li>
+                    <li>Bấm Test Connection bên dưới</li>
+                  </ol>
+                  <button onClick={testConnection} disabled={!hasCredentials}
+                    className="w-full rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
+                    Test Connection
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -404,7 +437,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
             </div>
 
             {/* curl/Postman mode */}
-            {curlMode ? (
+            {fetchMode === 'curl' ? (
               <div className="space-y-3">
                 <button onClick={generateTasksCurl} disabled={!hasCredentials || !jql.trim()}
                   className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40">
@@ -520,7 +553,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
               Uploads manual time entries to Jira worklogs.
               {manualEntryCount > 0 && ` ${manualEntryCount} entr${manualEntryCount === 1 ? 'y' : 'ies'} ready.`}
             </p>
-            {curlMode ? (
+            {fetchMode === 'curl' ? (
               <div className="space-y-2">
                 <button onClick={generateUploadCurls} disabled={manualEntryCount === 0}
                   className="w-full flex items-center justify-center gap-2 rounded-lg border border-accent/40 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
