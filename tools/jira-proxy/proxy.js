@@ -4,16 +4,41 @@
 const http = require('http')
 const https = require('https')
 const readline = require('readline')
+const fs = require('fs')
+const path = require('path')
 const { URL } = require('url')
 
-function startProxy(target, port) {
+// Config file sits next to the exe (or next to proxy.js when run via node)
+const EXE_DIR = path.dirname(process.execPath !== process.argv[0] ? process.execPath : process.argv[1])
+const CONFIG_PATH = path.join(EXE_DIR, 'config.json')
+
+function loadConfig() {
+  try {
+    const raw = fs.readFileSync(CONFIG_PATH, 'utf8')
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+function saveConfig(cfg) {
+  try {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2), 'utf8')
+  } catch {
+    // ignore write errors (read-only fs etc)
+  }
+}
+
+function startProxy(cfg) {
+  const { target, port = 8765 } = cfg
+
   let targetUrl
   try {
     targetUrl = new URL(target)
   } catch {
-    console.error('URL không hợp lệ:', target)
-    askAndStart()
-    return
+    console.error('  URL không hợp lệ:', target)
+    console.error('  Kiểm tra lại file config.json')
+    process.exit(1)
   }
 
   const isHttps = targetUrl.protocol === 'https:'
@@ -75,44 +100,72 @@ function startProxy(target, port) {
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.error('  Port ' + port + ' đang bị chiếm. Thử port khác...')
-      startProxy(target, port + 1)
+      console.error('  Port ' + port + ' đang bị chiếm. Thử port ' + (port + 1) + '...')
+      startProxy({ ...cfg, port: port + 1 })
     } else {
       console.error('  Server error:', err.message)
     }
   })
 }
 
-function askAndStart() {
+function askAndStart(defaults = {}) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
 
-  console.log('='.repeat(52))
+  console.log('='.repeat(54))
   console.log('  Jira CORS Proxy')
-  console.log('='.repeat(52))
+  console.log('='.repeat(54))
   console.log('')
 
-  const savedTargets = []
+  const defaultTarget = defaults.target || ''
+  const defaultPort = defaults.port || 8765
+  const targetPrompt = defaultTarget
+    ? `  Jira URL [${defaultTarget}]: `
+    : '  Jira URL (vd: https://jira.company.com): '
 
-  rl.question('  Jira URL (vd: https://jira.company.com): ', (target) => {
-    const t = target.trim()
-    if (!t) { console.log('  Cần nhập URL.'); rl.close(); askAndStart(); return }
-
-    rl.question('  Port [8765]: ', (portStr) => {
-      const port = parseInt(portStr.trim() || '8765', 10)
+  rl.question(targetPrompt, (targetInput) => {
+    const target = targetInput.trim() || defaultTarget
+    if (!target) {
+      console.log('  Cần nhập URL.')
       rl.close()
+      askAndStart(defaults)
+      return
+    }
+
+    rl.question(`  Port [${defaultPort}]: `, (portInput) => {
+      const port = parseInt(portInput.trim() || String(defaultPort), 10)
+      rl.close()
+
+      const cfg = { target, port }
+      saveConfig(cfg)
       console.log('')
+      console.log('  Đã lưu vào config.json')
       console.log('  Đang khởi động...')
-      startProxy(t, port)
+      startProxy(cfg)
     })
   })
 }
 
-// Entry point
+// Entry point: CLI args > config.json > interactive prompt
 const argTarget = process.argv[2]
-const argPort = parseInt(process.argv[3] || '8765', 10)
+const argPort = parseInt(process.argv[3] || '0', 10)
 
 if (argTarget) {
-  startProxy(argTarget, argPort)
+  const cfg = loadConfig()
+  startProxy({ ...cfg, target: argTarget, ...(argPort ? { port: argPort } : {}) })
 } else {
-  askAndStart()
+  const cfg = loadConfig()
+  if (cfg.target) {
+    // Config exists — start directly, no prompt
+    console.log('='.repeat(54))
+    console.log('  Jira CORS Proxy')
+    console.log('='.repeat(54))
+    console.log('')
+    console.log('  Dùng config.json:')
+    console.log('  Target : ' + cfg.target)
+    console.log('  Port   : ' + (cfg.port || 8765))
+    console.log('')
+    startProxy(cfg)
+  } else {
+    askAndStart()
+  }
 }
