@@ -153,19 +153,7 @@ if (argTarget) {
   const cfg = loadConfig()
   startProxy({ ...cfg, target: argTarget, ...(argPort ? { port: argPort } : {}) })
 } else {
+  // Always prompt — config values shown as defaults, Enter to keep them
   const cfg = loadConfig()
-  if (cfg.target) {
-    // Config exists — start directly, no prompt
-    console.log('='.repeat(54))
-    console.log('  Jira CORS Proxy')
-    console.log('='.repeat(54))
-    console.log('')
-    console.log('  Dùng config.json:')
-    console.log('  Target : ' + cfg.target)
-    console.log('  Port   : ' + (cfg.port || 8765))
-    console.log('')
-    startProxy(cfg)
-  } else {
-    askAndStart()
-  }
+  askAndStart(cfg)
 }
