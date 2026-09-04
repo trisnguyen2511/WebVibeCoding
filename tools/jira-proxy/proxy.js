@@ -9,7 +9,10 @@ const path = require('path')
 const { URL } = require('url')
 
 // Config file sits next to the exe (or next to proxy.js when run via node)
-const EXE_DIR = path.dirname(process.execPath !== process.argv[0] ? process.execPath : process.argv[1])
+// process.pkg is set by pkg bundler; use execPath to find files next to the exe
+const EXE_DIR = process.pkg
+  ? path.dirname(process.execPath)
+  : path.dirname(process.argv[1])
 const CONFIG_PATH = path.join(EXE_DIR, 'config.json')
 
 function loadConfig() {
