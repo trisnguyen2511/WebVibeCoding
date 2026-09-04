@@ -3,98 +3,116 @@
 
 const http = require('http')
 const https = require('https')
+const readline = require('readline')
 const { URL } = require('url')
 
-const TARGET = process.argv[2]
-const PORT = parseInt(process.argv[3] || '8765', 10)
-
-if (!TARGET) {
-  console.log('='.repeat(50))
-  console.log('  Jira CORS Proxy')
-  console.log('='.repeat(50))
-  console.log('')
-  console.log('Usage:')
-  console.log('  jira-proxy.exe <jira-url> [port]')
-  console.log('')
-  console.log('Examples:')
-  console.log('  jira-proxy.exe https://jira.company.com')
-  console.log('  jira-proxy.exe https://jira.company.com:8443 8765')
-  console.log('')
-  console.log('Then in Timeline app, set Host to:')
-  console.log('  http://localhost:8765')
-  console.log('')
-  process.exit(1)
-}
-
-let targetUrl
-try {
-  targetUrl = new URL(TARGET)
-} catch {
-  console.error('Invalid URL:', TARGET)
-  process.exit(1)
-}
-
-const isHttps = targetUrl.protocol === 'https:'
-const lib = isHttps ? https : http
-
-const server = http.createServer((req, res) => {
-  // CORS headers for every response
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept, X-Atlassian-Token')
-  res.setHeader('Access-Control-Max-Age', '86400')
-
-  // Preflight
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204)
-    res.end()
+function startProxy(target, port) {
+  let targetUrl
+  try {
+    targetUrl = new URL(target)
+  } catch {
+    console.error('URL không hợp lệ:', target)
+    askAndStart()
     return
   }
 
-  const options = {
-    hostname: targetUrl.hostname,
-    port: targetUrl.port || (isHttps ? 443 : 80),
-    path: req.url,
-    method: req.method,
-    headers: {
-      ...req.headers,
-      host: targetUrl.host,
-    },
-    rejectUnauthorized: false, // allow self-signed certs on internal servers
-  }
+  const isHttps = targetUrl.protocol === 'https:'
+  const lib = isHttps ? https : http
 
-  const proxyReq = lib.request(options, (proxyRes) => {
-    const headers = {}
-    for (const [k, v] of Object.entries(proxyRes.headers)) {
-      const lower = k.toLowerCase()
-      if (!lower.startsWith('access-control-')) headers[k] = v
+  const server = http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept, X-Atlassian-Token')
+    res.setHeader('Access-Control-Max-Age', '86400')
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204)
+      res.end()
+      return
     }
-    res.writeHead(proxyRes.statusCode, headers)
-    proxyRes.pipe(res)
+
+    const options = {
+      hostname: targetUrl.hostname,
+      port: targetUrl.port || (isHttps ? 443 : 80),
+      path: req.url,
+      method: req.method,
+      headers: { ...req.headers, host: targetUrl.host },
+      rejectUnauthorized: false,
+    }
+
+    const proxyReq = lib.request(options, (proxyRes) => {
+      const headers = {}
+      for (const [k, v] of Object.entries(proxyRes.headers)) {
+        if (!k.toLowerCase().startsWith('access-control-')) headers[k] = v
+      }
+      res.writeHead(proxyRes.statusCode, headers)
+      proxyRes.pipe(res)
+    })
+
+    proxyReq.on('error', (err) => {
+      console.error('[error]', err.message)
+      if (!res.headersSent) {
+        res.writeHead(502, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: err.message }))
+      }
+    })
+
+    req.pipe(proxyReq)
   })
 
-  proxyReq.on('error', (err) => {
-    console.error('[error]', err.message)
-    if (!res.headersSent) {
-      res.writeHead(502, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ error: err.message }))
-    }
+  server.listen(port, '127.0.0.1', () => {
+    console.log('')
+    console.log('  ✓ Proxy đang chạy!')
+    console.log('  Target : ' + target)
+    console.log('  Port   : ' + port)
+    console.log('')
+    console.log('  → Trong Timeline app, set Host to:')
+    console.log('    http://localhost:' + port)
+    console.log('')
+    console.log('  Nhấn Ctrl+C để dừng.')
+    console.log('')
   })
 
-  req.pipe(proxyReq)
-})
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error('  Port ' + port + ' đang bị chiếm. Thử port khác...')
+      startProxy(target, port + 1)
+    } else {
+      console.error('  Server error:', err.message)
+    }
+  })
+}
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log('='.repeat(50))
-  console.log('  Jira CORS Proxy — READY')
-  console.log('='.repeat(50))
+function askAndStart() {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+
+  console.log('='.repeat(52))
+  console.log('  Jira CORS Proxy')
+  console.log('='.repeat(52))
   console.log('')
-  console.log('  Proxy URL : http://localhost:' + PORT)
-  console.log('  Target    : ' + TARGET)
-  console.log('')
-  console.log('  → Trong Timeline app, set Host to:')
-  console.log('    http://localhost:' + PORT)
-  console.log('')
-  console.log('  Ctrl+C to stop')
-  console.log('')
-})
+
+  const savedTargets = []
+
+  rl.question('  Jira URL (vd: https://jira.company.com): ', (target) => {
+    const t = target.trim()
+    if (!t) { console.log('  Cần nhập URL.'); rl.close(); askAndStart(); return }
+
+    rl.question('  Port [8765]: ', (portStr) => {
+      const port = parseInt(portStr.trim() || '8765', 10)
+      rl.close()
+      console.log('')
+      console.log('  Đang khởi động...')
+      startProxy(t, port)
+    })
+  })
+}
+
+// Entry point
+const argTarget = process.argv[2]
+const argPort = parseInt(process.argv[3] || '8765', 10)
+
+if (argTarget) {
+  startProxy(argTarget, argPort)
+} else {
+  askAndStart()
+}
