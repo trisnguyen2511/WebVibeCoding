@@ -279,6 +279,18 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     return `${h.replace(/\/$/, '').replace(/^(?!https?:\/\/)/, 'https://')}/browse/${key}`
   }
 
+  function dedupeByJira(list: Task[]): Task[] {
+    const jiraMap = new Map<string, Task>()
+    const nonJira: Task[] = []
+    for (const t of list) {
+      const key = t.jiraId || t.jiraKey
+      if (!key) { nonJira.push(t); continue }
+      const prev = jiraMap.get(key)
+      if (!prev || (t.timeEntries?.length ?? 0) > (prev.timeEntries?.length ?? 0)) jiraMap.set(key, t)
+    }
+    return [...nonJira, ...jiraMap.values()]
+  }
+
   function mergePulledIssues(issues: IssueRow[], parentMap: Record<string, string>) {
     // Extract parent names embedded in each subtask's parent field (avoids a second query)
     for (const issue of issues) {
@@ -288,7 +300,9 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     }
 
     const logs: JiraSyncLog[] = []
-    const base: Task[] = syncMode === 'clear' ? [] : syncMode === 'replace' ? tasks.filter(t => !t.jiraId) : [...tasks]
+    const rawBase: Task[] = syncMode === 'clear' ? [] : syncMode === 'replace' ? tasks.filter(t => !t.jiraId) : [...tasks]
+    // Deduplicate stale Jira duplicates before merging (keep the task with most timeEntries)
+    const base = dedupeByJira(rawBase)
     const result: Task[] = [...base]
     for (const issue of issues) {
       const existingIdx = result.findIndex(t => t.jiraId === issue.id || t.jiraKey === issue.key)
