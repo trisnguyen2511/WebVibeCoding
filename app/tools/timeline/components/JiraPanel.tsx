@@ -25,7 +25,8 @@ async function jiraRequest(
 ): Promise<unknown> {
   const base = config.host.trim().replace(/\/$/, '').replace(/^(?!https?:\/\/)/, 'https://')
   const url = `${base}/rest/api/2${path}`
-  const auth = serverMode
+  // local-proxy: email is empty → use Bearer PAT; serverMode: also Bearer; direct: Basic email:token
+  const auth = (serverMode || !config.email)
     ? `Bearer ${config.token}`
     : `Basic ${btoa(`${config.email}:${config.token}`)}`
   const headers: Record<string, string> = { 'Authorization': auth, 'Accept': 'application/json' }
@@ -110,7 +111,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   const [uploadCurls, setUploadCurls] = useState('')
 
   function getConfig(): JiraConfig { return { host: host.trim(), email: email.trim(), token: token.trim() } }
-  function getProxyConfig(): JiraConfig { return { host: `http://127.0.0.1:${proxyPort.trim() || '8765'}`, email: '', token: proxyToken.trim() } }
+  function getProxyConfig(): JiraConfig { return { host: `https://127.0.0.1:${proxyPort.trim() || '8765'}`, email: '', token: proxyToken.trim() } }
   const isDirectMode = fetchMode === 'direct' || fetchMode === 'local-proxy'
   const curlMode = fetchMode === 'curl'
   function req(path: string, method = 'GET', data?: unknown) {
@@ -392,7 +393,8 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 <ol className="space-y-1 text-[11px] text-muted list-decimal list-inside leading-relaxed">
                   <li>Giải nén → mở <span className="font-mono text-fg">config.json</span> → sửa URL Jira</li>
                   <li>Bật VPN → double-click <span className="font-mono text-fg">run.bat</span></li>
-                  <li>Nhập Port và Token bên dưới rồi bấm Test Connection</li>
+                  <li>Mở link &quot;Chấp nhận cert&quot; bên dưới → click <em>Advanced → Proceed</em> (1 lần duy nhất)</li>
+                  <li>Nhập Port và Token rồi bấm Test Connection</li>
                 </ol>
                 <div className="space-y-2">
                   <div className="flex gap-2 items-center">
@@ -400,7 +402,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                     <input value={proxyPort} onChange={e => setProxyPort(e.target.value)}
                       placeholder="8765"
                       className="w-24 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-fg font-mono placeholder:text-muted focus:border-accent focus:outline-none" />
-                    <span className="text-[11px] text-muted font-mono truncate">→ 127.0.0.1:{proxyPort || '8765'}</span>
+                    <span className="text-[11px] text-muted font-mono truncate">→ https://127.0.0.1:{proxyPort || '8765'}</span>
                   </div>
                   <input type="password" value={proxyToken} onChange={e => setProxyToken(e.target.value)}
                     placeholder="Personal Access Token (PAT)"
@@ -411,12 +413,12 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                   Test Connection
                 </button>
                 <div className="space-y-1 pt-1">
-                  <a href={`http://127.0.0.1:${proxyPort.trim() || '8765'}/health`} target="_blank" rel="noreferrer"
-                    className="flex items-center justify-center gap-1.5 w-full rounded-lg border border-border py-1.5 text-xs text-muted hover:text-fg hover:border-border/80 transition-colors">
-                    <MonitorDot size={11} />Kiểm tra proxy
+                  <a href={`https://127.0.0.1:${proxyPort.trim() || '8765'}/health`} target="_blank" rel="noreferrer"
+                    className="flex items-center justify-center gap-1.5 w-full rounded-lg border border-accent/30 py-1.5 text-xs text-accent-soft hover:bg-accent/10 transition-colors">
+                    <MonitorDot size={11} />Chấp nhận cert (bắt buộc lần đầu)
                   </a>
                   <p className="text-[10px] text-muted text-center leading-relaxed">
-                    Nếu tab mới hiện JSON <span className="font-mono">{'{'}status: ok{'}'}</span> → proxy đang chạy đúng
+                    Tab mới hiện cảnh báo bảo mật → click <em>Advanced → Proceed to 127.0.0.1 (unsafe)</em> → thấy JSON là OK
                   </p>
                 </div>
               </div>
