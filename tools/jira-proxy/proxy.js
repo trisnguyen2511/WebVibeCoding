@@ -47,16 +47,33 @@ function startProxy(cfg) {
   const isHttps = targetUrl.protocol === 'https:'
   const lib = isHttps ? https : http
 
-  const server = http.createServer((req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept, X-Atlassian-Token')
-    res.setHeader('Access-Control-Allow-Private-Network', 'true')
-    res.setHeader('Access-Control-Max-Age', '86400')
+  const CORS_HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept, X-Atlassian-Token',
+    'Access-Control-Allow-Private-Network': 'true',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
+  }
 
+  const server = http.createServer((req, res) => {
+    // Log every request (status logged on finish)
+    res.on('finish', () => {
+      console.log(`[${req.method}] ${req.url} → ${res.statusCode}`)
+    })
+
+    // Preflight
     if (req.method === 'OPTIONS') {
-      res.writeHead(204)
+      res.writeHead(204, CORS_HEADERS)
       res.end()
+      return
+    }
+
+    // Health check — browser navigation (not fetch) so no PNA block
+    if (req.url === '/health') {
+      const body = JSON.stringify({ status: 'ok', port: port })
+      res.writeHead(200, { ...CORS_HEADERS, 'Content-Type': 'application/json' })
+      res.end(body)
       return
     }
 
@@ -70,7 +87,8 @@ function startProxy(cfg) {
     }
 
     const proxyReq = lib.request(options, (proxyRes) => {
-      const headers = {}
+      // Strip upstream CORS headers then re-apply ours explicitly
+      const headers = { ...CORS_HEADERS }
       for (const [k, v] of Object.entries(proxyRes.headers)) {
         if (!k.toLowerCase().startsWith('access-control-')) headers[k] = v
       }
@@ -81,7 +99,7 @@ function startProxy(cfg) {
     proxyReq.on('error', (err) => {
       console.error('[error]', err.message)
       if (!res.headersSent) {
-        res.writeHead(502, { 'Content-Type': 'application/json' })
+        res.writeHead(502, { ...CORS_HEADERS, 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ error: err.message }))
       }
     })

@@ -410,6 +410,15 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                   className="w-full rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
                   Test Connection
                 </button>
+                <div className="space-y-1 pt-1">
+                  <a href={`http://127.0.0.1:${proxyPort.trim() || '8765'}/health`} target="_blank" rel="noreferrer"
+                    className="flex items-center justify-center gap-1.5 w-full rounded-lg border border-border py-1.5 text-xs text-muted hover:text-fg hover:border-border/80 transition-colors">
+                    <MonitorDot size={11} />Kiểm tra proxy
+                  </a>
+                  <p className="text-[10px] text-muted text-center leading-relaxed">
+                    Nếu tab mới hiện JSON <span className="font-mono">{'{'}status: ok{'}'}</span> → proxy đang chạy đúng
+                  </p>
+                </div>
               </div>
             )}
           </div>
