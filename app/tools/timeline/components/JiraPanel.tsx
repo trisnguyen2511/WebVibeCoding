@@ -711,7 +711,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
             {fetchMode === 'curl' ? (
               <div className="space-y-2">
                 <button onClick={generateUploadCurls} disabled={!hasPushableData}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg border border-accent/40 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
+                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40">
                   <Terminal size={13} />Generate curls — Upload Time ({manualEntryCount})
                 </button>
                 {uploadCurls && (
@@ -726,7 +726,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
               </div>
             ) : (
               <button onClick={handleUploadTime} disabled={step === 'uploading' || !hasCredentials || !hasPushableData}
-                className="w-full flex items-center justify-center gap-2 rounded-lg border border-accent/40 py-2.5 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40">
                 {step === 'uploading' ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                 {step === 'uploading' ? 'Uploading...' : 'Push Time Entries → Jira'}
               </button>
