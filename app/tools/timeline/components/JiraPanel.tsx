@@ -373,6 +373,8 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     ? !!(proxyPort.trim() && proxyToken.trim())
     : !!(host.trim() && token.trim())
   const manualEntryCount = tasks.filter(t => t.jiraId).reduce((n, t) => n + t.timeEntries.filter(e => e.source === 'manual').length, 0)
+  const fieldsTaskCount  = tasks.filter(t => t.jiraId && (t.estimateHours || t.dueDate || t.actualStartDate || t.actualEndDate)).length
+  const hasPushableData  = manualEntryCount > 0 || fieldsTaskCount > 0
 
   return (
     <>
@@ -646,10 +648,11 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
             <p className="text-xs text-muted">
               Worklogs + estimate + due date.
               {manualEntryCount > 0 && ` ${manualEntryCount} entr${manualEntryCount === 1 ? 'y' : 'ies'} ready.`}
+              {fieldsTaskCount > 0 && ` ${fieldsTaskCount} task${fieldsTaskCount === 1 ? '' : 's'} with fields.`}
             </p>
             {fetchMode === 'curl' ? (
               <div className="space-y-2">
-                <button onClick={generateUploadCurls} disabled={manualEntryCount === 0}
+                <button onClick={generateUploadCurls} disabled={!hasPushableData}
                   className="w-full flex items-center justify-center gap-2 rounded-lg border border-accent/40 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
                   <Terminal size={13} />Generate curls — Upload Time ({manualEntryCount})
                 </button>
@@ -664,7 +667,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 )}
               </div>
             ) : (
-              <button onClick={handleUploadTime} disabled={step === 'uploading' || !hasCredentials || manualEntryCount === 0}
+              <button onClick={handleUploadTime} disabled={step === 'uploading' || !hasCredentials || !hasPushableData}
                 className="w-full flex items-center justify-center gap-2 rounded-lg border border-accent/40 py-2.5 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
                 {step === 'uploading' ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                 {step === 'uploading' ? 'Uploading...' : 'Push Time Entries → Jira'}
