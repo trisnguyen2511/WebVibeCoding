@@ -67,18 +67,21 @@ type JiraBaseline = Record<string, {
   actualStartDate: string | null
   actualEndDate: string | null
   manualCount: number
+  manualHours: number
 }>
 
 function buildBaseline(tasks: Task[]): JiraBaseline {
   const b: JiraBaseline = {}
   for (const t of tasks) {
     if (!t.jiraId) continue
+    const manual = t.timeEntries.filter(e => e.source === 'manual')
     b[t.jiraId] = {
       estimateHours: t.estimateHours ?? null,
       dueDate: t.dueDate ?? null,
       actualStartDate: t.actualStartDate ?? null,
       actualEndDate: t.actualEndDate ?? null,
-      manualCount: t.timeEntries.filter(e => e.source === 'manual').length,
+      manualCount: manual.length,
+      manualHours: manual.reduce((s, e) => s + e.hours, 0),
     }
   }
   return b
@@ -420,7 +423,9 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   const manualEntryCount = tasks.filter(t => t.jiraId).reduce((n, t) => n + t.timeEntries.filter(e => e.source === 'manual').length, 0)
   const fieldsTaskCount  = tasks.filter(t => {
     if (!t.jiraId) return false
-    const manualCount = t.timeEntries.filter(e => e.source === 'manual').length
+    const manual = t.timeEntries.filter(e => e.source === 'manual')
+    const manualCount = manual.length
+    const manualHours = manual.reduce((s, e) => s + e.hours, 0)
     if (!baseline) return manualCount > 0
     const b = baseline[t.jiraId]
     if (!b) return manualCount > 0
@@ -429,7 +434,8 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       (t.dueDate ?? null) !== b.dueDate ||
       (t.actualStartDate ?? null) !== b.actualStartDate ||
       (t.actualEndDate ?? null) !== b.actualEndDate ||
-      manualCount !== b.manualCount
+      manualCount !== b.manualCount ||
+      manualHours !== b.manualHours
     )
   }).length
   const hasPushableData  = fieldsTaskCount > 0
