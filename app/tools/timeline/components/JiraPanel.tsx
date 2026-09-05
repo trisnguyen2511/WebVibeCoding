@@ -63,6 +63,8 @@ function buildCurl(host: string, token: string, path: string, method = 'GET', bo
 // ── Baseline tracking (detect changes since last pull/push) ──
 type JiraBaseline = Record<string, {
   estimateHours: number | null
+  estimateStartDate: string | null
+  estimateEndDate: string | null
   dueDate: string | null
   actualStartDate: string | null
   actualEndDate: string | null
@@ -77,6 +79,8 @@ function buildBaseline(tasks: Task[]): JiraBaseline {
     const manual = t.timeEntries.filter(e => e.source === 'manual')
     b[t.jiraId] = {
       estimateHours: t.estimateHours ?? null,
+      estimateStartDate: t.estimateStartDate ?? null,
+      estimateEndDate: t.estimateEndDate ?? null,
       dueDate: t.dueDate ?? null,
       actualStartDate: t.actualStartDate ?? null,
       actualEndDate: t.actualEndDate ?? null,
@@ -308,6 +312,8 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       // 2. Update estimate + due date on the Jira issue
       const fields: Record<string, unknown> = {}
       if (task.estimateHours) fields.timeoriginalestimate = Math.round(task.estimateHours * 3600)
+      if (task.estimateStartDate) fields.customfield_estimatestart = task.estimateStartDate
+      if (task.estimateEndDate)   fields.customfield_estimateend   = task.estimateEndDate
       if (task.dueDate) fields.duedate = task.dueDate
       if (task.actualStartDate) fields.customfield_actualstart = task.actualStartDate
       if (task.actualEndDate)   fields.customfield_actualend   = task.actualEndDate
@@ -431,6 +437,8 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     if (!b) return manualCount > 0
     return (
       (t.estimateHours ?? null) !== b.estimateHours ||
+      (t.estimateStartDate ?? null) !== b.estimateStartDate ||
+      (t.estimateEndDate ?? null) !== b.estimateEndDate ||
       (t.dueDate ?? null) !== b.dueDate ||
       (t.actualStartDate ?? null) !== b.actualStartDate ||
       (t.actualEndDate ?? null) !== b.actualEndDate ||
