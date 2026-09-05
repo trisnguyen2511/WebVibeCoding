@@ -74,6 +74,7 @@ export interface ExportData {
   projects: Project[]
   tasks: Task[]
   collapsedParents?: Record<string, string[]>  // projectId → collapsed parentKeys
+  proxyConfig?: { port: string; token: string }  // Local Proxy settings (sensitive, opt-in)
 }
 
 export interface JiraSyncLog {

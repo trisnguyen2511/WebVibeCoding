@@ -9,7 +9,7 @@ import {
 import { ToolShell } from '@/components/tool-shell'
 import {
   getProject, getTasks, saveProject, saveTask, deleteTask,
-  upsertTimeEntry, deleteTimeEntry, exportData,
+  upsertTimeEntry, deleteTimeEntry, exportData, PROXY_TOKEN_KEY,
 } from '@/lib/timeline-storage'
 import type { Project, Task, Sprint, TimeEntry, JiraConfig } from '@/lib/timeline-types'
 import { GanttChart } from '../components/GanttChart'
@@ -147,17 +147,18 @@ export default function ProjectPage({ params }: PageProps) {
 
   function handleExport() {
     if (!project) return
-    // If project has a Jira token, show confirmation modal first
-    if (project.jiraConfig?.token) {
+    const hasJiraToken  = !!project.jiraConfig?.token
+    const hasProxyToken = !!(typeof window !== 'undefined' && localStorage.getItem(PROXY_TOKEN_KEY))
+    if (hasJiraToken || hasProxyToken) {
       setShowExportModal(true)
     } else {
-      doExport(false)
+      doExport(false, false)
     }
   }
 
-  function doExport(includeSensitive: boolean) {
+  function doExport(includeSensitive: boolean, includeProxyToken: boolean) {
     if (!project) return
-    const data = exportData(projectId, { includeSensitive })
+    const data = exportData(projectId, { includeSensitive, includeProxyToken })
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
@@ -329,6 +330,8 @@ export default function ProjectPage({ params }: PageProps) {
       {showExportModal && (
         <ExportModal
           onExport={doExport}
+          hasJiraToken={!!project?.jiraConfig?.token}
+          hasProxyToken={!!(typeof window !== 'undefined' && localStorage.getItem(PROXY_TOKEN_KEY))}
           onClose={() => setShowExportModal(false)}
         />
       )}
@@ -389,11 +392,36 @@ export default function ProjectPage({ params }: PageProps) {
 
 // ── Export Modal ───────────────────────────────────────────────
 
-function ExportModal({ onExport, onClose }: {
-  onExport: (includeSensitive: boolean) => void
-  onClose: () => void
+function CheckRow({ checked, onChange, label, sub }: {
+  checked: boolean; onChange: (v: boolean) => void; label: string; sub: string
 }) {
-  const [includeSensitive, setIncludeSensitive] = useState(false)
+  return (
+    <label className="flex items-start gap-3 cursor-pointer group">
+      <div className="mt-0.5 relative shrink-0">
+        <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="sr-only" />
+        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+          checked ? 'bg-accent border-accent' : 'border-border group-hover:border-accent/50'
+        }`}>
+          {checked && <svg viewBox="0 0 10 8" className="w-2.5 h-2 fill-none stroke-white stroke-2"><polyline points="1,4 3.5,6.5 9,1" /></svg>}
+        </div>
+      </div>
+      <div>
+        <p className="text-sm text-fg leading-snug">{label}</p>
+        <p className="text-xs text-muted mt-0.5">{sub}</p>
+      </div>
+    </label>
+  )
+}
+
+function ExportModal({ onExport, onClose, hasJiraToken, hasProxyToken }: {
+  onExport: (includeSensitive: boolean, includeProxyToken: boolean) => void
+  onClose: () => void
+  hasJiraToken: boolean
+  hasProxyToken: boolean
+}) {
+  const [includeSensitive,  setIncludeSensitive]  = useState(false)
+  const [includeProxyToken, setIncludeProxyToken] = useState(false)
+  const anySelected = includeSensitive || includeProxyToken
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
@@ -403,57 +431,41 @@ function ExportModal({ onExport, onClose }: {
         <h3 className="font-display font-semibold text-fg mb-1">Export Timeline</h3>
         <p className="text-sm text-muted mb-5">Download project data as JSON for backup or sharing.</p>
 
-        {/* Sensitive data section */}
-        <div className="rounded-xl border border-border bg-background p-4 mb-5">
-          <p className="text-xs font-semibold text-fg/70 uppercase tracking-wider mb-3">Sensitive Data</p>
-
-          <label className="flex items-start gap-3 cursor-pointer group">
-            <div className="mt-0.5 relative shrink-0">
-              <input
-                type="checkbox"
-                checked={includeSensitive}
-                onChange={e => setIncludeSensitive(e.target.checked)}
-                className="sr-only"
-              />
-              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                includeSensitive ? 'bg-accent border-accent' : 'border-border group-hover:border-accent/50'
-              }`}>
-                {includeSensitive && (
-                  <svg viewBox="0 0 10 8" className="w-2.5 h-2 fill-none stroke-white stroke-2">
-                    <polyline points="1,4 3.5,6.5 9,1" />
-                  </svg>
-                )}
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-fg leading-snug">Include Jira token</p>
-              <p className="text-xs text-muted mt-0.5">
-                {includeSensitive
-                  ? 'Token sẽ được ghi vào file — không chia sẻ file này công khai.'
-                  : 'Token sẽ bị xóa khỏi file (mặc định an toàn).'}
-              </p>
-            </div>
-          </label>
+        <div className="rounded-xl border border-border bg-background p-4 mb-5 space-y-3">
+          <p className="text-xs font-semibold text-fg/70 uppercase tracking-wider">Sensitive Data</p>
+          {hasJiraToken && (
+            <CheckRow
+              checked={includeSensitive}
+              onChange={setIncludeSensitive}
+              label="Include Jira token"
+              sub={includeSensitive ? 'Token sẽ được ghi vào file.' : 'Token sẽ bị xóa khỏi file (mặc định an toàn).'}
+            />
+          )}
+          {hasProxyToken && (
+            <CheckRow
+              checked={includeProxyToken}
+              onChange={setIncludeProxyToken}
+              label="Include Local Proxy PAT"
+              sub={includeProxyToken ? 'PAT proxy sẽ được ghi vào file.' : 'PAT proxy sẽ bị xóa khỏi file (mặc định an toàn).'}
+            />
+          )}
         </div>
 
-        {/* Warning when sensitive is on */}
-        {includeSensitive && (
+        {anySelected && (
           <div className="flex items-start gap-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 px-3 py-2.5 mb-5">
             <span className="text-yellow-400 text-sm leading-none mt-px">⚠</span>
             <p className="text-xs text-yellow-300/90">
-              File export sẽ chứa Jira API token. Hãy bảo mật file và không commit lên git.
+              File export sẽ chứa token nhạy cảm. Hãy bảo mật file và không commit lên git.
             </p>
           </div>
         )}
 
         <div className="flex gap-2">
-          <button
-            onClick={onClose}
+          <button onClick={onClose}
             className="flex-1 rounded-xl border border-border py-2.5 text-sm text-muted hover:text-fg transition-colors">
             Hủy
           </button>
-          <button
-            onClick={() => onExport(includeSensitive)}
+          <button onClick={() => onExport(includeSensitive, includeProxyToken)}
             className="flex-1 rounded-xl bg-accent py-2.5 text-sm font-medium text-white hover:bg-accent/90 transition-colors">
             Export JSON
           </button>

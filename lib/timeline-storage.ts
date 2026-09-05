@@ -88,11 +88,13 @@ export function deleteTimeEntry(taskId: string, entryId: string): void {
   write(TASKS_KEY, all)
 }
 
-export function exportData(projectId?: string, opts?: { includeSensitive?: boolean }): ExportData {
+export const PROXY_PORT_KEY  = 'timeline:proxy:port'
+export const PROXY_TOKEN_KEY = 'timeline:proxy:token'
+
+export function exportData(projectId?: string, opts?: { includeSensitive?: boolean; includeProxyToken?: boolean }): ExportData {
   const rawProjects = projectId ? getProjects().filter(p => p.id === projectId) : getProjects()
   const projects: Project[] = rawProjects.map(p => {
     if (opts?.includeSensitive || !p.jiraConfig) return p
-    // Strip token when not explicitly included
     return { ...p, jiraConfig: { ...p.jiraConfig, token: '' } }
   })
   const projectIds = new Set(projects.map(p => p.id))
@@ -104,7 +106,13 @@ export function exportData(projectId?: string, opts?: { includeSensitive?: boole
       if (raw) collapsedParents[id] = JSON.parse(raw) as string[]
     } catch { /* noop */ }
   })
-  return { version: '1.0', exportedAt: new Date().toISOString(), projects, tasks, collapsedParents }
+  const result: ExportData = { version: '1.0', exportedAt: new Date().toISOString(), projects, tasks, collapsedParents }
+  if (opts?.includeProxyToken) {
+    const port  = localStorage.getItem(PROXY_PORT_KEY)  || '8765'
+    const token = localStorage.getItem(PROXY_TOKEN_KEY) || ''
+    if (token) result.proxyConfig = { port, token }
+  }
+  return result
 }
 
 export function importData(data: ExportData): void {
@@ -128,5 +136,11 @@ export function importData(data: ExportData): void {
     for (const [id, keys] of Object.entries(data.collapsedParents)) {
       try { localStorage.setItem(`timeline:collapsed:${id}`, JSON.stringify(keys)) } catch { /* noop */ }
     }
+  }
+  if (data.proxyConfig?.token) {
+    try {
+      localStorage.setItem(PROXY_PORT_KEY,  data.proxyConfig.port  || '8765')
+      localStorage.setItem(PROXY_TOKEN_KEY, data.proxyConfig.token)
+    } catch { /* noop */ }
   }
 }

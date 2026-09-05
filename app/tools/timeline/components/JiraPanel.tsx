@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Plug, RefreshCw, Upload, CheckCircle, AlertCircle, Loader2, RotateCcw, Copy, Terminal, Download, MonitorDot } from 'lucide-react'
 import type { Project, Task, JiraConfig, JiraSyncLog, JiraUploadLog } from '@/lib/timeline-types'
-import { generateId } from '@/lib/timeline-storage'
+import { generateId, PROXY_PORT_KEY, PROXY_TOKEN_KEY } from '@/lib/timeline-storage'
 
 interface Props {
   project: Project
@@ -95,11 +95,16 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   })
   // 'curl' | 'direct' | 'local-proxy'
   type FetchMode = 'curl' | 'direct' | 'local-proxy'
-  const [fetchMode, setFetchMode] = useState<FetchMode>('curl')
+  const [fetchMode, setFetchMode] = useState<FetchMode>('local-proxy')
 
-  // Local Proxy — separate fields, don't affect curl/direct tabs
-  const [proxyPort,  setProxyPort]  = useState('8765')
-  const [proxyToken, setProxyToken] = useState('')
+  // Local Proxy — persisted to localStorage
+  const [proxyPort,  setProxyPort]  = useState(() =>
+    (typeof window !== 'undefined' ? localStorage.getItem(PROXY_PORT_KEY)  : null) ?? '8765')
+  const [proxyToken, setProxyToken] = useState(() =>
+    (typeof window !== 'undefined' ? localStorage.getItem(PROXY_TOKEN_KEY) : null) ?? '')
+
+  useEffect(() => { localStorage.setItem(PROXY_PORT_KEY,  proxyPort)  }, [proxyPort])
+  useEffect(() => { localStorage.setItem(PROXY_TOKEN_KEY, proxyToken) }, [proxyToken])
 
   const [jql,      setJql]      = useState(DEFAULT_JQL)
   const [syncMode, setSyncMode] = useState<'merge' | 'replace' | 'clear'>('replace')
