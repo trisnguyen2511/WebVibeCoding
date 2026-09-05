@@ -111,7 +111,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   const [uploadCurls, setUploadCurls] = useState('')
 
   function getConfig(): JiraConfig { return { host: host.trim(), email: email.trim(), token: token.trim() } }
-  function getProxyConfig(): JiraConfig { return { host: `https://127.0.0.1:${proxyPort.trim() || '8765'}`, email: '', token: proxyToken.trim() } }
+  function getProxyConfig(): JiraConfig { return { host: `http://127.0.0.1:${proxyPort.trim() || '8765'}`, email: '', token: proxyToken.trim() } }
   const isDirectMode = fetchMode === 'direct' || fetchMode === 'local-proxy'
   const curlMode = fetchMode === 'curl'
   function req(path: string, method = 'GET', data?: unknown) {
@@ -404,23 +404,20 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                     <input value={proxyPort} onChange={e => setProxyPort(e.target.value)}
                       placeholder="8765"
                       className="w-24 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-fg font-mono placeholder:text-muted focus:border-accent focus:outline-none" />
-                    <span className="text-[11px] text-muted font-mono truncate">→ https://127.0.0.1:{proxyPort || '8765'}</span>
+                    <span className="text-[11px] text-muted font-mono truncate">→ http://127.0.0.1:{proxyPort || '8765'}</span>
                   </div>
                   <input type="password" value={proxyToken} onChange={e => setProxyToken(e.target.value)}
                     placeholder="Personal Access Token (PAT)"
                     className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none font-mono" />
                 </div>
-                <p className="text-[11px] text-muted leading-relaxed">
-                  <span className="text-amber-400 font-medium">Lần đầu:</span> bấm <span className="font-medium text-fg">Accept Cert</span> → Chrome hiện cảnh báo → click <em>Advanced → Proceed</em>. Chỉ cần làm 1 lần.
-                </p>
                 <div className="flex gap-2">
                   <button onClick={testConnection} disabled={!hasCredentials}
                     className="flex-1 rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
                     Test Connection
                   </button>
-                  <a href={`https://127.0.0.1:${proxyPort.trim() || '8765'}/health`} target="_blank" rel="noreferrer"
-                    className="flex items-center gap-1 rounded-lg border border-amber-500/40 px-3 py-2 text-xs text-amber-400 hover:bg-amber-500/10 transition-colors whitespace-nowrap">
-                    <MonitorDot size={11} />Accept Cert
+                  <a href={`http://127.0.0.1:${proxyPort.trim() || '8765'}/health`} target="_blank" rel="noreferrer"
+                    className="flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs text-muted hover:text-fg hover:border-border/80 transition-colors">
+                    <MonitorDot size={11} />Ping
                   </a>
                 </div>
               </div>

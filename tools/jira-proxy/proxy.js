@@ -160,18 +160,15 @@ function startProxy(cfg) {
     req.pipe(proxyReq)
   }
 
-  const server = https.createServer({ cert: CERT, key: KEY }, handler)
+  const server = http.createServer(handler)
 
-  server.listen(port, '0.0.0.0', () => {
+  server.listen(port, '127.0.0.1', () => {
     console.log('')
-    console.log('  ✓ Proxy đang chạy (HTTPS)!')
+    console.log('  ✓ Proxy đang chạy!')
     console.log('  Target : ' + target)
     console.log('  Port   : ' + port)
     console.log('')
-    console.log('  → Lần đầu: mở Chrome và truy cập URL bên dưới,')
-    console.log('    bấm Advanced → Proceed to 127.0.0.1 để chấp nhận cert:')
-    console.log('    https://127.0.0.1:' + port + '/health')
-    console.log('')
+    console.log('  → Kiểm tra: http://127.0.0.1:' + port + '/health')
     console.log('  → Trong Timeline app, set port = ' + port)
     console.log('  Nhấn Ctrl+C để dừng.')
     console.log('')
