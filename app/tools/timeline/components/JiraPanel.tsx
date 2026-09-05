@@ -172,7 +172,15 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       if (!id) throw new Error('Invalid response — check host URL and credentials')
       setError(`✓ Connected as ${res.displayName ?? id}`)
       onUpdateConfig(getConfig())
-    } catch (e) { setError(`Connection failed: ${e instanceof Error ? e.message : String(e)}`) }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      const isCert = msg.includes('fetch') || msg.includes('network') || msg.toLowerCase().includes('failed')
+      if (fetchMode === 'local-proxy' && isCert) {
+        setError('⚠ Cert chưa được chấp nhận — mở link "Chấp nhận cert" bên dưới, click Advanced → Proceed to 127.0.0.1 (unsafe), rồi thử lại.')
+      } else {
+        setError(`Connection failed: ${msg}`)
+      }
+    }
   }
 
   async function syncTasks() {
@@ -390,12 +398,6 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                   className="flex items-center justify-center gap-2 w-full rounded-lg bg-accent py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors">
                   <Download size={13} />Tải jira-proxy.zip
                 </a>
-                <ol className="space-y-1 text-[11px] text-muted list-decimal list-inside leading-relaxed">
-                  <li>Giải nén → mở <span className="font-mono text-fg">config.json</span> → sửa URL Jira</li>
-                  <li>Bật VPN → double-click <span className="font-mono text-fg">run.bat</span></li>
-                  <li>Mở link &quot;Chấp nhận cert&quot; bên dưới → click <em>Advanced → Proceed</em> (1 lần duy nhất)</li>
-                  <li>Nhập Port và Token rồi bấm Test Connection</li>
-                </ol>
                 <div className="space-y-2">
                   <div className="flex gap-2 items-center">
                     <span className="text-[11px] text-muted whitespace-nowrap">Port proxy</span>
@@ -408,19 +410,21 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                     placeholder="Personal Access Token (PAT)"
                     className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none font-mono" />
                 </div>
-                <button onClick={testConnection} disabled={!hasCredentials}
-                  className="w-full rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
-                  Test Connection
-                </button>
-                <div className="space-y-1 pt-1">
+                {/* Step 1: Accept cert — must do before Test Connection */}
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-2.5 space-y-1.5">
+                  <p className="text-[11px] text-yellow-400 font-medium">Bước 1 — Chấp nhận cert (bắt buộc, chỉ làm 1 lần)</p>
                   <a href={`https://127.0.0.1:${proxyPort.trim() || '8765'}/health`} target="_blank" rel="noreferrer"
-                    className="flex items-center justify-center gap-1.5 w-full rounded-lg border border-accent/30 py-1.5 text-xs text-accent-soft hover:bg-accent/10 transition-colors">
-                    <MonitorDot size={11} />Chấp nhận cert (bắt buộc lần đầu)
+                    className="flex items-center justify-center gap-1.5 w-full rounded-lg border border-yellow-500/40 py-1.5 text-xs text-yellow-300 hover:bg-yellow-500/10 transition-colors">
+                    <MonitorDot size={11} />Mở https://127.0.0.1:{proxyPort || '8765'}/health
                   </a>
-                  <p className="text-[10px] text-muted text-center leading-relaxed">
-                    Tab mới hiện cảnh báo bảo mật → click <em>Advanced → Proceed to 127.0.0.1 (unsafe)</em> → thấy JSON là OK
+                  <p className="text-[10px] text-muted leading-relaxed">
+                    Tab mới hiện cảnh báo → click <strong className="text-fg">Advanced</strong> → <strong className="text-fg">Proceed to 127.0.0.1 (unsafe)</strong> → thấy JSON là xong
                   </p>
                 </div>
+                <button onClick={testConnection} disabled={!hasCredentials}
+                  className="w-full rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
+                  Bước 2 — Test Connection
+                </button>
               </div>
             )}
           </div>
