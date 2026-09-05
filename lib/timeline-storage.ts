@@ -46,10 +46,38 @@ function getAllTasks(): Task[] {
   return read<Task[]>(TASKS_KEY, [])
 }
 
+function dedupeJiraTasks(list: Task[]): Task[] {
+  // Find the best task (most timeEntries) for each jiraKey/jiraId
+  const winner = new Map<string, Task>()
+  for (const t of list) {
+    const key = t.jiraKey || t.jiraId
+    if (!key) continue
+    const prev = winner.get(key)
+    if (!prev || (t.timeEntries?.length ?? 0) > (prev.timeEntries?.length ?? 0)) winner.set(key, t)
+  }
+  // Preserve order of first occurrence; replace with winner content
+  const seen = new Set<string>()
+  const result: Task[] = []
+  for (const t of list) {
+    const key = t.jiraKey || t.jiraId
+    if (!key) { result.push(t); continue }
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(winner.get(key)!)
+  }
+  return result
+}
+
 export function getTasks(projectId: string): Task[] {
-  return getAllTasks()
-    .filter(t => t.projectId === projectId)
-    .sort((a, b) => a.order - b.order)
+  const all = getAllTasks()
+  const filtered = all.filter(t => t.projectId === projectId).sort((a, b) => a.order - b.order)
+  const deduped = dedupeJiraTasks(filtered)
+  if (deduped.length < filtered.length) {
+    // Auto-heal storage: remove duplicate Jira tasks
+    const keptIds = new Set(deduped.map(t => t.id))
+    write(TASKS_KEY, all.filter(t => t.projectId !== projectId || keptIds.has(t.id)))
+  }
+  return deduped
 }
 
 export function getTask(id: string): Task | undefined {

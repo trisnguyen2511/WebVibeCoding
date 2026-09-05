@@ -288,7 +288,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     const jiraMap = new Map<string, Task>()
     const nonJira: Task[] = []
     for (const t of list) {
-      const key = t.jiraId || t.jiraKey
+      const key = t.jiraKey || t.jiraId
       if (!key) { nonJira.push(t); continue }
       const prev = jiraMap.get(key)
       if (!prev || (t.timeEntries?.length ?? 0) > (prev.timeEntries?.length ?? 0)) jiraMap.set(key, t)
