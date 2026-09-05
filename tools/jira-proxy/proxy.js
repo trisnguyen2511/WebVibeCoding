@@ -98,16 +98,20 @@ function startProxy(cfg) {
   const isHttps = targetUrl.protocol === 'https:'
   const lib = isHttps ? https : http
 
-  const CORS_HEADERS = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept, X-Atlassian-Token',
-    'Access-Control-Allow-Private-Network': 'true',
-    'Access-Control-Max-Age': '86400',
-    'Vary': 'Origin',
-  }
-
   const handler = (req, res) => {
+    // Reflect exact Origin to satisfy Chrome 130+ Private Network Access (PNA) spec.
+    // PNA requires Access-Control-Allow-Origin to echo the request origin (not '*')
+    // when Access-Control-Allow-Private-Network: true is present.
+    const origin = req.headers.origin || '*'
+    const CORS_HEADERS = {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept, X-Atlassian-Token',
+      'Access-Control-Allow-Private-Network': 'true',
+      'Access-Control-Max-Age': '86400',
+      'Vary': 'Origin',
+    }
+
     res.on('finish', () => {
       console.log(`[${req.method}] ${req.url} → ${res.statusCode}`)
     })
