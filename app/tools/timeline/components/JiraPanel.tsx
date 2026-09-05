@@ -5,6 +5,30 @@ import { X, Plug, RefreshCw, Upload, CheckCircle, AlertCircle, Loader2, RotateCc
 import type { Project, Task, JiraConfig, JiraSyncLog, JiraUploadLog } from '@/lib/timeline-types'
 import { generateId, PROXY_PORT_KEY, PROXY_TOKEN_KEY } from '@/lib/timeline-storage'
 
+const FIELD_MAP_KEY = 'timeline:jira-field-map'
+
+type FieldMap = {
+  actualStart:   string
+  actualEnd:     string
+  estimateStart: string
+  estimateEnd:   string
+}
+
+const DEFAULT_FIELD_MAP: FieldMap = {
+  actualStart:   '',
+  actualEnd:     '',
+  estimateStart: '',
+  estimateEnd:   '',
+}
+
+function loadFieldMap(): FieldMap {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(FIELD_MAP_KEY) : null
+    if (!raw) return { ...DEFAULT_FIELD_MAP }
+    return { ...DEFAULT_FIELD_MAP, ...JSON.parse(raw) as Partial<FieldMap> }
+  } catch { return { ...DEFAULT_FIELD_MAP } }
+}
+
 interface Props {
   project: Project
   tasks: Task[]
@@ -150,6 +174,14 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   useEffect(() => { localStorage.setItem(PROXY_PORT_KEY,  proxyPort)  }, [proxyPort])
   useEffect(() => { localStorage.setItem(PROXY_TOKEN_KEY, proxyToken) }, [proxyToken])
 
+  const [fieldMap, setFieldMap] = useState<FieldMap>(() => loadFieldMap())
+  const [fieldDetecting, setFieldDetecting] = useState(false)
+
+  function saveFieldMap(fm: FieldMap) {
+    setFieldMap(fm)
+    localStorage.setItem(FIELD_MAP_KEY, JSON.stringify(fm))
+  }
+
   const [connOpen,  setConnOpen]  = useState(false)
   const [jql,      setJql]      = useState(DEFAULT_JQL)
   const [syncMode, setSyncMode] = useState<'merge' | 'replace' | 'clear'>('replace')
@@ -240,6 +272,36 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       } else {
         setError(`Connection failed: ${msg}`)
       }
+    }
+  }
+
+  async function detectFields() {
+    const firstTask = tasks.find(t => t.jiraId && t.jiraKey)
+    if (!firstTask) { setError('Cần có ít nhất 1 task Jira để detect fields'); return }
+    setFieldDetecting(true); setError('')
+    try {
+      const resp = await req(`/issue/${firstTask.jiraKey}?expand=names`) as { names?: Record<string, string> }
+      const names = resp.names ?? {}
+      const newMap: FieldMap = { ...fieldMap }
+      for (const [id, name] of Object.entries(names)) {
+        const n = name.toLowerCase()
+        if (/actual\s*start/.test(n))      newMap.actualStart   = id
+        else if (/actual\s*end/.test(n))   newMap.actualEnd     = id
+        else if (/target\s*start/.test(n)) newMap.estimateStart = id
+        else if (/target\s*end/.test(n))   newMap.estimateEnd   = id
+      }
+      saveFieldMap(newMap)
+      const parts = [
+        `target start=${newMap.estimateStart || '?'}`,
+        `target end=${newMap.estimateEnd || '?'}`,
+        `actual start=${newMap.actualStart || '?'}`,
+        `actual end=${newMap.actualEnd || '?'}`,
+      ]
+      setError(`✓ Field IDs detected: ${parts.join(', ')}`)
+    } catch (e) {
+      setError(`Detect failed: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setFieldDetecting(false)
     }
   }
 
@@ -346,18 +408,18 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
 
       // 3. Custom actual date fields — separate PUT, only changed
       const actualFields: Record<string, unknown> = {}
-      if ((task.actualStartDate ?? null) !== (b?.actualStartDate ?? null) && task.actualStartDate)
-        actualFields.customfield_actualstart = task.actualStartDate
-      if ((task.actualEndDate ?? null) !== (b?.actualEndDate ?? null) && task.actualEndDate)
-        actualFields.customfield_actualend   = task.actualEndDate
+      if (fieldMap.actualStart && (task.actualStartDate ?? null) !== (b?.actualStartDate ?? null) && task.actualStartDate)
+        actualFields[fieldMap.actualStart] = task.actualStartDate
+      if (fieldMap.actualEnd && (task.actualEndDate ?? null) !== (b?.actualEndDate ?? null) && task.actualEndDate)
+        actualFields[fieldMap.actualEnd] = task.actualEndDate
       if (Object.keys(actualFields).length > 0) await putFields(task.jiraId!, key, actualFields, 'actual-dates')
 
-      // 4. Custom estimate date fields — separate PUT, only changed, silently skip missing fields
+      // 4. Custom estimate date fields (Target start/end) — separate PUT, silently skip if field missing
       const estDateFields: Record<string, unknown> = {}
-      if ((task.estimateStartDate ?? null) !== (b?.estimateStartDate ?? null) && task.estimateStartDate)
-        estDateFields.customfield_estimatestart = task.estimateStartDate
-      if ((task.estimateEndDate ?? null) !== (b?.estimateEndDate ?? null) && task.estimateEndDate)
-        estDateFields.customfield_estimateend   = task.estimateEndDate
+      if (fieldMap.estimateStart && (task.estimateStartDate ?? null) !== (b?.estimateStartDate ?? null) && task.estimateStartDate)
+        estDateFields[fieldMap.estimateStart] = task.estimateStartDate
+      if (fieldMap.estimateEnd && (task.estimateEndDate ?? null) !== (b?.estimateEndDate ?? null) && task.estimateEndDate)
+        estDateFields[fieldMap.estimateEnd] = task.estimateEndDate
       if (Object.keys(estDateFields).length > 0) {
         try { await req(`/issue/${task.jiraId}`, 'PUT', { fields: estDateFields }) } catch { /* custom field may not exist */ }
       }
@@ -600,6 +662,37 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                     className="flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs text-muted hover:text-fg hover:border-border/80 transition-colors">
                     <MonitorDot size={11} />Ping
                   </a>
+                </div>
+
+                {/* Field ID mapping */}
+                <div className="border-t border-border/40 pt-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-fg">Custom Field IDs</span>
+                    <button onClick={detectFields} disabled={fieldDetecting || !hasCredentials || tasks.filter(t => t.jiraId).length === 0}
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-accent/10 text-accent-soft hover:bg-accent/20 transition-colors disabled:opacity-40">
+                      {fieldDetecting ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                      Auto Detect
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-muted">Nhấn Auto Detect để tự tìm field ID từ Jira. Hoặc nhập thủ công (vd: customfield_10015).</p>
+                  {(
+                    [
+                      { label: 'Target start (estimate)',  key: 'estimateStart' },
+                      { label: 'Target end (estimate)',    key: 'estimateEnd'   },
+                      { label: 'Actual start',             key: 'actualStart'   },
+                      { label: 'Actual end',               key: 'actualEnd'     },
+                    ] as { label: string; key: keyof FieldMap }[]
+                  ).map(({ label, key }) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted w-36 shrink-0">{label}</span>
+                      <input
+                        value={fieldMap[key]}
+                        onChange={e => saveFieldMap({ ...fieldMap, [key]: e.target.value.trim() })}
+                        placeholder="customfield_XXXXX"
+                        className="flex-1 rounded border border-border bg-background px-2 py-1 text-[10px] font-mono text-fg placeholder:text-muted/50 focus:border-accent focus:outline-none"
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
