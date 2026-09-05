@@ -288,7 +288,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       const prev = jiraMap.get(key)
       if (!prev || (t.timeEntries?.length ?? 0) > (prev.timeEntries?.length ?? 0)) jiraMap.set(key, t)
     }
-    return [...nonJira, ...jiraMap.values()]
+    return [...nonJira, ...Array.from(jiraMap.values())]
   }
 
   function mergePulledIssues(issues: IssueRow[], parentMap: Record<string, string>) {
