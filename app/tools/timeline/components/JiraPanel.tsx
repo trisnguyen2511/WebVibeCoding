@@ -307,38 +307,55 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     }
 
     await Promise.allSettled(tasks.filter(t => t.jiraId).map(async task => {
-      const key = task.jiraKey ?? task.id
+      const key  = task.jiraKey ?? task.id
+      const b    = baseline?.[task.jiraId!]
+      const manual        = task.timeEntries.filter(e => e.source === 'manual')
+      const curCount      = manual.length
+      const curHours      = manual.reduce((s, e) => s + e.hours, 0)
+      const baseCount     = b?.manualCount  ?? 0
+      const baseHours     = b?.manualHours  ?? 0
+      const timeChanged   = curCount !== baseCount || curHours !== baseHours
 
-      // 1. Worklogs — each entry independently
-      await Promise.allSettled(task.timeEntries.filter(e => e.source === 'manual').map(async entry => {
-        try {
-          await req(`/issue/${task.jiraId}/worklog`, 'POST', {
-            started: `${entry.date}T09:00:00.000+0000`,
-            timeSpentSeconds: Math.round(entry.hours * 3600),
-            comment: entry.note ?? 'Logged via Timeline',
-          })
-          logs.push({ action: 'create_worklog', jiraKey: key, date: entry.date, hours: entry.hours })
-        } catch (e) {
-          logs.push({ action: 'skip', jiraKey: key, date: entry.date, hours: entry.hours, reason: e instanceof Error ? e.message : 'worklog error' })
-        }
-      }))
+      // 1. Worklogs — only when time entries changed since baseline
+      if (timeChanged) {
+        // Push only new entries when count grew; re-push all when hours edited on same count
+        const entriesToPush = curCount > baseCount ? manual.slice(baseCount) : manual
+        await Promise.allSettled(entriesToPush.map(async entry => {
+          try {
+            await req(`/issue/${task.jiraId}/worklog`, 'POST', {
+              started: `${entry.date}T09:00:00.000+0000`,
+              timeSpentSeconds: Math.round(entry.hours * 3600),
+              comment: entry.note ?? 'Logged via Timeline',
+            })
+            logs.push({ action: 'create_worklog', jiraKey: key, date: entry.date, hours: entry.hours })
+          } catch (e) {
+            logs.push({ action: 'skip', jiraKey: key, date: entry.date, hours: entry.hours, reason: e instanceof Error ? e.message : 'worklog error' })
+          }
+        }))
+      }
 
-      // 2. Standard Jira fields (timeoriginalestimate, duedate) — one PUT
+      // 2. Standard fields — only include fields that changed vs baseline
       const std: Record<string, unknown> = {}
-      if (task.estimateHours) std.timeoriginalestimate = Math.round(task.estimateHours * 3600)
-      if (task.dueDate) std.duedate = task.dueDate
+      if ((task.estimateHours ?? null) !== (b?.estimateHours ?? null) && task.estimateHours != null)
+        std.timeoriginalestimate = Math.round(task.estimateHours * 3600)
+      if ((task.dueDate ?? null) !== (b?.dueDate ?? null) && task.dueDate)
+        std.duedate = task.dueDate
       if (Object.keys(std).length > 0) await putFields(task.jiraId!, key, std, 'estimate+due')
 
-      // 3. Custom actual date fields — separate PUT (independent from standard)
+      // 3. Custom actual date fields — separate PUT, only changed
       const actualFields: Record<string, unknown> = {}
-      if (task.actualStartDate) actualFields.customfield_actualstart = task.actualStartDate
-      if (task.actualEndDate)   actualFields.customfield_actualend   = task.actualEndDate
+      if ((task.actualStartDate ?? null) !== (b?.actualStartDate ?? null) && task.actualStartDate)
+        actualFields.customfield_actualstart = task.actualStartDate
+      if ((task.actualEndDate ?? null) !== (b?.actualEndDate ?? null) && task.actualEndDate)
+        actualFields.customfield_actualend   = task.actualEndDate
       if (Object.keys(actualFields).length > 0) await putFields(task.jiraId!, key, actualFields, 'actual-dates')
 
-      // 4. Custom estimate date fields — separate PUT, silently skip unknown fields
+      // 4. Custom estimate date fields — separate PUT, only changed, silently skip missing fields
       const estDateFields: Record<string, unknown> = {}
-      if (task.estimateStartDate) estDateFields.customfield_estimatestart = task.estimateStartDate
-      if (task.estimateEndDate)   estDateFields.customfield_estimateend   = task.estimateEndDate
+      if ((task.estimateStartDate ?? null) !== (b?.estimateStartDate ?? null) && task.estimateStartDate)
+        estDateFields.customfield_estimatestart = task.estimateStartDate
+      if ((task.estimateEndDate ?? null) !== (b?.estimateEndDate ?? null) && task.estimateEndDate)
+        estDateFields.customfield_estimateend   = task.estimateEndDate
       if (Object.keys(estDateFields).length > 0) {
         try { await req(`/issue/${task.jiraId}`, 'PUT', { fields: estDateFields }) } catch { /* custom field may not exist */ }
       }
