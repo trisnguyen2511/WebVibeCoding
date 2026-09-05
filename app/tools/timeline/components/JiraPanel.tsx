@@ -90,6 +90,10 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   type FetchMode = 'curl' | 'direct' | 'local-proxy'
   const [fetchMode, setFetchMode] = useState<FetchMode>('curl')
 
+  // Local Proxy — separate fields, don't affect curl/direct tabs
+  const [proxyPort,  setProxyPort]  = useState('8765')
+  const [proxyToken, setProxyToken] = useState('')
+
   const [jql,      setJql]      = useState(DEFAULT_JQL)
   const [syncMode, setSyncMode] = useState<'merge' | 'replace' | 'clear'>('replace')
 
@@ -106,9 +110,13 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   const [uploadCurls, setUploadCurls] = useState('')
 
   function getConfig(): JiraConfig { return { host: host.trim(), email: email.trim(), token: token.trim() } }
+  function getProxyConfig(): JiraConfig { return { host: `http://localhost:${proxyPort.trim() || '8765'}`, email: '', token: proxyToken.trim() } }
   const isDirectMode = fetchMode === 'direct' || fetchMode === 'local-proxy'
   const curlMode = fetchMode === 'curl'
-  function req(path: string, method = 'GET', data?: unknown) { return jiraRequest(getConfig(), path, method, data, serverMode) }
+  function req(path: string, method = 'GET', data?: unknown) {
+    if (fetchMode === 'local-proxy') return jiraRequest(getProxyConfig(), path, method, data, true)
+    return jiraRequest(getConfig(), path, method, data, serverMode)
+  }
   function buildSearchPath(jqlStr: string) { return `/search?jql=${encodeURIComponent(jqlStr.trim())}&maxResults=100&fields=${FIELDS}` }
 
   // ── curl/Postman handlers ───────────────────────────────────
@@ -293,7 +301,9 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   }
 
   // ── Derived ─────────────────────────────────────────────────
-  const hasCredentials = !!(host.trim() && token.trim())
+  const hasCredentials = fetchMode === 'local-proxy'
+    ? !!(proxyPort.trim() && proxyToken.trim())
+    : !!(host.trim() && token.trim())
   const manualEntryCount = tasks.filter(t => t.jiraId).reduce((n, t) => n + t.timeEntries.filter(e => e.source === 'manual').length, 0)
 
   return (
@@ -324,74 +334,84 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
               </div>
             </div>
 
-            <div className="space-y-2">
-              <input value={host} onChange={e => setHost(e.target.value)}
-                placeholder={serverMode ? 'https://jira.company.com:8443' : 'https://company.atlassian.net'}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none" />
-              {!serverMode && (
-                <input value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com"
+            {/* Mode toggle: curl / direct / local-proxy */}
+            <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs">
+              <button onClick={() => setFetchMode('curl')}
+                className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 transition-colors ${fetchMode === 'curl' ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
+                <Terminal size={11} />curl
+              </button>
+              <button onClick={() => setFetchMode('direct')}
+                className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 border-x border-border transition-colors ${fetchMode === 'direct' ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
+                <Plug size={11} />Direct
+              </button>
+              <button onClick={() => setFetchMode('local-proxy')}
+                className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 transition-colors ${fetchMode === 'local-proxy' ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
+                <MonitorDot size={11} />Local Proxy
+              </button>
+            </div>
+
+            {/* curl / direct: shared host+token fields */}
+            {fetchMode !== 'local-proxy' && (
+              <div className="space-y-2">
+                <input value={host} onChange={e => setHost(e.target.value)}
+                  placeholder={serverMode ? 'https://jira.company.com:8443' : 'https://company.atlassian.net'}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none" />
-              )}
-              <input type="password" value={token} onChange={e => setToken(e.target.value)}
-                placeholder={serverMode ? 'Personal Access Token (PAT)' : 'Jira API Token'}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none font-mono" />
-
-              {/* Mode toggle: curl / direct / local-proxy */}
-              <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs">
-                <button onClick={() => setFetchMode('curl')}
-                  className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 transition-colors ${fetchMode === 'curl' ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
-                  <Terminal size={11} />curl
-                </button>
-                <button onClick={() => setFetchMode('direct')}
-                  className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 border-x border-border transition-colors ${fetchMode === 'direct' ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
-                  <Plug size={11} />Direct
-                </button>
-                <button onClick={() => setFetchMode('local-proxy')}
-                  className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 transition-colors ${fetchMode === 'local-proxy' ? 'bg-accent/20 text-accent-soft' : 'text-muted hover:text-fg'}`}>
-                  <MonitorDot size={11} />Local Proxy
-                </button>
-              </div>
-
-              {/* curl: test connection command */}
-              {fetchMode === 'curl' && host.trim() && token.trim() && (
-                <CurlBlock label="Test Connection:" curl={buildCurl(host.trim(), token.trim(), '/myself')} />
-              )}
-
-              {/* direct: test button */}
-              {fetchMode === 'direct' && (
-                <button onClick={testConnection} disabled={!hasCredentials}
-                  className="w-full rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
-                  Test Connection
-                </button>
-              )}
-
-              {/* local-proxy: download + setup card */}
-              {fetchMode === 'local-proxy' && (
-                <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 space-y-3">
-                  <div className="flex items-start gap-2.5">
-                    <MonitorDot size={14} className="text-accent-soft shrink-0 mt-0.5" />
-                    <div className="space-y-1 text-xs text-muted leading-relaxed">
-                      <p className="text-fg font-medium">Local Proxy (VPN / nội bộ)</p>
-                      <p>Chạy proxy trên máy bạn để bypass CORS khi Jira nằm trong mạng nội bộ.</p>
-                    </div>
-                  </div>
-                  <a href="/jira-proxy.zip" download
-                    className="flex items-center justify-center gap-2 w-full rounded-lg bg-accent py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors">
-                    <Download size={13} />Tải jira-proxy.zip
-                  </a>
-                  <ol className="space-y-1 text-[11px] text-muted list-decimal list-inside leading-relaxed">
-                    <li>Giải nén → mở <span className="font-mono text-fg">config.json</span> → sửa URL Jira</li>
-                    <li>Bật VPN → double-click <span className="font-mono text-fg">run.bat</span></li>
-                    <li>Set <span className="font-mono text-fg">Host</span> bên trên thành <span className="font-mono text-accent-soft">http://localhost:8765</span></li>
-                    <li>Bấm Test Connection bên dưới</li>
-                  </ol>
+                {!serverMode && (
+                  <input value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none" />
+                )}
+                <input type="password" value={token} onChange={e => setToken(e.target.value)}
+                  placeholder={serverMode ? 'Personal Access Token (PAT)' : 'Jira API Token'}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none font-mono" />
+                {fetchMode === 'curl' && host.trim() && token.trim() && (
+                  <CurlBlock label="Test Connection:" curl={buildCurl(host.trim(), token.trim(), '/myself')} />
+                )}
+                {fetchMode === 'direct' && (
                   <button onClick={testConnection} disabled={!hasCredentials}
                     className="w-full rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
                     Test Connection
                   </button>
+                )}
+              </div>
+            )}
+
+            {/* local-proxy: own fields + setup card */}
+            {fetchMode === 'local-proxy' && (
+              <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <MonitorDot size={14} className="text-accent-soft shrink-0 mt-0.5" />
+                  <div className="space-y-1 text-xs text-muted leading-relaxed">
+                    <p className="text-fg font-medium">Local Proxy (VPN / nội bộ)</p>
+                    <p>Chạy proxy trên máy bạn để bypass CORS khi Jira nằm trong mạng nội bộ.</p>
+                  </div>
                 </div>
-              )}
-            </div>
+                <a href="/jira-proxy.zip" download
+                  className="flex items-center justify-center gap-2 w-full rounded-lg bg-accent py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors">
+                  <Download size={13} />Tải jira-proxy.zip
+                </a>
+                <ol className="space-y-1 text-[11px] text-muted list-decimal list-inside leading-relaxed">
+                  <li>Giải nén → mở <span className="font-mono text-fg">config.json</span> → sửa URL Jira</li>
+                  <li>Bật VPN → double-click <span className="font-mono text-fg">run.bat</span></li>
+                  <li>Nhập Port và Token bên dưới rồi bấm Test Connection</li>
+                </ol>
+                <div className="space-y-2">
+                  <div className="flex gap-2 items-center">
+                    <span className="text-[11px] text-muted whitespace-nowrap">Port proxy</span>
+                    <input value={proxyPort} onChange={e => setProxyPort(e.target.value)}
+                      placeholder="8765"
+                      className="w-24 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-fg font-mono placeholder:text-muted focus:border-accent focus:outline-none" />
+                    <span className="text-[11px] text-muted font-mono truncate">→ localhost:{proxyPort || '8765'}</span>
+                  </div>
+                  <input type="password" value={proxyToken} onChange={e => setProxyToken(e.target.value)}
+                    placeholder="Personal Access Token (PAT)"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none font-mono" />
+                </div>
+                <button onClick={testConnection} disabled={!hasCredentials}
+                  className="w-full rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
+                  Test Connection
+                </button>
+              </div>
+            )}
           </div>
 
           {error && (
