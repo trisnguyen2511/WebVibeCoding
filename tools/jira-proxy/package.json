@@ -11,7 +11,12 @@
     "build:linux": "pkg proxy.js --target node18-linux-x64 --output dist/jira-proxy-linux"
   },
   "pkg": {
-    "targets": ["node18-win-x64"],
+    "targets": [
+      "node18-win-x64"
+    ],
     "outputPath": "dist"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
   }
 }
