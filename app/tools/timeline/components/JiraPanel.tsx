@@ -294,9 +294,22 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   async function handleUploadTime() {
     setStep('uploading')
     const logs: JiraUploadLog[] = []
-    // Process all tasks in parallel
+
+    async function putFields(jiraId: string, jiraKey: string, fields: Record<string, unknown>, label: string) {
+      try {
+        await req(`/issue/${jiraId}`, 'PUT', { fields })
+        logs.push({ action: 'update_fields', jiraKey, date: label, hours: 0 })
+        return true
+      } catch (e) {
+        logs.push({ action: 'skip', jiraKey, date: label, hours: 0, reason: e instanceof Error ? e.message : 'error' })
+        return false
+      }
+    }
+
     await Promise.allSettled(tasks.filter(t => t.jiraId).map(async task => {
-      // 1. Create worklogs in parallel
+      const key = task.jiraKey ?? task.id
+
+      // 1. Worklogs — each entry independently
       await Promise.allSettled(task.timeEntries.filter(e => e.source === 'manual').map(async entry => {
         try {
           await req(`/issue/${task.jiraId}/worklog`, 'POST', {
@@ -304,28 +317,33 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
             timeSpentSeconds: Math.round(entry.hours * 3600),
             comment: entry.note ?? 'Logged via Timeline',
           })
-          logs.push({ action: 'create_worklog', jiraKey: task.jiraKey ?? task.id, date: entry.date, hours: entry.hours })
-        } catch {
-          logs.push({ action: 'skip', jiraKey: task.jiraKey ?? task.id, date: entry.date, hours: entry.hours, reason: 'worklog error' })
+          logs.push({ action: 'create_worklog', jiraKey: key, date: entry.date, hours: entry.hours })
+        } catch (e) {
+          logs.push({ action: 'skip', jiraKey: key, date: entry.date, hours: entry.hours, reason: e instanceof Error ? e.message : 'worklog error' })
         }
       }))
-      // 2. Update estimate + due date on the Jira issue
-      const fields: Record<string, unknown> = {}
-      if (task.estimateHours) fields.timeoriginalestimate = Math.round(task.estimateHours * 3600)
-      if (task.estimateStartDate) fields.customfield_estimatestart = task.estimateStartDate
-      if (task.estimateEndDate)   fields.customfield_estimateend   = task.estimateEndDate
-      if (task.dueDate) fields.duedate = task.dueDate
-      if (task.actualStartDate) fields.customfield_actualstart = task.actualStartDate
-      if (task.actualEndDate)   fields.customfield_actualend   = task.actualEndDate
-      if (Object.keys(fields).length > 0) {
-        try {
-          await req(`/issue/${task.jiraId}`, 'PUT', { fields })
-          logs.push({ action: 'update_fields', jiraKey: task.jiraKey ?? task.id, date: '', hours: 0 })
-        } catch {
-          logs.push({ action: 'skip', jiraKey: task.jiraKey ?? task.id, date: '', hours: 0, reason: 'fields update skipped' })
-        }
+
+      // 2. Standard Jira fields (timeoriginalestimate, duedate) — one PUT
+      const std: Record<string, unknown> = {}
+      if (task.estimateHours) std.timeoriginalestimate = Math.round(task.estimateHours * 3600)
+      if (task.dueDate) std.duedate = task.dueDate
+      if (Object.keys(std).length > 0) await putFields(task.jiraId!, key, std, 'estimate+due')
+
+      // 3. Custom actual date fields — separate PUT (independent from standard)
+      const actualFields: Record<string, unknown> = {}
+      if (task.actualStartDate) actualFields.customfield_actualstart = task.actualStartDate
+      if (task.actualEndDate)   actualFields.customfield_actualend   = task.actualEndDate
+      if (Object.keys(actualFields).length > 0) await putFields(task.jiraId!, key, actualFields, 'actual-dates')
+
+      // 4. Custom estimate date fields — separate PUT, silently skip unknown fields
+      const estDateFields: Record<string, unknown> = {}
+      if (task.estimateStartDate) estDateFields.customfield_estimatestart = task.estimateStartDate
+      if (task.estimateEndDate)   estDateFields.customfield_estimateend   = task.estimateEndDate
+      if (Object.keys(estDateFields).length > 0) {
+        try { await req(`/issue/${task.jiraId}`, 'PUT', { fields: estDateFields }) } catch { /* custom field may not exist */ }
       }
     }))
+
     const newBaseline = buildBaseline(tasks)
     saveBaselineToStorage(project.id, newBaseline)
     setBaseline(newBaseline)
