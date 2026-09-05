@@ -48,8 +48,8 @@ Vào Timeline → Jira Integration → tab "Local Proxy"
   Port  : 8765        ← port bạn đặt ở config.json
   Token : <Personal Access Token của bạn>
 
-Bấm "Chấp nhận cert (bắt buộc lần đầu)" để mở bước 4 nhanh.
-Bấm "Test Connection" → sẽ thấy "Connected as ..."
+Bấm "Accept Cert" (màu vàng) để mở bước 4 nhanh → chấp nhận cert.
+Sau đó bấm "Test Connection" → sẽ thấy "Connected as ..."
 
 BƯỚC 6: Dừng proxy
 -------------------
