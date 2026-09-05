@@ -31,6 +31,8 @@ async function jiraRequest(
     : `Basic ${btoa(`${config.email}:${config.token}`)}`
   const headers: Record<string, string> = { 'Authorization': auth, 'Accept': 'application/json' }
   if (data) headers['Content-Type'] = 'application/json'
+  // Jira CSRF bypass — required for write ops when Origin header is present (browser cross-origin requests)
+  if (method !== 'GET' && method !== 'HEAD') headers['X-Atlassian-Token'] = 'no-check'
   // Chrome 142+ Local Network Access: loopback fetch needs targetAddressSpace hint
   const isLoopback = /^https?:\/\/(127\.|localhost)/.test(url)
   const init: RequestInit & { targetAddressSpace?: string } = {
