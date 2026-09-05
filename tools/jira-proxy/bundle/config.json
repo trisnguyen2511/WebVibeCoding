@@ -1,4 +1,4 @@
 {
-  "target": "https://jira.company.com",
+  "target": "https://atlassiansuite.mservice.com.vn:8443",
   "port": 8765
 }
