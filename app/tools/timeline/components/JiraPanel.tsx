@@ -31,7 +31,13 @@ async function jiraRequest(
     : `Basic ${btoa(`${config.email}:${config.token}`)}`
   const headers: Record<string, string> = { 'Authorization': auth, 'Accept': 'application/json' }
   if (data) headers['Content-Type'] = 'application/json'
-  const res = await fetch(url, { method, headers, body: data ? JSON.stringify(data) : undefined })
+  // Chrome 142+ Local Network Access: loopback fetch needs targetAddressSpace hint
+  const isLoopback = /^https?:\/\/(127\.|localhost)/.test(url)
+  const init: RequestInit & { targetAddressSpace?: string } = {
+    method, headers, body: data ? JSON.stringify(data) : undefined,
+    ...(isLoopback ? { targetAddressSpace: 'loopback' } : {}),
+  }
+  const res = await fetch(url, init)
   const text = await res.text()
   let json: unknown
   try { json = JSON.parse(text) } catch { json = {} }
@@ -174,9 +180,9 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       onUpdateConfig(getConfig())
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      const isNetwork = msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('networkerror')
+      const isNetwork = msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('networkerror') || msg.toLowerCase().includes('err_failed') || msg.toLowerCase().includes('address space')
       if (fetchMode === 'local-proxy' && isNetwork) {
-        setError('Không kết nối được proxy — kiểm tra proxy đang chạy (bấm Ping), bật VPN, rồi thử lại.')
+        setError('Chrome chặn kết nối — bấm "Test Connection" lần nữa và bấm Allow trên dialog của Chrome. Nếu không thấy dialog: vào địa chỉ bar → 🔒 → Site settings → "Apps on device" → Allow.')
       } else {
         setError(`Connection failed: ${msg}`)
       }
@@ -410,6 +416,9 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                     placeholder="Personal Access Token (PAT)"
                     className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none font-mono" />
                 </div>
+                <p className="text-[11px] text-muted leading-relaxed bg-surface rounded-lg px-2.5 py-2 border border-border">
+                  <span className="text-amber-400 font-medium">Lần đầu:</span> Chrome sẽ hiện dialog <em>&quot;Allow [site] to access apps on this device?&quot;</em> — bấm <strong className="text-fg">Allow</strong>. Chỉ cần làm 1 lần.
+                </p>
                 <div className="flex gap-2">
                   <button onClick={testConnection} disabled={!hasCredentials}
                     className="flex-1 rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
