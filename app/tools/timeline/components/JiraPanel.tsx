@@ -291,7 +291,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     const base: Task[] = syncMode === 'clear' ? [] : syncMode === 'replace' ? tasks.filter(t => !t.jiraId) : [...tasks]
     const result: Task[] = [...base]
     for (const issue of issues) {
-      const existingIdx = result.findIndex(t => t.jiraId === issue.id)
+      const existingIdx = result.findIndex(t => t.jiraId === issue.id || t.jiraKey === issue.key)
       const jiraStatusName = issue.fields.status.name
       const s = jiraStatusName.toLowerCase()
       const status = s.includes('done') || s.includes('closed') || s.includes('resolved') ? 'done' as const
