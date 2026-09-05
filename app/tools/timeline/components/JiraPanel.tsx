@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Plug, RefreshCw, Upload, CheckCircle, AlertCircle, Loader2, RotateCcw, Copy, Terminal, Download, MonitorDot } from 'lucide-react'
+import { X, Plug, RefreshCw, Upload, CheckCircle, AlertCircle, Loader2, RotateCcw, Copy, Terminal, Download, MonitorDot, ChevronDown } from 'lucide-react'
 import type { Project, Task, JiraConfig, JiraSyncLog, JiraUploadLog } from '@/lib/timeline-types'
 import { generateId, PROXY_PORT_KEY, PROXY_TOKEN_KEY } from '@/lib/timeline-storage'
 
@@ -106,6 +106,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   useEffect(() => { localStorage.setItem(PROXY_PORT_KEY,  proxyPort)  }, [proxyPort])
   useEffect(() => { localStorage.setItem(PROXY_TOKEN_KEY, proxyToken) }, [proxyToken])
 
+  const [connOpen,  setConnOpen]  = useState(false)
   const [jql,      setJql]      = useState(DEFAULT_JQL)
   const [syncMode, setSyncMode] = useState<'merge' | 'replace' | 'clear'>('replace')
 
@@ -197,6 +198,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   async function syncTasks() {
     setStep('syncing'); setError('')
     try {
+      // ── Fetch issues (JQL + parent keys) ──
       const searchRes = await req(buildSearchPath(jql)) as { issues?: IssueRow[] }
       const subtasks: IssueRow[] = searchRes.issues ?? []
       const parentKeysSet = new Set(subtasks.flatMap(i => i.fields.parent?.key ? [i.fields.parent.key] : []))
@@ -210,48 +212,72 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       }
       const parentMap: Record<string, string> = {}
       for (const p of parentIssues) parentMap[p.key] = p.fields.summary
-      // Deduplicate issues by id — same issue can appear in both subtask query and parent key query
       const issueMap = new Map<string, IssueRow>()
       for (const issue of [...subtasks, ...parentIssues]) {
         if (!issueMap.has(issue.id)) issueMap.set(issue.id, issue)
       }
-      mergePulledIssues(Array.from(issueMap.values()), parentMap)
-    } catch (e) { setError(`Sync failed: ${e instanceof Error ? e.message : String(e)}`); setStep('idle') }
-  }
+      const allIssues = Array.from(issueMap.values())
 
-  async function syncTime() {
-    setStep('syncing'); setError('')
-    try {
-      const myself = await req('/myself') as { accountId?: string; name?: string }
-      const accountId = myself.accountId ?? myself.name
-      const updates: { taskId: string; entries: Task['timeEntries'] }[] = []
-      for (const task of tasks.filter(t => t.jiraId)) {
-        const worklogRes = await req(`/issue/${task.jiraId}/worklog`) as {
-          worklogs?: Array<{ id: string; author: { accountId: string }; started: string; timeSpentSeconds: number }>
+      // ── Fetch worklogs for all issues in parallel ──
+      const worklogMap = new Map<string, Task['timeEntries']>()
+      try {
+        const myself = await req('/myself') as { accountId?: string; name?: string }
+        const accountId = myself.accountId ?? myself.name ?? ''
+        if (accountId) {
+          await Promise.allSettled(allIssues.map(async issue => {
+            try {
+              const res = await req(`/issue/${issue.id}/worklog`) as {
+                worklogs?: Array<{ id: string; author: { accountId?: string; name?: string }; started: string; timeSpentSeconds: number }>
+              }
+              const mine = (res.worklogs ?? []).filter(w => w.author.accountId === accountId || w.author.name === accountId)
+              if (mine.length > 0) {
+                worklogMap.set(issue.id, mine.map(w => ({
+                  id: `jira-${w.id}`, date: w.started.slice(0, 10),
+                  hours: w.timeSpentSeconds / 3600, source: 'jira' as const, jiraWorklogId: w.id,
+                })))
+              }
+            } catch { /* skip individual worklog errors */ }
+          }))
         }
-        const myWorklogs = (worklogRes.worklogs ?? []).filter(w => w.author.accountId === accountId || (w.author as { name?: string }).name === accountId)
-        const newEntries = myWorklogs.map(w => ({ id: `jira-${w.id}`, date: w.started.slice(0, 10), hours: w.timeSpentSeconds / 3600, source: 'jira' as const, jiraWorklogId: w.id }))
-        const mergedEntries = [...task.timeEntries.filter(e => e.source === 'manual')]
-        for (const je of newEntries) {
-          if (!mergedEntries.find(e => e.jiraWorklogId === je.jiraWorklogId || (e.source === 'jira' && e.date === je.date))) mergedEntries.push(je)
-        }
-        updates.push({ taskId: task.id, entries: mergedEntries })
-      }
-      onSyncTime(updates); setError(`✓ Synced time for ${updates.length} tasks`); setStep('idle')
+      } catch { /* continue without time if /myself fails */ }
+
+      mergePulledIssues(allIssues, parentMap, worklogMap)
     } catch (e) { setError(`Sync failed: ${e instanceof Error ? e.message : String(e)}`); setStep('idle') }
   }
 
   async function handleUploadTime() {
     setStep('uploading')
     const logs: JiraUploadLog[] = []
-    for (const task of tasks.filter(t => t.jiraId)) {
-      for (const entry of task.timeEntries.filter(e => e.source === 'manual')) {
+    // Process all tasks in parallel
+    await Promise.allSettled(tasks.filter(t => t.jiraId).map(async task => {
+      // 1. Create worklogs in parallel
+      await Promise.allSettled(task.timeEntries.filter(e => e.source === 'manual').map(async entry => {
         try {
-          await req(`/issue/${task.jiraId}/worklog`, 'POST', { started: `${entry.date}T09:00:00.000+0000`, timeSpentSeconds: Math.round(entry.hours * 3600), comment: entry.note ?? 'Logged via Timeline' })
+          await req(`/issue/${task.jiraId}/worklog`, 'POST', {
+            started: `${entry.date}T09:00:00.000+0000`,
+            timeSpentSeconds: Math.round(entry.hours * 3600),
+            comment: entry.note ?? 'Logged via Timeline',
+          })
           logs.push({ action: 'create_worklog', jiraKey: task.jiraKey ?? task.id, date: entry.date, hours: entry.hours })
-        } catch { logs.push({ action: 'skip', jiraKey: task.jiraKey ?? task.id, date: entry.date, hours: entry.hours, reason: 'API error' }) }
+        } catch {
+          logs.push({ action: 'skip', jiraKey: task.jiraKey ?? task.id, date: entry.date, hours: entry.hours, reason: 'worklog error' })
+        }
+      }))
+      // 2. Update estimate + due date on the Jira issue
+      const fields: Record<string, unknown> = {}
+      if (task.estimateHours) fields.timeoriginalestimate = Math.round(task.estimateHours * 3600)
+      if (task.dueDate) fields.duedate = task.dueDate
+      if (task.actualStartDate) fields.customfield_actualstart = task.actualStartDate
+      if (task.actualEndDate)   fields.customfield_actualend   = task.actualEndDate
+      if (Object.keys(fields).length > 0) {
+        try {
+          await req(`/issue/${task.jiraId}`, 'PUT', { fields })
+          logs.push({ action: 'update_fields', jiraKey: task.jiraKey ?? task.id, date: '', hours: 0 })
+        } catch {
+          logs.push({ action: 'skip', jiraKey: task.jiraKey ?? task.id, date: '', hours: 0, reason: 'fields update skipped' })
+        }
       }
-    }
+    }))
     setUploadLogs(logs); setStep('done')
   }
 
@@ -296,8 +322,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     return [...nonJira, ...Array.from(jiraMap.values())]
   }
 
-  function mergePulledIssues(issues: IssueRow[], parentMap: Record<string, string>) {
-    // Extract parent names embedded in each subtask's parent field (avoids a second query)
+  function mergePulledIssues(issues: IssueRow[], parentMap: Record<string, string>, worklogMap = new Map<string, Task['timeEntries']>()) {
     for (const issue of issues) {
       const pk = issue.fields.parent?.key
       const ps = issue.fields.parent?.fields?.summary
@@ -306,7 +331,6 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
 
     const logs: JiraSyncLog[] = []
     const rawBase: Task[] = syncMode === 'clear' ? [] : syncMode === 'replace' ? tasks.filter(t => !t.jiraId) : [...tasks]
-    // Deduplicate stale Jira duplicates before merging (keep the task with most timeEntries)
     const base = dedupeByJira(rawBase)
     const result: Task[] = [...base]
     for (const issue of issues) {
@@ -319,12 +343,17 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       const parentKey = issue.fields.parent?.key
       const parentTitle = parentKey ? (parentMap[parentKey] ?? parentKey) : undefined
       const link = buildIssueLink(issue.key)
+      const newJiraEntries = worklogMap.get(issue.id) ?? []
       if (existingIdx >= 0) {
-        result[existingIdx] = { ...result[existingIdx], title: issue.fields.summary, jiraKey: issue.key, jiraStatus: jiraStatusName, status, parentKey, parentTitle, ...(link ? { link } : {}), dueDate: issue.fields.duedate ?? result[existingIdx].dueDate, estimateHours: issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : result[existingIdx].estimateHours, updatedAt: new Date().toISOString() }
+        const existing = result[existingIdx]
+        const existingJiraIds = new Set(existing.timeEntries.filter(e => e.jiraWorklogId).map(e => e.jiraWorklogId))
+        const freshJira = newJiraEntries.filter(e => !existingJiraIds.has(e.jiraWorklogId))
+        const mergedEntries = [...existing.timeEntries.filter(e => e.source === 'manual'), ...existing.timeEntries.filter(e => e.source === 'jira'), ...freshJira]
+        result[existingIdx] = { ...existing, title: issue.fields.summary, jiraKey: issue.key, jiraStatus: jiraStatusName, status, parentKey, parentTitle, ...(link ? { link } : {}), dueDate: issue.fields.duedate ?? existing.dueDate, estimateHours: issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : existing.estimateHours, timeEntries: mergedEntries, updatedAt: new Date().toISOString() }
         logs.push({ action: 'update', jiraKey: issue.key, title: issue.fields.summary })
       } else {
         const now = new Date().toISOString()
-        result.push({ id: generateId(), projectId: project.id, jiraId: issue.id, jiraKey: issue.key, jiraStatus: jiraStatusName, parentKey, parentTitle, ...(link ? { link } : {}), title: issue.fields.summary, status, dueDate: issue.fields.duedate ?? undefined, estimateHours: issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : undefined, timeEntries: [], order: result.length, createdAt: now, updatedAt: now })
+        result.push({ id: generateId(), projectId: project.id, jiraId: issue.id, jiraKey: issue.key, jiraStatus: jiraStatusName, parentKey, parentTitle, ...(link ? { link } : {}), title: issue.fields.summary, status, dueDate: issue.fields.duedate ?? undefined, estimateHours: issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : undefined, timeEntries: newJiraEntries, order: result.length, createdAt: now, updatedAt: now })
         logs.push({ action: 'add', jiraKey: issue.key, title: issue.fields.summary })
       }
     }
@@ -363,15 +392,23 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
 
           {/* ── Connection config ── */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <button onClick={() => setConnOpen(v => !v)} className="w-full flex items-center justify-between group py-0.5">
               <h3 className="text-sm font-medium text-fg">Connection</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-muted">
+                  {fetchMode === 'local-proxy' ? `Local Proxy · :${proxyPort || '8765'}` : fetchMode === 'curl' ? 'curl / Postman' : host.trim() ? host.trim().replace(/^https?:\/\//, '').split('/')[0].slice(0, 28) : 'Not configured'}
+                </span>
+                <ChevronDown size={13} className={`text-muted transition-transform duration-200 ${connOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {connOpen && <>
               <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs">
                 <button onClick={() => { setServerMode(false); setFetchMode('direct') }}
                   className={`px-3 py-1 transition-colors ${!serverMode ? 'bg-accent text-white' : 'text-muted hover:text-fg'}`}>Cloud</button>
                 <button onClick={() => { setServerMode(true); setFetchMode('curl') }}
                   className={`px-3 py-1 transition-colors ${serverMode ? 'bg-accent text-white' : 'text-muted hover:text-fg'}`}>Server / DC</button>
               </div>
-            </div>
 
             {/* Mode toggle: curl / direct / local-proxy */}
             <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs">
@@ -455,6 +492,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 </div>
               </div>
             )}
+            </>}
           </div>
 
           {error && (
@@ -521,18 +559,11 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 )}
               </div>
             ) : (
-              <>
-                <button onClick={syncTasks} disabled={step === 'syncing' || !hasCredentials || !jql.trim()}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40">
-                  {step === 'syncing' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                  {step === 'syncing' ? 'Syncing...' : 'Pull Tasks'}
-                </button>
-                <button onClick={syncTime} disabled={step === 'syncing' || !hasCredentials}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40">
-                  {step === 'syncing' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                  Pull Time (Jira worklogs → local)
-                </button>
-              </>
+              <button onClick={syncTasks} disabled={step === 'syncing' || !hasCredentials || !jql.trim()}
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40">
+                {step === 'syncing' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                {step === 'syncing' ? 'Syncing...' : 'Pull Tasks + Time'}
+              </button>
             )}
           </div>
 
@@ -611,9 +642,9 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
 
           {/* ── Push Time → Jira ── */}
           <div className="space-y-2">
-            <h3 className="text-sm font-medium text-fg">Push Time → Jira</h3>
+            <h3 className="text-sm font-medium text-fg">Push → Jira</h3>
             <p className="text-xs text-muted">
-              Uploads manual time entries to Jira worklogs.
+              Worklogs + estimate + due date.
               {manualEntryCount > 0 && ` ${manualEntryCount} entr${manualEntryCount === 1 ? 'y' : 'ies'} ready.`}
             </p>
             {fetchMode === 'curl' ? (
@@ -648,11 +679,13 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
               <div className="max-h-48 overflow-y-auto space-y-1">
                 {uploadLogs.map((log, i) => (
                   <div key={i} className="flex items-center gap-2 rounded-lg bg-background px-3 py-2 text-xs">
-                    <span className={`font-medium ${log.action === 'create_worklog' ? 'text-green-400' : 'text-muted'}`}>{log.action === 'create_worklog' ? '✓' : '–'}</span>
-                    <span className="font-mono text-accent-soft">{log.jiraKey}</span>
-                    <span className="text-muted">{log.date}</span>
-                    <span className="font-mono text-fg">{log.hours}h</span>
-                    {log.reason && <span className="text-red-400">{log.reason}</span>}
+                    <span className={`font-medium shrink-0 ${log.action === 'skip' ? 'text-muted' : 'text-green-400'}`}>
+                      {log.action === 'create_worklog' ? '✓ log' : log.action === 'update_fields' ? '✓ upd' : '–'}
+                    </span>
+                    <span className="font-mono text-accent-soft shrink-0">{log.jiraKey}</span>
+                    {log.date && <span className="text-muted shrink-0">{log.date}</span>}
+                    {log.hours > 0 && <span className="font-mono text-fg shrink-0">{log.hours}h</span>}
+                    {log.reason && <span className="text-red-400 truncate">{log.reason}</span>}
                   </div>
                 ))}
               </div>

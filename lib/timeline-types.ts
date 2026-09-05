@@ -85,7 +85,7 @@ export interface JiraSyncLog {
 }
 
 export interface JiraUploadLog {
-  action: 'create_worklog' | 'skip'
+  action: 'create_worklog' | 'update_fields' | 'skip'
   jiraKey: string
   date: string
   hours: number
