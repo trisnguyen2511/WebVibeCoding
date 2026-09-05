@@ -88,7 +88,7 @@ function startProxy(cfg) {
     req.pipe(proxyReq)
   })
 
-  server.listen(port, '127.0.0.1', () => {
+  server.listen(port, '0.0.0.0', () => {
     console.log('')
     console.log('  ✓ Proxy đang chạy!')
     console.log('  Target : ' + target)

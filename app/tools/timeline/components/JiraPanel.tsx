@@ -110,7 +110,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   const [uploadCurls, setUploadCurls] = useState('')
 
   function getConfig(): JiraConfig { return { host: host.trim(), email: email.trim(), token: token.trim() } }
-  function getProxyConfig(): JiraConfig { return { host: `http://localhost:${proxyPort.trim() || '8765'}`, email: '', token: proxyToken.trim() } }
+  function getProxyConfig(): JiraConfig { return { host: `http://127.0.0.1:${proxyPort.trim() || '8765'}`, email: '', token: proxyToken.trim() } }
   const isDirectMode = fetchMode === 'direct' || fetchMode === 'local-proxy'
   const curlMode = fetchMode === 'curl'
   function req(path: string, method = 'GET', data?: unknown) {
@@ -400,7 +400,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                     <input value={proxyPort} onChange={e => setProxyPort(e.target.value)}
                       placeholder="8765"
                       className="w-24 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-fg font-mono placeholder:text-muted focus:border-accent focus:outline-none" />
-                    <span className="text-[11px] text-muted font-mono truncate">→ localhost:{proxyPort || '8765'}</span>
+                    <span className="text-[11px] text-muted font-mono truncate">→ 127.0.0.1:{proxyPort || '8765'}</span>
                   </div>
                   <input type="password" value={proxyToken} onChange={e => setProxyToken(e.target.value)}
                     placeholder="Personal Access Token (PAT)"
