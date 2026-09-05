@@ -278,7 +278,11 @@ export function GanttChart({
         standalone.push(task)
       }
     }
-    const rows: DisplayRow[] = standalone.map(t => ({ type: 'task', task: t, isSubtask: false, colorIdx: -1 }))
+    // A task whose jiraKey matches a parentKey is already represented as the group header — skip it as standalone
+    const parentKeySet = new Set(byParent.keys())
+    const rows: DisplayRow[] = standalone
+      .filter(t => !t.jiraKey || !parentKeySet.has(t.jiraKey))
+      .map(t => ({ type: 'task', task: t, isSubtask: false, colorIdx: -1 }))
     let colorIdx = 0
     for (const [parentKey, children] of Array.from(byParent)) {
       const parentTitle = children[0].parentTitle ?? parentKey

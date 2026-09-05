@@ -47,23 +47,25 @@ function getAllTasks(): Task[] {
 }
 
 function dedupeJiraTasks(list: Task[]): Task[] {
-  // Find the best task (most timeEntries) for each jiraKey/jiraId
-  const winner = new Map<string, Task>()
+  // Semantic dedup: two tasks are the same Jira issue if they share jiraKey OR jiraId
+  const byKey = new Map<string, Task>()
+  const byId  = new Map<string, Task>()
   for (const t of list) {
-    const key = t.jiraKey || t.jiraId
-    if (!key) continue
-    const prev = winner.get(key)
-    if (!prev || (t.timeEntries?.length ?? 0) > (prev.timeEntries?.length ?? 0)) winner.set(key, t)
+    if (!t.jiraKey && !t.jiraId) continue
+    const prev = (t.jiraKey ? byKey.get(t.jiraKey) : undefined) ?? (t.jiraId ? byId.get(t.jiraId) : undefined)
+    const better = !prev || (t.timeEntries?.length ?? 0) > (prev.timeEntries?.length ?? 0) ? t : prev
+    if (t.jiraKey) byKey.set(t.jiraKey, better)
+    if (t.jiraId)  byId.set(t.jiraId,  better)
   }
-  // Preserve order of first occurrence; replace with winner content
-  const seen = new Set<string>()
+  // Collect unique winners preserving first-occurrence order
+  const emitted = new Set<string>()
   const result: Task[] = []
   for (const t of list) {
-    const key = t.jiraKey || t.jiraId
-    if (!key) { result.push(t); continue }
-    if (seen.has(key)) continue
-    seen.add(key)
-    result.push(winner.get(key)!)
+    if (!t.jiraKey && !t.jiraId) { result.push(t); continue }
+    const winner = (t.jiraKey ? byKey.get(t.jiraKey) : undefined) ?? (t.jiraId ? byId.get(t.jiraId) : undefined)
+    if (!winner || emitted.has(winner.id)) continue
+    emitted.add(winner.id)
+    result.push(winner)
   }
   return result
 }
