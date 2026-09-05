@@ -210,7 +210,12 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       }
       const parentMap: Record<string, string> = {}
       for (const p of parentIssues) parentMap[p.key] = p.fields.summary
-      mergePulledIssues([...subtasks, ...parentIssues], parentMap)
+      // Deduplicate issues by id — same issue can appear in both subtask query and parent key query
+      const issueMap = new Map<string, IssueRow>()
+      for (const issue of [...subtasks, ...parentIssues]) {
+        if (!issueMap.has(issue.id)) issueMap.set(issue.id, issue)
+      }
+      mergePulledIssues(Array.from(issueMap.values()), parentMap)
     } catch (e) { setError(`Sync failed: ${e instanceof Error ? e.message : String(e)}`); setStep('idle') }
   }
 
