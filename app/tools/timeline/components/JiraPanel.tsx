@@ -60,6 +60,41 @@ function buildCurl(host: string, token: string, path: string, method = 'GET', bo
   return lines.join(' \\\n')
 }
 
+// ── Baseline tracking (detect changes since last pull/push) ──
+type JiraBaseline = Record<string, {
+  estimateHours: number | null
+  dueDate: string | null
+  actualStartDate: string | null
+  actualEndDate: string | null
+  manualCount: number
+}>
+
+function buildBaseline(tasks: Task[]): JiraBaseline {
+  const b: JiraBaseline = {}
+  for (const t of tasks) {
+    if (!t.jiraId) continue
+    b[t.jiraId] = {
+      estimateHours: t.estimateHours ?? null,
+      dueDate: t.dueDate ?? null,
+      actualStartDate: t.actualStartDate ?? null,
+      actualEndDate: t.actualEndDate ?? null,
+      manualCount: t.timeEntries.filter(e => e.source === 'manual').length,
+    }
+  }
+  return b
+}
+
+function loadBaselineFromStorage(projectId: string): JiraBaseline | null {
+  try {
+    const raw = localStorage.getItem(`timeline:jira-baseline:${projectId}`)
+    return raw ? JSON.parse(raw) as JiraBaseline : null
+  } catch { return null }
+}
+
+function saveBaselineToStorage(projectId: string, baseline: JiraBaseline): void {
+  try { localStorage.setItem(`timeline:jira-baseline:${projectId}`, JSON.stringify(baseline)) } catch { /* noop */ }
+}
+
 // ── UI helpers ────────────────────────────────────────────────
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
@@ -116,6 +151,10 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   const [uploadLogs,      setUploadLogs]      = useState<JiraUploadLog[]>([])
   const [pendingTasks,    setPendingTasks]    = useState<Task[]>([])
   const [selectedSprintIds, setSelectedSprintIds] = useState<string[]>([])
+
+  const [baseline, setBaseline] = useState<JiraBaseline | null>(() =>
+    typeof window !== 'undefined' ? loadBaselineFromStorage(project.id) : null
+  )
 
   // curl/Postman state
   const [tasksCurl,   setTasksCurl]   = useState('')
@@ -278,6 +317,9 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
         }
       }
     }))
+    const newBaseline = buildBaseline(tasks)
+    saveBaselineToStorage(project.id, newBaseline)
+    setBaseline(newBaseline)
     setUploadLogs(logs); setStep('done')
   }
 
@@ -288,6 +330,9 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       sprintIds: selectedSprintIds.length > 0 ? selectedSprintIds : t.sprintIds,
     }))
     onSyncTasks(tasksWithSprints)
+    const newBaseline = buildBaseline(tasksWithSprints)
+    saveBaselineToStorage(project.id, newBaseline)
+    setBaseline(newBaseline)
     setStep('idle')
     setSyncLogs([])
     setSelectedSprintIds([])
@@ -373,8 +418,21 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     ? !!(proxyPort.trim() && proxyToken.trim())
     : !!(host.trim() && token.trim())
   const manualEntryCount = tasks.filter(t => t.jiraId).reduce((n, t) => n + t.timeEntries.filter(e => e.source === 'manual').length, 0)
-  const fieldsTaskCount  = tasks.filter(t => t.jiraId && (t.estimateHours || t.dueDate || t.actualStartDate || t.actualEndDate)).length
-  const hasPushableData  = manualEntryCount > 0 || fieldsTaskCount > 0
+  const fieldsTaskCount  = tasks.filter(t => {
+    if (!t.jiraId) return false
+    const manualCount = t.timeEntries.filter(e => e.source === 'manual').length
+    if (!baseline) return manualCount > 0
+    const b = baseline[t.jiraId]
+    if (!b) return manualCount > 0
+    return (
+      (t.estimateHours ?? null) !== b.estimateHours ||
+      (t.dueDate ?? null) !== b.dueDate ||
+      (t.actualStartDate ?? null) !== b.actualStartDate ||
+      (t.actualEndDate ?? null) !== b.actualEndDate ||
+      manualCount !== b.manualCount
+    )
+  }).length
+  const hasPushableData  = fieldsTaskCount > 0
 
   return (
     <>
