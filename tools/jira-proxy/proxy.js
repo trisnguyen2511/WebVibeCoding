@@ -51,6 +51,7 @@ function startProxy(cfg) {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept, X-Atlassian-Token')
+    res.setHeader('Access-Control-Allow-Private-Network', 'true')
     res.setHeader('Access-Control-Max-Age', '86400')
 
     if (req.method === 'OPTIONS') {
