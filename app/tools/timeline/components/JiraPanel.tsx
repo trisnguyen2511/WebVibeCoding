@@ -114,7 +114,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   const isDirectMode = fetchMode === 'direct' || fetchMode === 'local-proxy'
   const curlMode = fetchMode === 'curl'
   function req(path: string, method = 'GET', data?: unknown) {
-    if (fetchMode === 'local-proxy') return jiraRequest(getProxyConfig(), path, method, data, true)
+    if (fetchMode === 'local-proxy') return jiraRequest(getProxyConfig(), path, method, data, false)
     return jiraRequest(getConfig(), path, method, data, serverMode)
   }
   function buildSearchPath(jqlStr: string) { return `/search?jql=${encodeURIComponent(jqlStr.trim())}&maxResults=100&fields=${FIELDS}` }
