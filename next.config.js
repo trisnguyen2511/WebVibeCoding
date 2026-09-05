@@ -60,7 +60,8 @@ const withPWA = require('next-pwa')({
       },
     },
     {
-      urlPattern: /.*/i,
+      // Exclude local proxy (http://127.0.0.1:*) — let browser's native fetch handle PNA preflight
+      urlPattern: /^(?!http:\/\/127\.0\.0\.1).*/i,
       handler: 'NetworkFirst',
       options: {
         cacheName: 'others',
