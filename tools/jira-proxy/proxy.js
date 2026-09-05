@@ -156,21 +156,16 @@ function startProxy(cfg) {
     req.pipe(proxyReq)
   }
 
-  // HTTPS server with bundled self-signed cert — avoids Chrome PNA / mixed-content blocks
-  const server = https.createServer({ key: KEY, cert: CERT }, handler)
+  const server = http.createServer(handler)
 
   server.listen(port, '0.0.0.0', () => {
     console.log('')
-    console.log('  ✓ Proxy đang chạy (HTTPS)!')
+    console.log('  ✓ Proxy đang chạy!')
     console.log('  Target : ' + target)
     console.log('  Port   : ' + port)
     console.log('')
-    console.log('  ► Bước 1: Mở tab mới, truy cập URL sau để chấp nhận cert:')
-    console.log('    https://127.0.0.1:' + port + '/health')
-    console.log('    → Click "Advanced" → "Proceed to 127.0.0.1 (unsafe)"')
-    console.log('    → Tab hiện {"status":"ok"} là OK (chỉ cần làm 1 lần)')
-    console.log('')
-    console.log('  ► Bước 2: Trong Timeline app, set port = ' + port)
+    console.log('  → Trong Timeline app, set port = ' + port)
+    console.log('  → Kiểm tra: http://127.0.0.1:' + port + '/health')
     console.log('')
     console.log('  Nhấn Ctrl+C để dừng.')
     console.log('')
@@ -190,7 +185,7 @@ function askAndStart(defaults = {}) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
 
   console.log('='.repeat(54))
-  console.log('  Jira CORS Proxy (HTTPS)')
+  console.log('  Jira CORS Proxy')
   console.log('='.repeat(54))
   console.log('')
 
