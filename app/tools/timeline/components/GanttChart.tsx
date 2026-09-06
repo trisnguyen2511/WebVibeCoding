@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
-import { GripVertical, ExternalLink, Trash2, ChevronDown, Search, X } from 'lucide-react'
+import { GripVertical, ExternalLink, Trash2, ChevronDown, Search, X, ChevronsDown, ChevronsUp } from 'lucide-react'
 import type { Task, Sprint, TimeEntry } from '@/lib/timeline-types'
 import { TimeEntryModal } from './TimeEntryModal'
 
@@ -257,6 +257,15 @@ export function GanttChart({
       if (s.has(key)) s.delete(key); else s.add(key)
       return s
     })
+  }
+
+  function collapseAll() {
+    const keys = tasks.map(t => t.parentKey).filter((k): k is string => !!k)
+    setCollapsedParents(new Set(keys))
+  }
+
+  function expandAll() {
+    setCollapsedParents(new Set())
   }
 
   // Persist collapsed state to localStorage whenever it changes
@@ -717,12 +726,26 @@ export function GanttChart({
           </div>
 
           {/* Column labels */}
-          <div className="flex items-end px-3 pb-2 flex-1">
-            <div className="grid w-full gap-1 text-[10px] font-semibold uppercase tracking-wider text-fg/60"
+          <div className="flex items-end px-3 pb-2 flex-1 gap-2">
+            <div className="grid flex-1 gap-1 text-[10px] font-semibold uppercase tracking-wider text-fg/60"
               style={{ gridTemplateColumns: '16px 1fr 48px 52px' }}>
               <span /><span>Task</span>
               <span className="text-right">Hrs</span>
               <span className="text-right">Due</span>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={expandAll}
+                title="Expand all groups"
+                className="flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-mono text-muted/50 hover:text-accent-soft hover:bg-border/40 transition-colors">
+                <ChevronsDown size={10} />
+              </button>
+              <button
+                onClick={collapseAll}
+                title="Collapse all groups"
+                className="flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-mono text-muted/50 hover:text-accent-soft hover:bg-border/40 transition-colors">
+                <ChevronsUp size={10} />
+              </button>
             </div>
           </div>
         </div>
