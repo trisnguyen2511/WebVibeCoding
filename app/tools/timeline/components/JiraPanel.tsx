@@ -194,6 +194,15 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   const [selectedSprintIds, setSelectedSprintIds] = useState<string[]>([])
   const [previewExpanded,   setPreviewExpanded]   = useState(false)
 
+  // Detect OS for platform-specific proxy download
+  const osType: 'windows' | 'mac' | 'linux' = (() => {
+    if (typeof window === 'undefined') return 'windows'
+    const ua = navigator.userAgent.toLowerCase()
+    if (ua.includes('mac'))   return 'mac'
+    if (ua.includes('linux')) return 'linux'
+    return 'windows'
+  })()
+
   const [baseline, setBaseline] = useState<JiraBaseline | null>(() =>
     typeof window !== 'undefined' ? loadBaselineFromStorage(project.id) : null
   )
@@ -720,10 +729,40 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                     <p>Chạy proxy trên máy bạn để bypass CORS khi Jira nằm trong mạng nội bộ.</p>
                   </div>
                 </div>
-                <a href="/jira-proxy.zip" download
-                  className="flex items-center justify-center gap-2 w-full rounded-lg bg-accent py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors">
-                  <Download size={13} />Tải jira-proxy.zip
-                </a>
+                {/* Platform-specific download / setup */}
+                {osType === 'windows' ? (
+                  <>
+                    <a href="/jira-proxy.zip" download
+                      className="flex items-center justify-center gap-2 w-full rounded-lg bg-accent py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors">
+                      <Download size={13} />Tải jira-proxy.zip (Windows)
+                    </a>
+                    <p className="text-[11px] text-muted leading-relaxed bg-surface rounded-lg px-2.5 py-2 border border-border">
+                      Giải nén → chạy <code className="text-accent-soft font-mono">jira-proxy.exe --target https://jira.company.com --token YOUR_PAT</code>
+                    </p>
+                    <p className="text-[11px] text-muted leading-relaxed bg-surface rounded-lg px-2.5 py-2 border border-border">
+                      <span className="text-amber-400 font-medium">Lần đầu:</span> Chrome hiện dialog <em>&quot;Allow access to apps on this device?&quot;</em> — bấm <strong className="text-fg">Allow</strong>. Chỉ 1 lần.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <a href="/jira-proxy.js" download
+                      className="flex items-center justify-center gap-2 w-full rounded-lg bg-accent py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors">
+                      <Download size={13} />Tải jira-proxy.js {osType === 'mac' ? '(Mac)' : '(Linux)'}
+                    </a>
+                    <div className="rounded-lg bg-surface border border-border px-2.5 py-2 space-y-1.5">
+                      <p className="text-[10px] text-muted font-medium uppercase tracking-wide">Terminal — chạy 1 lần:</p>
+                      <code className="block text-[10px] font-mono text-accent-soft leading-relaxed break-all">
+                        {'node jira-proxy.js \\\n  --target '}
+                        <span className="text-amber-300">{host.trim() || 'https://jira.company.com'}</span>
+                        {' \\\n  --token '}
+                        <span className="text-amber-300">YOUR_PAT</span>
+                        {` \\\n  --port ${proxyPort || '8765'}`}
+                      </code>
+                      <p className="text-[10px] text-muted">Yêu cầu: Node.js ≥ 16. Không cần cài thêm package.</p>
+                    </div>
+                  </>
+                )}
+
                 <div className="space-y-2">
                   <div className="flex gap-2 items-center">
                     <span className="text-[11px] text-muted whitespace-nowrap">Port proxy</span>
@@ -736,9 +775,6 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                     placeholder="Personal Access Token (PAT)"
                     className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none font-mono" />
                 </div>
-                <p className="text-[11px] text-muted leading-relaxed bg-surface rounded-lg px-2.5 py-2 border border-border">
-                  <span className="text-amber-400 font-medium">Lần đầu:</span> Chrome sẽ hiện dialog <em>&quot;Allow [site] to access apps on this device?&quot;</em> — bấm <strong className="text-fg">Allow</strong>. Chỉ cần làm 1 lần.
-                </p>
                 <div className="flex gap-2">
                   <button onClick={testConnection} disabled={!hasCredentials}
                     className="flex-1 rounded-lg border border-accent/30 py-2 text-sm text-accent-soft hover:bg-accent/10 transition-colors disabled:opacity-40">
