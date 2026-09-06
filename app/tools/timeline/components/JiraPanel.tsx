@@ -192,6 +192,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   const [uploadLogs,      setUploadLogs]      = useState<JiraUploadLog[]>([])
   const [pendingTasks,    setPendingTasks]    = useState<Task[]>([])
   const [selectedSprintIds, setSelectedSprintIds] = useState<string[]>([])
+  const [previewExpanded,   setPreviewExpanded]   = useState(false)
 
   const [baseline, setBaseline] = useState<JiraBaseline | null>(() =>
     typeof window !== 'undefined' ? loadBaselineFromStorage(project.id) : null
@@ -584,6 +585,11 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       const removedManual = tasks.filter(t => !t.jiraId).length
       if (removedManual > 0) logs.push({ action: 'skip', jiraKey: '—', title: `${removedManual} manual task(s) cleared`, reason: 'clear-all' })
     }
+    // Auto-select sprint(s) that contain today
+    const today = new Date().toISOString().slice(0, 10)
+    const todaySprints = project.sprints.filter(s => s.startDate <= today && s.endDate >= today).map(s => s.id)
+    if (todaySprints.length > 0) setSelectedSprintIds(todaySprints)
+    setPreviewExpanded(false)
     setSyncLogs(logs); setPendingTasks(result); setStep('preview')
   }
 
@@ -904,23 +910,33 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 </div>
               )}
 
-              <div className="max-h-40 overflow-y-auto space-y-1">
-                {syncLogs.map((log, i) => (
-                  <div key={i} className="flex items-center gap-2 rounded-lg bg-background px-3 py-2 text-xs">
-                    <span className={`font-medium shrink-0 ${log.action === 'add' ? 'text-green-400' : log.action === 'update' ? 'text-blue-400' : 'text-red-400/70'}`}>
-                      {log.action === 'add' ? '+add' : log.action === 'update' ? '~upd' : '−rem'}
-                    </span>
-                    <span className="font-mono text-accent-soft shrink-0">{log.jiraKey}</span>
-                    <span className="text-muted truncate">{log.title}</span>
-                  </div>
-                ))}
-              </div>
               <div className="flex gap-2">
                 <button onClick={() => { setStep('idle'); setSyncLogs([]); setSelectedSprintIds([]) }}
-                  className="flex-1 rounded-lg border border-border py-2 text-sm text-muted">Cancel</button>
+                  className="flex-1 rounded-lg border border-border py-2 text-sm text-muted hover:text-fg transition-colors">Cancel</button>
                 <button onClick={confirmSync}
-                  className="flex-1 rounded-lg bg-accent py-2 text-sm font-medium text-white">Apply</button>
+                  className="flex-1 rounded-lg bg-accent py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors">Apply</button>
               </div>
+
+              {/* Collapsible task preview list */}
+              <button
+                onClick={() => setPreviewExpanded(v => !v)}
+                className="w-full flex items-center justify-between rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-xs text-muted hover:text-fg transition-colors">
+                <span>Tasks preview ({syncLogs.filter(l => l.action !== 'skip').length})</span>
+                <ChevronDown size={12} className={`transition-transform duration-200 ${previewExpanded ? 'rotate-180' : ''}`} />
+              </button>
+              {previewExpanded && (
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {syncLogs.map((log, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-lg bg-background px-3 py-2 text-xs">
+                      <span className={`font-medium shrink-0 ${log.action === 'add' ? 'text-green-400' : log.action === 'update' ? 'text-blue-400' : 'text-red-400/70'}`}>
+                        {log.action === 'add' ? '+add' : log.action === 'update' ? '~upd' : '−rem'}
+                      </span>
+                      <span className="font-mono text-accent-soft shrink-0">{log.jiraKey}</span>
+                      <span className="text-muted truncate">{log.title}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
