@@ -745,20 +745,19 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                   </>
                 ) : (
                   <>
-                    <a href="/jira-proxy.js" download
+                    <a href="/jira-proxy-mac-linux.zip" download
                       className="flex items-center justify-center gap-2 w-full rounded-lg bg-accent py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors">
-                      <Download size={13} />Tải jira-proxy.js {osType === 'mac' ? '(Mac)' : '(Linux)'}
+                      <Download size={13} />Tải jira-proxy-mac-linux.zip
                     </a>
                     <div className="rounded-lg bg-surface border border-border px-2.5 py-2 space-y-1.5">
-                      <p className="text-[10px] text-muted font-medium uppercase tracking-wide">Terminal — chạy 1 lần:</p>
-                      <code className="block text-[10px] font-mono text-accent-soft leading-relaxed break-all">
-                        {'node jira-proxy.js \\\n  --target '}
-                        <span className="text-amber-300">{host.trim() || 'https://jira.company.com'}</span>
-                        {' \\\n  --token '}
-                        <span className="text-amber-300">YOUR_PAT</span>
-                        {` \\\n  --port ${proxyPort || '8765'}`}
-                      </code>
-                      <p className="text-[10px] text-muted">Yêu cầu: Node.js ≥ 16. Không cần cài thêm package.</p>
+                      <p className="text-[10px] text-muted font-medium uppercase tracking-wide">Cách dùng:</p>
+                      <p className="text-[10px] text-muted leading-relaxed">
+                        1. Giải nén → mở <code className="text-accent-soft">config.json</code> → điền <code className="text-accent-soft">target</code> và <code className="text-accent-soft">token</code>
+                      </p>
+                      <p className="text-[10px] text-muted leading-relaxed">
+                        2. Mở Terminal → <code className="text-accent-soft font-mono">bash start.sh</code>
+                      </p>
+                      <p className="text-[10px] text-muted">Yêu cầu: Node.js ≥ 16 · Không cần cài thêm package.</p>
                     </div>
                   </>
                 )}

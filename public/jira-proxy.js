@@ -1,33 +1,56 @@
 #!/usr/bin/env node
-// jira-proxy.js — Local CORS proxy for Jira (Mac / Linux / Windows)
+// jira-proxy.js — Local CORS proxy for Jira (Mac / Linux)
+// Đọc cấu hình từ config.json cùng thư mục, hoặc CLI args.
 //
-// Usage:
-//   node jira-proxy.js --target https://jira.company.com --token YOUR_PAT
-//   node jira-proxy.js --target https://jira.company.com --token YOUR_PAT --port 8765
-//
-// Or via env vars:
-//   PROXY_TARGET=https://jira.company.com PROXY_TOKEN=xxx node jira-proxy.js
+// Cách chạy:
+//   1. Sửa config.json → chạy:  ./start.sh   (hoặc  bash start.sh)
+//   2. Hoặc truyền thẳng args:
+//        node jira-proxy.js --target https://jira.company.com --token YOUR_PAT
 
 'use strict'
 const http  = require('http')
 const https = require('https')
+const fs    = require('fs')
+const path  = require('path')
 const { URL } = require('url')
 
+// ── Đọc config.json ────────────────────────────────────────────
+let fileConfig = {}
+try {
+  const cfgPath = path.join(__dirname, 'config.json')
+  fileConfig = JSON.parse(fs.readFileSync(cfgPath, 'utf8'))
+} catch { /* không có file hoặc parse lỗi → bỏ qua */ }
+
+// ── CLI args ───────────────────────────────────────────────────
 function getArg(name) {
   const i = process.argv.indexOf(name)
   return i >= 0 ? process.argv[i + 1] : undefined
 }
 
-const PORT   = parseInt(getArg('--port') || process.env.PROXY_PORT  || '8765', 10)
-const TOKEN  = getArg('--token')  || process.env.PROXY_TOKEN  || ''
-const TARGET = (getArg('--target') || process.env.PROXY_TARGET || '').replace(/\/$/, '')
+// Ưu tiên: CLI arg > config.json > env var > default
+const PORT   = parseInt(getArg('--port')   || fileConfig.port   || process.env.PROXY_PORT  || '8765', 10)
+const TOKEN  =          getArg('--token')  || fileConfig.token  || process.env.PROXY_TOKEN  || ''
+const TARGET =         (getArg('--target') || fileConfig.target || process.env.PROXY_TARGET || '').replace(/\/$/, '')
 
-if (!TOKEN)  { console.error('Error: --token is required (Personal Access Token)'); process.exit(1) }
-if (!TARGET) { console.error('Error: --target is required (Jira base URL, e.g. https://jira.company.com)'); process.exit(1) }
+// ── Validate ───────────────────────────────────────────────────
+if (!TOKEN) {
+  console.error('❌  Lỗi: thiếu token (PAT).')
+  console.error('    → Điền "token" vào config.json, hoặc thêm --token YOUR_PAT')
+  process.exit(1)
+}
+if (!TARGET) {
+  console.error('❌  Lỗi: thiếu target URL Jira.')
+  console.error('    → Điền "target" vào config.json, hoặc thêm --target https://jira.company.com')
+  process.exit(1)
+}
 
 let target
-try { target = new URL(TARGET) } catch { console.error('Error: invalid --target URL'); process.exit(1) }
+try { target = new URL(TARGET) } catch {
+  console.error('❌  Lỗi: target URL không hợp lệ:', TARGET)
+  process.exit(1)
+}
 
+// ── Headers cần strip trước khi forward ───────────────────────
 const STRIP = new Set([
   'origin', 'referer',
   'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest', 'sec-fetch-user',
@@ -35,6 +58,7 @@ const STRIP = new Set([
   'user-agent', 'connection', 'host',
 ])
 
+// ── HTTP Server ────────────────────────────────────────────────
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin',  '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
@@ -67,8 +91,8 @@ const server = http.createServer((req, res) => {
     rejectUnauthorized: false,
   }
 
-  const proto  = target.protocol === 'https:' ? https : http
-  const proxy  = proto.request(options, proxyRes => {
+  const proto = target.protocol === 'https:' ? https : http
+  const proxy = proto.request(options, proxyRes => {
     const outHeaders = { ...proxyRes.headers, 'Access-Control-Allow-Origin': '*' }
     delete outHeaders['transfer-encoding']
     res.writeHead(proxyRes.statusCode || 502, outHeaders)
@@ -86,7 +110,13 @@ const server = http.createServer((req, res) => {
 })
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`✓ jira-proxy listening on http://127.0.0.1:${PORT}`)
-  console.log(`  → forwarding to ${TARGET}`)
-  console.log('  Press Ctrl+C to stop.\n')
+  console.log('====================================================')
+  console.log('  Jira CORS Proxy — Đang chạy!')
+  console.log('====================================================')
+  console.log(`  Target : ${TARGET}`)
+  console.log(`  Port   : ${PORT}`)
+  console.log(`  Health : http://127.0.0.1:${PORT}/health`)
+  console.log('----------------------------------------------------')
+  console.log('  Nhấn Ctrl+C để dừng.')
+  console.log('====================================================\n')
 })
