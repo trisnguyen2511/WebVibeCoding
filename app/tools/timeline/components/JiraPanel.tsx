@@ -425,13 +425,23 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
         }))
       }
 
-      // 2. Standard fields — separate PUTs so one failure doesn't block the other
-      // timeoriginalestimate may not be on the Jira edit screen → silently skip if 400
+      // 2. Original Estimate — try timeoriginalestimate (seconds), fallback to timetracking composite field
       if ((task.estimateHours ?? null) !== (b?.estimateHours ?? null) && task.estimateHours != null) {
+        const secs = Math.round(task.estimateHours * 3600)
+        const hStr = task.estimateHours % 1 === 0 ? `${task.estimateHours}h` : `${Math.floor(task.estimateHours)}h ${Math.round((task.estimateHours % 1) * 60)}m`
+        let estOk = false
         try {
-          await req(`/issue/${task.jiraId}`, 'PUT', { fields: { timeoriginalestimate: Math.round(task.estimateHours * 3600) } })
-          logs.push({ action: 'update_fields', jiraKey: key, date: 'estimate hours', hours: 0 })
-        } catch { /* field not on screen — skip silently */ }
+          await req(`/issue/${task.jiraId}`, 'PUT', { fields: { timeoriginalestimate: secs } })
+          estOk = true
+        } catch { /* not on Edit screen — try timetracking composite */ }
+        if (!estOk) {
+          try {
+            await req(`/issue/${task.jiraId}`, 'PUT', { fields: { timetracking: { originalEstimate: hStr } } })
+            estOk = true
+          } catch { /* neither field accessible via API */ }
+        }
+        if (estOk) logs.push({ action: 'update_fields', jiraKey: key, date: 'estimate hours', hours: 0 })
+        else logs.push({ action: 'skip', jiraKey: key, date: 'estimate hours', hours: 0, reason: 'timeoriginalestimate & timetracking không có trên Edit screen' })
       }
       if ((task.dueDate ?? null) !== (b?.dueDate ?? null) && task.dueDate) {
         await putFields(task.jiraId!, key, { duedate: task.dueDate }, 'due date')
