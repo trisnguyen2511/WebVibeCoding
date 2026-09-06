@@ -359,6 +359,32 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     setStep('uploading')
     const logs: JiraUploadLog[] = []
 
+    // Auto-detect field IDs before pushing if fieldMap is empty and date changes exist
+    let activeFieldMap = fieldMap
+    const needsDetect = hasDateChanges && fieldMapEmpty
+    if (needsDetect) {
+      const firstTask = tasks.find(t => t.jiraId && t.jiraKey)
+      if (firstTask) {
+        try {
+          const resp = await req(`/issue/${firstTask.jiraKey}?expand=names`) as { names?: Record<string, string> }
+          const names = resp.names ?? {}
+          const detected: FieldMap = { ...fieldMap }
+          for (const [id, name] of Object.entries(names)) {
+            const n = name.toLowerCase()
+            if (/actual\s*start/.test(n))      detected.actualStart   = id
+            else if (/actual\s*end/.test(n))   detected.actualEnd     = id
+            else if (/target\s*start/.test(n)) detected.estimateStart = id
+            else if (/target\s*end/.test(n))   detected.estimateEnd   = id
+          }
+          saveFieldMap(detected)
+          activeFieldMap = detected
+        } catch { /* proceed with empty fieldMap, will skip date fields */ }
+      }
+    }
+
+    // Track which date fields were actually pushed per jiraId, to update baseline correctly
+    const pushedDates: Record<string, { actualStart?: boolean; actualEnd?: boolean; estimateStart?: boolean; estimateEnd?: boolean }> = {}
+
     async function putFields(jiraId: string, jiraKey: string, fields: Record<string, unknown>, label: string) {
       try {
         await req(`/issue/${jiraId}`, 'PUT', { fields })
@@ -380,9 +406,10 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       const baseHours     = b?.manualHours  ?? 0
       const timeChanged   = curCount !== baseCount || curHours !== baseHours
 
+      pushedDates[task.jiraId!] = {}
+
       // 1. Worklogs — only when time entries changed since baseline
       if (timeChanged) {
-        // Push only new entries when count grew; re-push all when hours edited on same count
         const entriesToPush = curCount > baseCount ? manual.slice(baseCount) : manual
         await Promise.allSettled(entriesToPush.map(async entry => {
           try {
@@ -406,26 +433,51 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
         std.duedate = task.dueDate
       if (Object.keys(std).length > 0) await putFields(task.jiraId!, key, std, 'estimate+due')
 
-      // 3. Custom actual date fields — separate PUT, only changed
+      // 3. Custom actual date fields — skip and warn if field ID not configured
       const actualFields: Record<string, unknown> = {}
-      if (fieldMap.actualStart && (task.actualStartDate ?? null) !== (b?.actualStartDate ?? null) && task.actualStartDate)
-        actualFields[fieldMap.actualStart] = task.actualStartDate
-      if (fieldMap.actualEnd && (task.actualEndDate ?? null) !== (b?.actualEndDate ?? null) && task.actualEndDate)
-        actualFields[fieldMap.actualEnd] = task.actualEndDate
+      const actualStartChanged = (task.actualStartDate ?? null) !== (b?.actualStartDate ?? null) && task.actualStartDate
+      const actualEndChanged   = (task.actualEndDate   ?? null) !== (b?.actualEndDate   ?? null) && task.actualEndDate
+
+      if (actualStartChanged) {
+        if (activeFieldMap.actualStart) { actualFields[activeFieldMap.actualStart] = task.actualStartDate; pushedDates[task.jiraId!].actualStart = true }
+        else logs.push({ action: 'skip', jiraKey: key, date: 'actual start', hours: 0, reason: 'Field ID not found — check Jira field names' })
+      }
+      if (actualEndChanged) {
+        if (activeFieldMap.actualEnd) { actualFields[activeFieldMap.actualEnd] = task.actualEndDate; pushedDates[task.jiraId!].actualEnd = true }
+        else logs.push({ action: 'skip', jiraKey: key, date: 'actual end', hours: 0, reason: 'Field ID not found — check Jira field names' })
+      }
       if (Object.keys(actualFields).length > 0) await putFields(task.jiraId!, key, actualFields, 'actual-dates')
 
-      // 4. Custom estimate date fields (Target start/end) — separate PUT, silently skip if field missing
+      // 4. Custom estimate date fields (Target start/end) — skip and warn if field ID not found
       const estDateFields: Record<string, unknown> = {}
-      if (fieldMap.estimateStart && (task.estimateStartDate ?? null) !== (b?.estimateStartDate ?? null) && task.estimateStartDate)
-        estDateFields[fieldMap.estimateStart] = task.estimateStartDate
-      if (fieldMap.estimateEnd && (task.estimateEndDate ?? null) !== (b?.estimateEndDate ?? null) && task.estimateEndDate)
-        estDateFields[fieldMap.estimateEnd] = task.estimateEndDate
+      const estStartChanged = (task.estimateStartDate ?? null) !== (b?.estimateStartDate ?? null) && task.estimateStartDate
+      const estEndChanged   = (task.estimateEndDate   ?? null) !== (b?.estimateEndDate   ?? null) && task.estimateEndDate
+
+      if (estStartChanged) {
+        if (activeFieldMap.estimateStart) { estDateFields[activeFieldMap.estimateStart] = task.estimateStartDate; pushedDates[task.jiraId!].estimateStart = true }
+        else logs.push({ action: 'skip', jiraKey: key, date: 'target start', hours: 0, reason: 'Field ID not found — check Jira field names' })
+      }
+      if (estEndChanged) {
+        if (activeFieldMap.estimateEnd) { estDateFields[activeFieldMap.estimateEnd] = task.estimateEndDate; pushedDates[task.jiraId!].estimateEnd = true }
+        else logs.push({ action: 'skip', jiraKey: key, date: 'target end', hours: 0, reason: 'Field ID not found — check Jira field names' })
+      }
       if (Object.keys(estDateFields).length > 0) {
-        try { await req(`/issue/${task.jiraId}`, 'PUT', { fields: estDateFields }) } catch { /* custom field may not exist */ }
+        try { await req(`/issue/${task.jiraId}`, 'PUT', { fields: estDateFields }) } catch { /* custom field may not exist in Jira */ }
       }
     }))
 
+    // Build baseline — preserve old values for date fields that were not pushed (field ID missing)
     const newBaseline = buildBaseline(tasks)
+    for (const t of tasks) {
+      if (!t.jiraId) continue
+      const oldB  = baseline?.[t.jiraId]
+      const pushed = pushedDates[t.jiraId] ?? {}
+      if (!pushed.actualStart)   newBaseline[t.jiraId].actualStartDate   = oldB?.actualStartDate   ?? null
+      if (!pushed.actualEnd)     newBaseline[t.jiraId].actualEndDate     = oldB?.actualEndDate     ?? null
+      if (!pushed.estimateStart) newBaseline[t.jiraId].estimateStartDate = oldB?.estimateStartDate ?? null
+      if (!pushed.estimateEnd)   newBaseline[t.jiraId].estimateEndDate   = oldB?.estimateEndDate   ?? null
+    }
+
     saveBaselineToStorage(project.id, newBaseline)
     setBaseline(newBaseline)
     setUploadLogs(logs); setStep('done')
@@ -546,6 +598,20 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     )
   }).length
   const hasPushableData  = fieldsTaskCount > 0
+
+  // Warn when date fields changed but field map not yet configured
+  const fieldMapEmpty = !fieldMap.actualStart && !fieldMap.actualEnd && !fieldMap.estimateStart && !fieldMap.estimateEnd
+  const hasDateChanges = tasks.some(t => {
+    if (!t.jiraId) return false
+    const b = baseline?.[t.jiraId]
+    return (
+      (t.estimateStartDate ?? null) !== (b?.estimateStartDate ?? null) ||
+      (t.estimateEndDate   ?? null) !== (b?.estimateEndDate   ?? null) ||
+      (t.actualStartDate   ?? null) !== (b?.actualStartDate   ?? null) ||
+      (t.actualEndDate     ?? null) !== (b?.actualEndDate     ?? null)
+    )
+  })
+  const showFieldMapWarning = fieldMapEmpty && hasDateChanges
 
   return (
     <>
@@ -869,11 +935,21 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 )}
               </div>
             ) : (
-              <button onClick={handleUploadTime} disabled={step === 'uploading' || !hasCredentials || !hasPushableData}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40">
-                {step === 'uploading' ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                {step === 'uploading' ? 'Uploading...' : 'Push Time Entries → Jira'}
-              </button>
+              <div className="space-y-2">
+                {showFieldMapWarning && (
+                  <div className="flex items-start gap-2 rounded-lg bg-blue-500/10 border border-blue-500/20 px-3 py-2 text-xs text-blue-300">
+                    <RefreshCw size={13} className="shrink-0 mt-0.5" />
+                    <span>
+                      Có thay đổi Target/Actual dates — <strong>sẽ tự động detect field IDs từ Jira khi Push</strong>.
+                    </span>
+                  </div>
+                )}
+                <button onClick={handleUploadTime} disabled={step === 'uploading' || !hasCredentials || !hasPushableData}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40">
+                  {step === 'uploading' ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {step === 'uploading' ? 'Uploading...' : 'Push Time Entries → Jira'}
+                </button>
+              </div>
             )}
           </div>
 
