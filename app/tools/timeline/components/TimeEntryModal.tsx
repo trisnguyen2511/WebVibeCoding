@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { Task, TimeEntry } from '@/lib/timeline-types'
 import { generateId } from '@/lib/timeline-storage'
 
@@ -16,6 +16,14 @@ interface Props {
 export function TimeEntryModal({ task, date, existingEntry, onSave, onDelete, onClose }: Props) {
   const [hours, setHours] = useState(existingEntry?.hours.toString() ?? '')
   const [note, setNote] = useState(existingEntry?.note ?? '')
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onCloseRef.current() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -31,8 +39,9 @@ export function TimeEntryModal({ task, date, existingEntry, onSave, onDelete, on
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div>
             <h3 className="font-display font-medium text-fg text-sm">{task.title}</h3>

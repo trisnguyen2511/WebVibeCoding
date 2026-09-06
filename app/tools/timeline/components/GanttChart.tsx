@@ -143,11 +143,21 @@ function QuickEstimateModal({ task, date, onSave, onClose }: {
 
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
+
+  function doSave() {
+    if (startDate && endDate && startDate <= endDate)
+      onSave(startDate, endDate, hours && Number(hours) > 0 ? Number(hours) : undefined)
+  }
+
   useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onCloseRef.current() }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') { onCloseRef.current(); return }
+      if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) { doSave() }
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, []) // stable: reads onClose through ref
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, hours])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -183,7 +193,7 @@ function QuickEstimateModal({ task, date, onSave, onClose }: {
             Cancel
           </button>
           <button
-            onClick={() => { if (startDate && endDate && startDate <= endDate) onSave(startDate, endDate, hours && Number(hours) > 0 ? Number(hours) : undefined) }}
+            onClick={doSave}
             disabled={!startDate || !endDate || startDate > endDate || (hours !== '' && Number(hours) < 0)}
             className="flex-1 rounded-lg bg-accent py-2 text-xs font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-40">
             Save
@@ -582,7 +592,11 @@ export function GanttChart({
     if (dragIdx === dropIdx) return false
     const dragged = displayRows[dragIdx]
     const target  = displayRows[dropIdx]
-    if (!dragged || !target || dragged.type === 'header') return false
+    if (!dragged || !target) return false
+    // Header drag: swap with another header group
+    if (dragged.type === 'header') {
+      return target.type === 'header' && target.parentKey !== dragged.parentKey
+    }
     if (dragged.type === 'task' && dragged.isSubtask) {
       // Subtasks: only within same parent group
       if (target.type === 'header') return target.colorIdx === dragged.colorIdx
@@ -600,6 +614,33 @@ export function GanttChart({
     if (!isValidListDrop(listDragIdx, dropIdx)) { setListDragIdx(null); setListDropIdx(null); return }
 
     const dragged = displayRows[listDragIdx]
+
+    if (dragged.type === 'header') {
+      // Reorder entire groups by parentKey
+      const groupOrder: string[] = []
+      for (const row of displayRows) {
+        if (row.type === 'header') groupOrder.push(row.parentKey)
+      }
+      const targetRow = displayRows[dropIdx]
+      if (targetRow?.type !== 'header') { setListDragIdx(null); setListDropIdx(null); return }
+      const fromIdx = groupOrder.indexOf(dragged.parentKey)
+      const toIdx   = groupOrder.indexOf(targetRow.parentKey)
+      if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) { setListDragIdx(null); setListDropIdx(null); return }
+      const newGroupOrder = [...groupOrder]
+      newGroupOrder.splice(fromIdx, 1)
+      newGroupOrder.splice(toIdx, 0, dragged.parentKey)
+
+      let orderIdx = 0
+      const orderMap = new Map<string, number>()
+      for (const pk of newGroupOrder) {
+        tasks.filter(t => t.parentKey === pk).sort((a, b) => a.order - b.order).forEach(t => orderMap.set(t.id, orderIdx++))
+      }
+      tasks.filter(t => !t.parentKey).sort((a, b) => a.order - b.order).forEach(t => orderMap.set(t.id, orderIdx++))
+      onReorderTasks(tasks.map(t => orderMap.has(t.id) ? { ...t, order: orderMap.get(t.id)! } : t))
+      setListDragIdx(null); setListDropIdx(null)
+      return
+    }
+
     if (dragged.type !== 'task') return
 
     // Build new row order
@@ -631,6 +672,7 @@ export function GanttChart({
   // ── Helpers ──────────────────────────────────────────────────
   function rowHeight(row: DisplayRow) {
     if (row.type === 'task' && row.hiddenByCollapse) return 0
+    if (row.type === 'header') return GROUP_H
     return ROW_H
   }
 
@@ -704,9 +746,13 @@ export function GanttChart({
               const pal = GROUP_PALETTE[row.colorIdx % GROUP_PALETTE.length]
               return (
                 <div key={`gh-${row.parentKey}`}
-                  className="grid items-center border-b border-border/60 transition-shadow duration-100 cursor-pointer hover:brightness-110"
-                  style={{ gridTemplateColumns: '20px 1fr 48px 52px', height: ROW_H, borderLeftWidth: 3, borderLeftColor: pal.border, background: pal.bg, paddingLeft: 8, paddingRight: 12, ...dropLineStyle }}
+                  draggable={!!onReorderTasks && !searchQuery}
+                  className={`grid items-center border-b border-border/60 transition-shadow duration-100 hover:brightness-110 ${onReorderTasks && !searchQuery ? 'cursor-grab' : 'cursor-pointer'} ${listDragIdx === ri ? 'opacity-40' : ''}`}
+                  style={{ gridTemplateColumns: '20px 1fr 48px 52px', height: GROUP_H, borderLeftWidth: 3, borderLeftColor: pal.border, background: pal.bg, paddingLeft: 8, paddingRight: 12, ...dropLineStyle }}
+                  onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setListDragIdx(ri); setListDropIdx(null) }}
+                  onDragEnd={() => { setListDragIdx(null); setListDropIdx(null) }}
                   onClick={e => {
+                    if (listDragIdx !== null) return
                     if ((e.ctrlKey || e.metaKey) && row.link) {
                       window.open(row.link, '_blank', 'noopener,noreferrer')
                     } else {
