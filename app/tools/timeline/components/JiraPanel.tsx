@@ -425,13 +425,17 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
         }))
       }
 
-      // 2. Standard fields — only include fields that changed vs baseline
-      const std: Record<string, unknown> = {}
-      if ((task.estimateHours ?? null) !== (b?.estimateHours ?? null) && task.estimateHours != null)
-        std.timeoriginalestimate = Math.round(task.estimateHours * 3600)
-      if ((task.dueDate ?? null) !== (b?.dueDate ?? null) && task.dueDate)
-        std.duedate = task.dueDate
-      if (Object.keys(std).length > 0) await putFields(task.jiraId!, key, std, 'estimate+due')
+      // 2. Standard fields — separate PUTs so one failure doesn't block the other
+      // timeoriginalestimate may not be on the Jira edit screen → silently skip if 400
+      if ((task.estimateHours ?? null) !== (b?.estimateHours ?? null) && task.estimateHours != null) {
+        try {
+          await req(`/issue/${task.jiraId}`, 'PUT', { fields: { timeoriginalestimate: Math.round(task.estimateHours * 3600) } })
+          logs.push({ action: 'update_fields', jiraKey: key, date: 'estimate hours', hours: 0 })
+        } catch { /* field not on screen — skip silently */ }
+      }
+      if ((task.dueDate ?? null) !== (b?.dueDate ?? null) && task.dueDate) {
+        await putFields(task.jiraId!, key, { duedate: task.dueDate }, 'due date')
+      }
 
       // 3. Custom actual date fields — skip and warn if field ID not configured
       const actualFields: Record<string, unknown> = {}
