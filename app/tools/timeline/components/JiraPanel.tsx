@@ -40,7 +40,7 @@ interface Props {
 
 type SyncStep = 'idle' | 'syncing' | 'preview' | 'uploading' | 'done'
 
-const DEFAULT_JQL = 'issuetype = Sub-task AND assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC'
+const DEFAULT_JQL = 'issuetype = Sub-task AND assignee = currentUser() AND sprint in openSprints() ORDER BY key ASC'
 const FIELDS = 'summary,status,parent,duedate,timeoriginalestimate,timespent'
 
 // ── Direct fetch (CORS must be handled by caller) ─────────────
