@@ -72,6 +72,11 @@ async function jiraRequest(
   return json
 }
 
+function extractJiraDate(raw: unknown): string | undefined {
+  if (typeof raw !== 'string' || !raw) return undefined
+  return raw.slice(0, 10)
+}
+
 // ── curl builder ──────────────────────────────────────────────
 function buildCurl(host: string, token: string, path: string, method = 'GET', body?: unknown): string {
   const base = host.replace(/\/$/, '').replace(/^(?!https?:\/\/)/, 'https://')
@@ -221,7 +226,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     if (fetchMode === 'local-proxy') return jiraRequest(getProxyConfig(), path, method, data, false)
     return jiraRequest(getConfig(), path, method, data, serverMode)
   }
-  function buildSearchPath(jqlStr: string) { return `/search?jql=${encodeURIComponent(jqlStr.trim())}&maxResults=100&fields=${FIELDS}` }
+  function buildSearchPath(jqlStr: string) { return `/search?jql=${encodeURIComponent(jqlStr.trim())}&maxResults=100&fields=${buildFields()}` }
 
   // ── curl/Postman handlers ───────────────────────────────────
   function generateTasksCurl() {
@@ -570,7 +575,18 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       parent?: { key: string; fields?: { summary?: string } }
       duedate?: string
       timeoriginalestimate?: number
+      [key: string]: unknown
     }
+  }
+
+  function buildFields(): string {
+    const base = 'summary,status,parent,duedate,timeoriginalestimate,timespent'
+    const extras: string[] = []
+    if (fieldMap.estimateStart) extras.push(fieldMap.estimateStart)
+    if (fieldMap.estimateEnd)   extras.push(fieldMap.estimateEnd)
+    if (fieldMap.actualStart)   extras.push(fieldMap.actualStart)
+    if (fieldMap.actualEnd)     extras.push(fieldMap.actualEnd)
+    return extras.length > 0 ? `${base},${extras.join(',')}` : base
   }
 
   function buildIssueLink(key: string): string | undefined {
@@ -612,16 +628,21 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
       const parentTitle = parentKey ? (parentMap[parentKey] ?? parentKey) : undefined
       const link = buildIssueLink(issue.key)
       const newJiraEntries = worklogMap.get(issue.id) ?? []
+      const pulledEstimateStart = extractJiraDate(fieldMap.estimateStart ? issue.fields[fieldMap.estimateStart] : undefined)
+      const pulledEstimateEnd   = extractJiraDate(fieldMap.estimateEnd   ? issue.fields[fieldMap.estimateEnd]   : undefined)
+      const pulledActualStart   = extractJiraDate(fieldMap.actualStart   ? issue.fields[fieldMap.actualStart]   : undefined)
+      const pulledActualEnd     = extractJiraDate(fieldMap.actualEnd     ? issue.fields[fieldMap.actualEnd]     : undefined)
+
       if (existingIdx >= 0) {
         const existing = result[existingIdx]
         const existingJiraIds = new Set(existing.timeEntries.filter(e => e.jiraWorklogId).map(e => e.jiraWorklogId))
         const freshJira = newJiraEntries.filter(e => !existingJiraIds.has(e.jiraWorklogId))
         const mergedEntries = [...existing.timeEntries.filter(e => e.source === 'manual'), ...existing.timeEntries.filter(e => e.source === 'jira'), ...freshJira]
-        result[existingIdx] = { ...existing, title: issue.fields.summary, jiraKey: issue.key, jiraStatus: jiraStatusName, status, parentKey, parentTitle, ...(link ? { link } : {}), dueDate: issue.fields.duedate ?? existing.dueDate, estimateHours: issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : existing.estimateHours, timeEntries: mergedEntries, updatedAt: new Date().toISOString() }
+        result[existingIdx] = { ...existing, title: issue.fields.summary, jiraKey: issue.key, jiraStatus: jiraStatusName, status, parentKey, parentTitle, ...(link ? { link } : {}), dueDate: issue.fields.duedate ?? existing.dueDate, estimateHours: issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : existing.estimateHours, estimateStartDate: pulledEstimateStart ?? existing.estimateStartDate, estimateEndDate: pulledEstimateEnd ?? existing.estimateEndDate, actualStartDate: pulledActualStart ?? existing.actualStartDate, actualEndDate: pulledActualEnd ?? existing.actualEndDate, timeEntries: mergedEntries, updatedAt: new Date().toISOString() }
         logs.push({ action: 'update', jiraKey: issue.key, title: issue.fields.summary })
       } else {
         const now = new Date().toISOString()
-        result.push({ id: generateId(), projectId: project.id, jiraId: issue.id, jiraKey: issue.key, jiraStatus: jiraStatusName, parentKey, parentTitle, ...(link ? { link } : {}), title: issue.fields.summary, status, dueDate: issue.fields.duedate ?? undefined, estimateHours: issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : undefined, timeEntries: newJiraEntries, order: result.length, createdAt: now, updatedAt: now })
+        result.push({ id: generateId(), projectId: project.id, jiraId: issue.id, jiraKey: issue.key, jiraStatus: jiraStatusName, parentKey, parentTitle, ...(link ? { link } : {}), title: issue.fields.summary, status, dueDate: issue.fields.duedate ?? undefined, estimateHours: issue.fields.timeoriginalestimate ? issue.fields.timeoriginalestimate / 3600 : undefined, estimateStartDate: pulledEstimateStart, estimateEndDate: pulledEstimateEnd, actualStartDate: pulledActualStart, actualEndDate: pulledActualEnd, timeEntries: newJiraEntries, order: result.length, createdAt: now, updatedAt: now })
         logs.push({ action: 'add', jiraKey: issue.key, title: issue.fields.summary })
       }
     }
