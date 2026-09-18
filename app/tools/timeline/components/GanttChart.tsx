@@ -997,11 +997,6 @@ export function GanttChart({
                 style={{ left: i * DAY_W, width: 1, background: 'rgb(var(--color-overlay) / 0.06)' }} />
             ))}
 
-            {/* Horizontal row lines */}
-            {filteredDisplayRows.map((row, ri) => (
-              <div key={`hl-${ri}`} className="absolute left-0 right-0 pointer-events-none"
-                style={{ top: rowTops[ri], height: 1, background: 'rgb(var(--color-overlay) / 0.07)' }} />
-            ))}
 
             {/* Background: sprint separators */}
             {sprints.map(sprint => {
