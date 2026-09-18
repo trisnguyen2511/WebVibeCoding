@@ -98,7 +98,7 @@ interface Tooltip {
   x: number; y: number
   task?: Task
   headerRow?: { parentKey: string; parentTitle: string; count: number; colorIdx: number; estStart?: string; estEnd?: string; actStart?: string; actEnd?: string }
-  date?: string; entry?: TimeEntry
+  date?: string; entry?: TimeEntry; entryTotalHours?: number
 }
 interface ContextMenu { x: number; y: number; task: Task; date?: string }
 
@@ -1090,7 +1090,15 @@ export function GanttChart({
               const isDragging = dragPreview?.taskId === task.id
 
               const isHidden = !!row.hiddenByCollapse
-              const entryByDate = new Map(task.timeEntries.map(e => [e.date, e]))
+              const entryByDate = (() => {
+                const m = new Map<string, { totalHours: number; entry: TimeEntry }>()
+                for (const e of task.timeEntries) {
+                  const prev = m.get(e.date)
+                  if (prev) m.set(e.date, { totalHours: prev.totalHours + e.hours, entry: prev.entry })
+                  else m.set(e.date, { totalHours: e.hours, entry: e })
+                }
+                return m
+              })()
               return (
                 <div key={task.id}
                   className={`relative border-b border-border/30 ${isHidden ? '' : `transition-colors duration-100 ${isHovered ? 'bg-surface/40' : ''}`}`}
@@ -1110,16 +1118,16 @@ export function GanttChart({
 
                   {/* Click cells + shortcut hint */}
                   {days.map((day, i) => {
-                    const entry = entryByDate.get(day)
+                    const dateEntry = entryByDate.get(day)
                     return (
                       <div key={day}
                         className="absolute top-0 bottom-0 cursor-pointer group"
                         style={{ left: i * DAY_W, width: DAY_W }}
-                        onClick={() => setEntryModal({ task, date: day, entry })}
+                        onClick={() => setEntryModal({ task, date: day, entry: dateEntry?.entry })}
                         onMouseEnter={e => {
                           hoveredCellRef.current = { task, date: day }
-                          if (!entry) return
-                          setTooltip({ x: e.clientX, y: e.clientY, task, date: day, entry })
+                          if (!dateEntry) return
+                          setTooltip({ x: e.clientX, y: e.clientY, task, date: day, entry: dateEntry.entry, entryTotalHours: dateEntry.totalHours })
                         }}
                         onMouseLeave={() => {
                           hoveredCellRef.current = null
@@ -1182,19 +1190,19 @@ export function GanttChart({
                     )
                   })()}
 
-                  {/* Time entry dots */}
-                  {task.timeEntries.map(entry => {
-                    const idx = dateToIndex(entry.date, timelineStart)
+                  {/* Time entry dots — one per day, opacity based on total hours that day */}
+                  {Array.from(entryByDate.entries()).map(([date, { totalHours }]) => {
+                    const idx = dateToIndex(date, timelineStart)
                     if (idx < 0 || idx >= totalDays) return null
                     return (
-                      <div key={entry.id}
+                      <div key={date}
                         className="absolute rounded-sm pointer-events-none"
                         style={{
                           left:   idx * DAY_W + 3,
                           width:  DAY_W - 6,
                           bottom: 5,
                           height: 6,
-                          background: `rgba(124,58,237,${0.50 + Math.min(0.50, entry.hours / 8 * 0.50)})`,
+                          background: `rgba(124,58,237,${0.50 + Math.min(0.50, totalHours / 8 * 0.50)})`,
                         }} />
                     )
                   })}
@@ -1315,7 +1323,7 @@ export function GanttChart({
               {tooltip.date && tooltip.entry ? (
                 <div className="rounded-lg bg-background px-3 py-2 space-y-1">
                   <p className="text-muted">{fmtDate(tooltip.date)}</p>
-                  <p className="font-mono text-lg font-bold text-accent-soft">{tooltip.entry.hours}h</p>
+                  <p className="font-mono text-lg font-bold text-accent-soft">{tooltip.entryTotalHours ?? tooltip.entry.hours}h</p>
                   {tooltip.entry.note && <p className="text-muted truncate">{tooltip.entry.note}</p>}
                   <p className="text-[10px] text-muted/60">{tooltip.entry.source === 'jira' ? 'from Jira' : 'manual'}</p>
                 </div>
