@@ -525,7 +525,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
         else logs.push({ action: 'skip', jiraKey: key, date: 'target end', hours: 0, reason: 'Field ID not found — check Jira field names' })
       }
       if (Object.keys(estDateFields).length > 0) {
-        try { await req(`/issue/${task.jiraId}`, 'PUT', { fields: estDateFields }) } catch { /* custom field may not exist in Jira */ }
+        await putFields(task.jiraId!, key, estDateFields, 'target-dates')
       }
     }))
 
@@ -651,9 +651,13 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
     const manual = t.timeEntries.filter(e => e.source === 'manual')
     const manualCount = manual.length
     const manualHours = manual.reduce((s, e) => s + e.hours, 0)
-    if (!baseline) return manualCount > 0
-    const b = baseline[t.jiraId]
-    if (!b) return manualCount > 0
+    const b = baseline?.[t.jiraId]
+    if (!b) return (
+      manualCount > 0 ||
+      t.estimateHours != null ||
+      !!t.estimateStartDate || !!t.estimateEndDate ||
+      !!t.dueDate || !!t.actualStartDate || !!t.actualEndDate
+    )
     return (
       (t.estimateHours ?? null) !== b.estimateHours ||
       (t.estimateStartDate ?? null) !== b.estimateStartDate ||
