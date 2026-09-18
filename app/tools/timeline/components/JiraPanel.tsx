@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Plug, RefreshCw, Upload, CheckCircle, AlertCircle, Loader2, RotateCcw, Copy, Terminal, Download, MonitorDot, ChevronDown } from 'lucide-react'
+import { X, Plug, RefreshCw, Upload, CheckCircle, AlertCircle, Loader2, RotateCcw, Copy, Terminal, Download, MonitorDot, ChevronDown, Clock } from 'lucide-react'
 import type { Project, Task, JiraConfig, JiraSyncLog, JiraUploadLog } from '@/lib/timeline-types'
 import { generateId, PROXY_PORT_KEY, PROXY_TOKEN_KEY } from '@/lib/timeline-storage'
 
@@ -193,6 +193,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
   const [pendingTasks,    setPendingTasks]    = useState<Task[]>([])
   const [selectedSprintIds, setSelectedSprintIds] = useState<string[]>([])
   const [previewExpanded,   setPreviewExpanded]   = useState(false)
+  const [pullingTime,     setPullingTime]     = useState(false)
 
   // Detect OS for platform-specific proxy download
   const osType: 'windows' | 'mac' | 'linux' = (() => {
@@ -363,6 +364,44 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
 
       mergePulledIssues(allIssues, parentMap, worklogMap)
     } catch (e) { setError(`Sync failed: ${e instanceof Error ? e.message : String(e)}`); setStep('idle') }
+  }
+
+  async function pullTimeOnly() {
+    const jiraTasks = tasks.filter(t => t.jiraId)
+    if (jiraTasks.length === 0) { setError('Không có task Jira nào để pull time'); return }
+    setPullingTime(true); setError('')
+    try {
+      const myself = await req('/myself') as { accountId?: string; name?: string }
+      const accountId = myself.accountId ?? myself.name ?? ''
+      if (!accountId) throw new Error('Không lấy được accountId')
+
+      const updates: { taskId: string; entries: Task['timeEntries'] }[] = []
+
+      await Promise.allSettled(jiraTasks.map(async task => {
+        try {
+          const res = await req(`/issue/${task.jiraId}/worklog`) as {
+            worklogs?: Array<{ id: string; author: { accountId?: string; name?: string }; started: string; timeSpentSeconds: number }>
+          }
+          const mine = (res.worklogs ?? []).filter(w => w.author.accountId === accountId || w.author.name === accountId)
+          const newJiraEntries: Task['timeEntries'] = mine.map(w => ({
+            id: `jira-${w.id}`, date: w.started.slice(0, 10),
+            hours: w.timeSpentSeconds / 3600, source: 'jira' as const, jiraWorklogId: w.id,
+          }))
+          const manualEntries = task.timeEntries.filter(e => e.source === 'manual')
+          const existingJiraIds = new Set(task.timeEntries.filter(e => e.jiraWorklogId).map(e => e.jiraWorklogId))
+          const freshJira = newJiraEntries.filter(e => !existingJiraIds.has(e.jiraWorklogId))
+          const mergedEntries = [...manualEntries, ...task.timeEntries.filter(e => e.source === 'jira'), ...freshJira]
+          updates.push({ taskId: task.id, entries: mergedEntries })
+        } catch { /* skip individual errors */ }
+      }))
+
+      onSyncTime(updates)
+      setError(`✓ Đã pull time cho ${updates.length} task`)
+    } catch (e) {
+      setError(`Pull time failed: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setPullingTime(false)
+    }
   }
 
   async function handleUploadTime() {
@@ -884,11 +923,18 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 )}
               </div>
             ) : (
-              <button onClick={syncTasks} disabled={step === 'syncing' || !hasCredentials || !jql.trim()}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40">
-                {step === 'syncing' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                {step === 'syncing' ? 'Syncing...' : 'Pull Tasks + Time'}
-              </button>
+              <div className="space-y-2">
+                <button onClick={syncTasks} disabled={step === 'syncing' || !hasCredentials || !jql.trim()}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-accent/15 border border-accent/20 py-2.5 text-sm text-accent-soft hover:bg-accent/25 transition-colors disabled:opacity-40">
+                  {step === 'syncing' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  {step === 'syncing' ? 'Syncing...' : 'Pull Tasks + Time'}
+                </button>
+                <button onClick={pullTimeOnly} disabled={pullingTime || !hasCredentials || tasks.filter(t => t.jiraId).length === 0}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg border border-border py-2 text-sm text-muted hover:text-fg hover:border-border/80 transition-colors disabled:opacity-40">
+                  {pullingTime ? <Loader2 size={13} className="animate-spin" /> : <Clock size={13} />}
+                  {pullingTime ? 'Pulling time...' : 'Pull Time'}
+                </button>
+              </div>
             )}
           </div>
 
