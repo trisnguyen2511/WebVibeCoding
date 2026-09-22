@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import https from 'https'
 import { startServer, stopServer, isRunning, getConfig } from './proxy-server'
 
 let tray: Tray | null = null
@@ -25,6 +26,12 @@ function configPath(): string {
   return path.join(app.getPath('userData'), 'config.json')
 }
 
+function defaultConfigPath(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'default-config.json')
+    : path.join(__dirname, '..', 'default-config.json')
+}
+
 // ── Config persistence ─────────────────────────────────────────────────────────
 
 interface SavedConfig {
@@ -33,18 +40,74 @@ interface SavedConfig {
 }
 
 function loadSavedConfig(): SavedConfig | null {
+  // 1. User's saved config (userData)
   try {
     const raw = fs.readFileSync(configPath(), 'utf8')
     return JSON.parse(raw) as SavedConfig
-  } catch {
-    return null
-  }
+  } catch { /* no saved config yet */ }
+
+  // 2. Bundled default config (shipped with app)
+  try {
+    const raw = fs.readFileSync(defaultConfigPath(), 'utf8')
+    return JSON.parse(raw) as SavedConfig
+  } catch { /* no default config */ }
+
+  return null
 }
 
 function writeSavedConfig(cfg: SavedConfig): void {
   try {
     fs.writeFileSync(configPath(), JSON.stringify(cfg, null, 2), 'utf8')
   } catch { /* noop */ }
+}
+
+// ── Update check ───────────────────────────────────────────────────────────────
+
+interface UpdateInfo {
+  hasUpdate: boolean
+  version: string
+  url: string
+}
+
+function checkForUpdate(): Promise<UpdateInfo> {
+  return new Promise((resolve) => {
+    const noUpdate = { hasUpdate: false, version: '', url: '' }
+    const options = {
+      hostname: 'api.github.com',
+      path: '/repos/trisnguyen2511/WebVibeCoding/releases/latest',
+      headers: { 'User-Agent': 'jira-proxy-electron' },
+      timeout: 8000,
+    }
+    const req = https.get(options, (res) => {
+      let data = ''
+      res.on('data', (c: string) => { data += c })
+      res.on('end', () => {
+        try {
+          const release = JSON.parse(data) as { tag_name: string; html_url: string }
+          const tag = release.tag_name ?? ''
+          if (!tag.startsWith('jira-proxy-v')) { resolve(noUpdate); return }
+          const newVer = tag.replace('jira-proxy-v', '')
+          const curVer = app.getVersion()
+          const hasUpdate = semverGt(newVer, curVer)
+          resolve({ hasUpdate, version: newVer, url: release.html_url })
+        } catch {
+          resolve(noUpdate)
+        }
+      })
+    })
+    req.on('error', () => resolve(noUpdate))
+    req.on('timeout', () => { req.destroy(); resolve(noUpdate) })
+  })
+}
+
+function semverGt(a: string, b: string): boolean {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] ?? 0) > (pb[i] ?? 0)) return true
+    if ((pa[i] ?? 0) < (pb[i] ?? 0)) return false
+  }
+  return false
 }
 
 // ── Tray ────────────────────────────────────────────────────────────────────────
@@ -93,7 +156,6 @@ function createTray() {
     icon = nativeImage.createFromPath(iconFile)
     if (process.platform === 'darwin') icon.setTemplateImage(true)
   } else {
-    // Fallback: tiny purple square generated from data URL
     icon = nativeImage.createFromDataURL(
       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA' +
       'MElEQVQ4T2NkYGD4z8BQDwAEgAF/QEABwAAAABJRU5ErkJggg=='
@@ -117,7 +179,7 @@ function createWindow() {
 
   win = new BrowserWindow({
     width: 460,
-    height: 560,
+    height: 580,
     resizable: false,
     title: 'Jira Proxy',
     ...(fs.existsSync(iconFile) ? { icon: iconFile } : {}),
@@ -132,7 +194,6 @@ function createWindow() {
 
   win.loadFile(rendererPath('index.html'))
 
-  // Hide to tray on close
   win.on('close', (e) => {
     if (!isQuitting) {
       e.preventDefault()
@@ -144,13 +205,11 @@ function createWindow() {
 // ── App lifecycle ───────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
-  // Hide from macOS dock — tray-only app
   if (process.platform === 'darwin') app.dock?.hide()
 
   createWindow()
   createTray()
 
-  // Show window on first launch
   win?.show()
 })
 
@@ -169,9 +228,9 @@ app.on('before-quit', async () => {
 
 ipcMain.handle('start-proxy', async (_, config: { target: string; token: string; port: number }) => {
   try {
-    await startServer(config)
+    const actualPort = await startServer(config)
     refreshTray()
-    return { ok: true }
+    return { ok: true, port: actualPort }
   } catch (err) {
     return { ok: false, error: (err as Error).message }
   }
@@ -202,4 +261,16 @@ ipcMain.handle('save-config', (_, cfg: { target: string; port: string }) => {
 
 ipcMain.handle('load-config', () => {
   return loadSavedConfig()
+})
+
+ipcMain.handle('check-update', async () => {
+  return checkForUpdate()
+})
+
+ipcMain.handle('get-version', () => {
+  return app.getVersion()
+})
+
+ipcMain.handle('open-url', (_, url: string) => {
+  shell.openExternal(url)
 })

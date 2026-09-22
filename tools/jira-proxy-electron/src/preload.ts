@@ -18,4 +18,13 @@ contextBridge.exposeInMainWorld('api', {
 
   loadConfig: () =>
     ipcRenderer.invoke('load-config'),
+
+  checkUpdate: () =>
+    ipcRenderer.invoke('check-update'),
+
+  getVersion: () =>
+    ipcRenderer.invoke('get-version'),
+
+  openUrl: (url: string) =>
+    ipcRenderer.invoke('open-url', url),
 })

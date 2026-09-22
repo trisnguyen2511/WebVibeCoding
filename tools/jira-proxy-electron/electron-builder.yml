@@ -13,6 +13,8 @@ files:
 extraResources:
   - from: renderer
     to: renderer
+  - from: default-config.json
+    to: default-config.json
 
 win:
   target:
