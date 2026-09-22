@@ -1,0 +1,45 @@
+appId: com.webvibecoding.jira-proxy
+productName: Jira Proxy
+copyright: WebVibeCoding
+
+directories:
+  output: dist-electron
+  buildResources: assets
+
+files:
+  - dist/**
+  - "!dist-electron/**"
+
+extraResources:
+  - from: renderer
+    to: renderer
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: jira-proxy-setup.exe
+
+nsis:
+  oneClick: true
+  perMachine: false
+  shortcutName: Jira Proxy
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+mac:
+  target:
+    - target: dmg
+      arch: [universal]
+  artifactName: jira-proxy-mac.dmg
+  category: public.app-category.developer-tools
+
+dmg:
+  title: Jira Proxy
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  artifactName: jira-proxy-linux.AppImage
+  category: Development
