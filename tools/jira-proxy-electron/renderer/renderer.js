@@ -2,7 +2,7 @@
 'use strict'
 
 let currentPort = 8765
-let updateUrl = ''
+let updateState = 'none' // 'none' | 'available' | 'downloading' | 'downloaded'
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
 
@@ -62,15 +62,30 @@ async function init() {
     document.getElementById('autostart-toggle').checked = autoStart
   } catch { /* noop */ }
 
-  // Check for update in background (silent on error)
-  api.checkUpdate().then(function(result) {
-    if (result && result.hasUpdate) {
-      updateUrl = result.url
-      document.getElementById('update-text').textContent =
-        'Có bản cập nhật mới: v' + result.version
-      document.getElementById('update-banner').classList.add('visible')
-    }
-  }).catch(function() {})
+  // Register push-based update listeners (electron-updater events from main process)
+  api.onUpdateAvailable(function(info) {
+    updateState = 'available'
+    document.getElementById('update-text').textContent = 'Có bản cập nhật mới: v' + info.version
+    document.getElementById('update-banner').classList.add('visible')
+    document.getElementById('update-btn').textContent = 'Tải về'
+    document.getElementById('update-btn').disabled = false
+  })
+
+  api.onDownloadProgress(function(progress) {
+    updateState = 'downloading'
+    var pct = Math.round(progress.percent || 0)
+    document.getElementById('update-progress').style.display = 'block'
+    document.getElementById('update-progress-bar').style.width = pct + '%'
+    document.getElementById('update-btn').textContent = pct + '%'
+    document.getElementById('update-btn').disabled = true
+  })
+
+  api.onUpdateDownloaded(function() {
+    updateState = 'downloaded'
+    document.getElementById('update-progress').style.display = 'none'
+    document.getElementById('update-btn').textContent = '↺ Cài & Khởi động lại'
+    document.getElementById('update-btn').disabled = false
+  })
 }
 
 // ── UI helpers ─────────────────────────────────────────────────────────────────
@@ -181,7 +196,12 @@ document.getElementById('health-btn').addEventListener('click', function() {
 })
 
 document.getElementById('update-btn').addEventListener('click', function() {
-  if (updateUrl) api.openUrl(updateUrl)
+  if (updateState === 'downloaded') {
+    api.installUpdate()
+  } else if (updateState === 'available') {
+    updateState = 'downloading'
+    api.downloadUpdate()
+  }
 })
 
 document.getElementById('theme-toggle').addEventListener('click', toggleTheme)

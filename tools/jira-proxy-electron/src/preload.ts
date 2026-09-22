@@ -22,6 +22,12 @@ contextBridge.exposeInMainWorld('api', {
   checkUpdate: () =>
     ipcRenderer.invoke('check-update'),
 
+  downloadUpdate: () =>
+    ipcRenderer.invoke('download-update'),
+
+  installUpdate: () =>
+    ipcRenderer.invoke('install-update'),
+
   getVersion: () =>
     ipcRenderer.invoke('get-version'),
 
@@ -33,4 +39,16 @@ contextBridge.exposeInMainWorld('api', {
 
   setAutoStart: (enable: boolean) =>
     ipcRenderer.invoke('set-auto-start', enable),
+
+  onUpdateAvailable: (cb: (info: { version: string }) => void) => {
+    ipcRenderer.on('update-available', (_, info) => cb(info))
+  },
+
+  onDownloadProgress: (cb: (progress: { percent: number }) => void) => {
+    ipcRenderer.on('download-progress', (_, progress) => cb(progress))
+  },
+
+  onUpdateDownloaded: (cb: () => void) => {
+    ipcRenderer.on('update-downloaded', () => cb())
+  },
 })

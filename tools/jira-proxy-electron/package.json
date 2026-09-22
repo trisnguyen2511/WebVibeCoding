@@ -1,7 +1,7 @@
 {
   "name": "jira-proxy",
   "productName": "Jira Proxy",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Local CORS proxy for Jira — bypass browser restrictions on internal networks",
   "main": "dist/main.js",
   "scripts": {
@@ -17,5 +17,8 @@
     "electron": "^31.2.0",
     "electron-builder": "^24.13.3",
     "typescript": "^5.5.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

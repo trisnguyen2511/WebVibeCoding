@@ -1,7 +1,7 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import path from 'path'
 import fs from 'fs'
-import https from 'https'
 import { startServer, stopServer, isRunning, getConfig } from './proxy-server'
 
 let tray: Tray | null = null
@@ -61,53 +61,30 @@ function writeSavedConfig(cfg: SavedConfig): void {
   } catch { /* noop */ }
 }
 
-// ── Update check ───────────────────────────────────────────────────────────────
+// ── Auto-updater ───────────────────────────────────────────────────────────────
 
-interface UpdateInfo {
-  hasUpdate: boolean
-  version: string
-  url: string
-}
+function setupAutoUpdater() {
+  if (!app.isPackaged) return
 
-function checkForUpdate(): Promise<UpdateInfo> {
-  return new Promise((resolve) => {
-    const noUpdate = { hasUpdate: false, version: '', url: '' }
-    const options = {
-      hostname: 'api.github.com',
-      path: '/repos/trisnguyen2511/WebVibeCoding/releases/latest',
-      headers: { 'User-Agent': 'jira-proxy-electron' },
-      timeout: 8000,
-    }
-    const req = https.get(options, (res) => {
-      let data = ''
-      res.on('data', (c: string) => { data += c })
-      res.on('end', () => {
-        try {
-          const release = JSON.parse(data) as { tag_name: string; html_url: string }
-          const tag = release.tag_name ?? ''
-          if (!tag.startsWith('jira-proxy-v')) { resolve(noUpdate); return }
-          const newVer = tag.replace('jira-proxy-v', '')
-          const curVer = app.getVersion()
-          const hasUpdate = semverGt(newVer, curVer)
-          resolve({ hasUpdate, version: newVer, url: release.html_url })
-        } catch {
-          resolve(noUpdate)
-        }
-      })
-    })
-    req.on('error', () => resolve(noUpdate))
-    req.on('timeout', () => { req.destroy(); resolve(noUpdate) })
+  autoUpdater.autoDownload = false
+  autoUpdater.autoInstallOnAppQuit = false
+
+  autoUpdater.on('update-available', (info) => {
+    win?.webContents.send('update-available', { version: info.version })
   })
-}
 
-function semverGt(a: string, b: string): boolean {
-  const pa = a.split('.').map(Number)
-  const pb = b.split('.').map(Number)
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] ?? 0) > (pb[i] ?? 0)) return true
-    if ((pa[i] ?? 0) < (pb[i] ?? 0)) return false
-  }
-  return false
+  autoUpdater.on('download-progress', (p) => {
+    win?.webContents.send('download-progress', { percent: p.percent })
+  })
+
+  autoUpdater.on('update-downloaded', () => {
+    win?.webContents.send('update-downloaded', {})
+  })
+
+  // Check on startup after window is ready
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch(() => {})
+  }, 3000)
 }
 
 // ── Tray ────────────────────────────────────────────────────────────────────────
@@ -209,6 +186,7 @@ app.whenReady().then(() => {
 
   createWindow()
   createTray()
+  setupAutoUpdater()
 
   win?.show()
 })
@@ -264,7 +242,21 @@ ipcMain.handle('load-config', () => {
 })
 
 ipcMain.handle('check-update', async () => {
-  return checkForUpdate()
+  if (!app.isPackaged) return
+  try { await autoUpdater.checkForUpdates() } catch { /* noop */ }
+})
+
+ipcMain.handle('download-update', async () => {
+  try {
+    await autoUpdater.downloadUpdate()
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('install-update', () => {
+  autoUpdater.quitAndInstall()
 })
 
 ipcMain.handle('get-version', () => {

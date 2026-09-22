@@ -74,6 +74,23 @@
     }
     .update-banner.visible { display: flex; }
 
+    .update-info { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+    .update-progress {
+      height: 4px;
+      background: rgba(124,58,237,0.2);
+      border-radius: 2px;
+      overflow: hidden;
+      display: none;
+    }
+    .update-progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
     .update-btn {
       background: var(--accent);
       color: #fff;
@@ -84,8 +101,10 @@
       font-weight: 600;
       cursor: pointer;
       white-space: nowrap;
+      flex-shrink: 0;
     }
-    .update-btn:hover { opacity: 0.85; }
+    .update-btn:hover:not(:disabled) { opacity: 0.85; }
+    .update-btn:disabled { opacity: 0.5; cursor: default; }
 
     /* ── Header ── */
     .header {
@@ -383,14 +402,19 @@
 <body>
 
   <div class="update-banner" id="update-banner">
-    <span id="update-text">Có bản cập nhật mới</span>
-    <button class="update-btn" id="update-btn">Tải về ↗</button>
+    <div class="update-info">
+      <span id="update-text">Có bản cập nhật mới</span>
+      <div class="update-progress" id="update-progress">
+        <div class="update-progress-bar" id="update-progress-bar"></div>
+      </div>
+    </div>
+    <button class="update-btn" id="update-btn">Tải về</button>
   </div>
 
   <header class="header">
     <div class="logo-box">🔀</div>
     <div class="header-text">
-      <h1>Jira Proxy <span class="version-chip" id="version-chip">v1.1.0</span></h1>
+      <h1>Jira Proxy <span class="version-chip" id="version-chip">v1.2.0</span></h1>
       <p>CORS proxy — kết nối Jira nội bộ từ trình duyệt</p>
     </div>
     <button class="theme-toggle" id="theme-toggle" title="Chuyển theme">☀️</button>
