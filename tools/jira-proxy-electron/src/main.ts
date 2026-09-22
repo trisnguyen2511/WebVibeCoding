@@ -5,6 +5,7 @@ import { startServer, stopServer, isRunning, getConfig } from './proxy-server'
 
 let tray: Tray | null = null
 let win: BrowserWindow | null = null
+let isQuitting = false
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 
@@ -133,7 +134,7 @@ function createWindow() {
 
   // Hide to tray on close
   win.on('close', (e) => {
-    if (!app.isQuitting) {
+    if (!isQuitting) {
       e.preventDefault()
       win?.hide()
     }
@@ -141,11 +142,6 @@ function createWindow() {
 }
 
 // ── App lifecycle ───────────────────────────────────────────────────────────────
-
-declare module 'electron' {
-  interface App { isQuitting: boolean }
-}
-app.isQuitting = false
 
 app.whenReady().then(() => {
   // Hide from macOS dock — tray-only app
@@ -163,7 +159,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', async () => {
-  app.isQuitting = true
+  isQuitting = true
   if (isRunning()) {
     try { await stopServer() } catch { /* noop */ }
   }
