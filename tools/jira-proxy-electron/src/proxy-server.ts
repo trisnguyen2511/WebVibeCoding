@@ -78,17 +78,18 @@ export function startServer(config: ProxyConfig): Promise<number> {
           if (!fwdHeaders['Content-Type'] && req.method !== 'GET' && req.method !== 'HEAD') {
             fwdHeaders['Content-Type'] = 'application/json'
           }
+          // Bypass Jira CSRF check — required for PUT/POST/DELETE with Bearer/PAT auth
+          fwdHeaders['X-Atlassian-Token'] = 'no-check'
         } else {
-          // Passthrough mode: copy all headers, fix host only
+          // Passthrough mode: copy all headers unchanged (same as old pkg proxy)
           for (const [k, v] of Object.entries(req.headers)) {
             if (k !== 'host' && v !== undefined) {
               fwdHeaders[k] = v as string | string[]
             }
           }
         }
-        fwdHeaders['Host'] = target.hostname
-        // Bypass Jira CSRF check for write operations (required for PUT/POST/DELETE with Bearer/PAT auth)
-        fwdHeaders['X-Atlassian-Token'] = 'no-check'
+        // Use target.host (includes port if non-standard) so Jira's virtual-host routing works
+        fwdHeaders['Host'] = target.host
 
         const options: https.RequestOptions = {
           hostname: target.hostname,
