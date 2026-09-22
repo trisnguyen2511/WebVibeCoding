@@ -179,7 +179,7 @@ function createWindow() {
 
   win = new BrowserWindow({
     width: 460,
-    height: 580,
+    height: 620,
     resizable: false,
     title: 'Jira Proxy',
     ...(fs.existsSync(iconFile) ? { icon: iconFile } : {}),
@@ -273,4 +273,16 @@ ipcMain.handle('get-version', () => {
 
 ipcMain.handle('open-url', (_, url: string) => {
   shell.openExternal(url)
+})
+
+ipcMain.handle('get-auto-start', () => {
+  return app.getLoginItemSettings().openAtLogin
+})
+
+ipcMain.handle('set-auto-start', (_, enable: boolean) => {
+  app.setLoginItemSettings({
+    openAtLogin: enable,
+    openAsHidden: true, // Start hidden in tray, don't show window
+  })
+  return app.getLoginItemSettings().openAtLogin
 })

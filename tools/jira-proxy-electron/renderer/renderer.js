@@ -56,6 +56,12 @@ async function init() {
     setRunning(running)
   } catch { /* noop */ }
 
+  // Load auto-start state
+  try {
+    var autoStart = await api.getAutoStart()
+    document.getElementById('autostart-toggle').checked = autoStart
+  } catch { /* noop */ }
+
   // Check for update in background (silent on error)
   api.checkUpdate().then(function(result) {
     if (result && result.hasUpdate) {
@@ -188,6 +194,13 @@ document.getElementById('toggle-eye').addEventListener('click', function() {
 })
 
 document.getElementById('port').addEventListener('input', updateAddr)
+
+document.getElementById('autostart-toggle').addEventListener('change', async function() {
+  var enabled = this.checked
+  var actual = await api.setAutoStart(enabled)
+  // Sync checkbox to actual system state (may differ on Linux)
+  this.checked = actual
+})
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
 

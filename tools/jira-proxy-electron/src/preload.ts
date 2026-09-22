@@ -27,4 +27,10 @@ contextBridge.exposeInMainWorld('api', {
 
   openUrl: (url: string) =>
     ipcRenderer.invoke('open-url', url),
+
+  getAutoStart: () =>
+    ipcRenderer.invoke('get-auto-start'),
+
+  setAutoStart: (enable: boolean) =>
+    ipcRenderer.invoke('set-auto-start', enable),
 })
