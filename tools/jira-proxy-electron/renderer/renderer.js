@@ -8,13 +8,12 @@ let updateUrl = ''
 
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme)
-  document.getElementById('theme-toggle').textContent = theme === 'dark' ? '🌙' : '☀️'
-  document.body.style.backgroundColor = theme === 'dark' ? '#08080E' : '#F4F4FA'
+  document.getElementById('theme-toggle').textContent = theme === 'light' ? '🌙' : '☀️'
 }
 
 function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme') || 'dark'
-  const next = current === 'dark' ? 'light' : 'dark'
+  const current = document.documentElement.getAttribute('data-theme') || 'light'
+  const next = current === 'light' ? 'dark' : 'light'
   localStorage.setItem('theme', next)
   applyTheme(next)
 }
@@ -22,66 +21,72 @@ function toggleTheme() {
 // ── Init ───────────────────────────────────────────────────────────────────────
 
 async function init() {
-  // Restore theme
-  const savedTheme = localStorage.getItem('theme') || 'dark'
+  // Default: light theme. Only switch if user explicitly chose dark.
+  const savedTheme = localStorage.getItem('theme') || 'light'
   applyTheme(savedTheme)
 
   // Show version
-  const version = await api.getVersion()
-  document.getElementById('version-chip').textContent = `v${version}`
+  try {
+    const version = await api.getVersion()
+    document.getElementById('version-chip').textContent = `v${version}`
+  } catch { /* noop */ }
 
-  // Load saved/default config (target + port)
-  const saved = await api.loadConfig()
-  if (saved) {
-    if (saved.target) document.getElementById('target').value = saved.target
-    if (saved.port) {
-      document.getElementById('port').value = saved.port
-      currentPort = parseInt(saved.port, 10) || 8765
+  // Load saved/default config (target + port, never token)
+  try {
+    const saved = await api.loadConfig()
+    if (saved) {
+      if (saved.target) document.getElementById('target').value = saved.target
+      if (saved.port) {
+        document.getElementById('port').value = saved.port
+        currentPort = parseInt(saved.port, 10) || 8765
+        updateAddr()
+      }
+    }
+  } catch { /* noop */ }
+
+  // Sync with any running proxy (window may have been reopened)
+  try {
+    const { running, config } = await api.getStatus()
+    if (running && config) {
+      currentPort = config.port
+      document.getElementById('port').value = String(config.port)
+      document.getElementById('target').value = config.target
       updateAddr()
     }
-  }
+    setRunning(running)
+  } catch { /* noop */ }
 
-  // Sync with running proxy (window may have reopened)
-  const { running, config } = await api.getStatus()
-  if (running && config) {
-    currentPort = config.port
-    document.getElementById('port').value = String(config.port)
-    document.getElementById('target').value = config.target
-    updateAddr()
-  }
-  setRunning(running)
-
-  // Check for update in background (non-blocking)
-  api.checkUpdate().then(({ hasUpdate, version: newVer, url }) => {
-    if (hasUpdate) {
-      updateUrl = url
+  // Check for update in background (silent on error)
+  api.checkUpdate().then(function(result) {
+    if (result && result.hasUpdate) {
+      updateUrl = result.url
       document.getElementById('update-text').textContent =
-        `Có bản cập nhật mới: v${newVer}`
+        'Có bản cập nhật mới: v' + result.version
       document.getElementById('update-banner').classList.add('visible')
     }
-  }).catch(() => { /* ignore network errors */ })
+  }).catch(function() {})
 }
 
 // ── UI helpers ─────────────────────────────────────────────────────────────────
 
 function setRunning(running) {
-  const card      = document.getElementById('status-card')
-  const dot       = document.getElementById('status-dot')
-  const label     = document.getElementById('status-label')
-  const value     = document.getElementById('status-value')
-  const healthBtn = document.getElementById('health-btn')
-  const btnStart  = document.getElementById('btn-start')
-  const btnStop   = document.getElementById('btn-stop')
+  var card      = document.getElementById('status-card')
+  var dot       = document.getElementById('status-dot')
+  var label     = document.getElementById('status-label')
+  var value     = document.getElementById('status-value')
+  var healthBtn = document.getElementById('health-btn')
+  var btnStart  = document.getElementById('btn-start')
+  var btnStop   = document.getElementById('btn-stop')
 
   if (running) {
-    card.className = 'status-card running'
-    dot.className  = 'status-dot running'
+    card.className  = 'status-card running'
+    dot.className   = 'status-dot running'
     label.textContent = 'Đang chạy'
-    value.textContent = `http://127.0.0.1:${currentPort}`
+    value.textContent = 'http://127.0.0.1:' + currentPort
     healthBtn.classList.add('visible')
   } else {
-    card.className = 'status-card'
-    dot.className  = 'status-dot'
+    card.className  = 'status-card'
+    dot.className   = 'status-dot'
     label.textContent = 'Chưa chạy'
     value.textContent = 'Nhập thông tin và bấm Bắt đầu'
     healthBtn.classList.remove('visible')
@@ -90,64 +95,51 @@ function setRunning(running) {
   btnStart.style.display = running ? 'none' : 'flex'
   btnStop.style.display  = running ? 'flex'  : 'none'
 
-  ;['target', 'token', 'port'].forEach(id => {
+  var ids = ['target', 'token', 'port']
+  ids.forEach(function(id) {
     document.getElementById(id).disabled = running
   })
   document.getElementById('toggle-eye').disabled = running
 }
 
 function showError(msg) {
-  const box = document.getElementById('error-box')
+  var box = document.getElementById('error-box')
   box.textContent = msg
   box.className = 'error-box' + (msg ? ' visible' : '')
 }
 
-function setLoading(loading) {
-  const btn = document.getElementById('btn-start')
+function setLoadingStart(loading) {
+  var btn = document.getElementById('btn-start')
   btn.disabled = loading
   btn.innerHTML = loading
-    ? '<span class="spin">⟳</span><span>Đang khởi động…</span>'
-    : '<span>▶</span><span>Bắt đầu</span>'
+    ? '<span class="spin">⟳</span> Đang khởi động…'
+    : '▶ Bắt đầu'
 }
 
 function updateAddr() {
-  const p = parseInt(document.getElementById('port').value, 10) || 8765
+  var p = parseInt(document.getElementById('port').value, 10) || 8765
   currentPort = p
-  document.getElementById('addr-input').value = `http://127.0.0.1:${p}`
-}
-
-document.getElementById('port').addEventListener('input', updateAddr)
-
-// ── Eye toggle ─────────────────────────────────────────────────────────────────
-
-function toggleEye() {
-  const input = document.getElementById('token')
-  const btn   = document.getElementById('toggle-eye')
-  input.type = input.type === 'password' ? 'text' : 'password'
-  btn.textContent = input.type === 'password' ? '👁' : '🙈'
+  document.getElementById('addr-input').value = 'http://127.0.0.1:' + p
 }
 
 // ── Actions ────────────────────────────────────────────────────────────────────
 
 async function startProxy() {
-  const target = document.getElementById('target').value.trim()
-  const token  = document.getElementById('token').value.trim()
-  const port   = parseInt(document.getElementById('port').value, 10) || 8765
+  var target = document.getElementById('target').value.trim()
+  var token  = document.getElementById('token').value.trim()
+  var port   = parseInt(document.getElementById('port').value, 10) || 8765
 
   showError('')
   if (!target) { showError('⚠️  Vui lòng nhập Jira URL'); return }
 
-  setLoading(true)
+  setLoadingStart(true)
+  await api.saveConfig({ target: target, port: String(port) })
 
-  // Save config (target + port only — never save token)
-  await api.saveConfig({ target, port: String(port) })
-
-  const result = await api.startProxy({ target, token, port })
-  setLoading(false)
+  var result = await api.startProxy({ target: target, token: token, port: port })
+  setLoadingStart(false)
 
   if (result.ok) {
-    // Use the actual port (may have auto-incremented)
-    currentPort = result.port ?? port
+    currentPort = result.port || port
     document.getElementById('port').value = String(currentPort)
     updateAddr()
     setRunning(true)
@@ -158,13 +150,13 @@ async function startProxy() {
 
 async function stopProxy() {
   showError('')
-  const btn = document.getElementById('btn-stop')
+  var btn = document.getElementById('btn-stop')
   btn.disabled = true
-  btn.innerHTML = '<span class="spin">⟳</span><span>Đang dừng…</span>'
+  btn.innerHTML = '<span class="spin">⟳</span> Đang dừng…'
 
-  const result = await api.stopProxy()
+  var result = await api.stopProxy()
   btn.disabled = false
-  btn.innerHTML = '<span>■</span><span>Dừng proxy</span>'
+  btn.innerHTML = '■ Dừng proxy'
 
   if (result.ok) {
     setRunning(false)
@@ -173,13 +165,29 @@ async function stopProxy() {
   }
 }
 
-function openHealth() {
-  api.openHealth(currentPort)
-}
+// ── Wire up all event listeners (no inline onclick — blocked by CSP) ──────────
 
-function openUpdate() {
+document.getElementById('btn-start').addEventListener('click', startProxy)
+document.getElementById('btn-stop').addEventListener('click', stopProxy)
+
+document.getElementById('health-btn').addEventListener('click', function() {
+  api.openHealth(currentPort)
+})
+
+document.getElementById('update-btn').addEventListener('click', function() {
   if (updateUrl) api.openUrl(updateUrl)
-}
+})
+
+document.getElementById('theme-toggle').addEventListener('click', toggleTheme)
+
+document.getElementById('toggle-eye').addEventListener('click', function() {
+  var input = document.getElementById('token')
+  var btn   = document.getElementById('toggle-eye')
+  input.type = input.type === 'password' ? 'text' : 'password'
+  btn.textContent = input.type === 'password' ? '👁' : '🙈'
+})
+
+document.getElementById('port').addEventListener('input', updateAddr)
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
 

@@ -189,7 +189,7 @@ function createWindow() {
       nodeIntegration: false,
     },
     show: false,
-    backgroundColor: '#08080E',
+    backgroundColor: '#FFFFFF',
   })
 
   win.loadFile(rendererPath('index.html'))

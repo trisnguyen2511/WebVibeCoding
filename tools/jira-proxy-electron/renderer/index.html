@@ -1,13 +1,31 @@
 <!DOCTYPE html>
-<html lang="vi" data-theme="dark">
+<html lang="vi" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'" />
   <title>Jira Proxy</title>
   <style>
-    /* ── Design tokens ── */
     :root {
+      --bg: #FBF7EE;
+      --surface: #FFFFFF;
+      --surface2: #F5F0E8;
+      --border: #E8E0D0;
+      --border2: #D8CFC0;
+      --accent: #7C3AED;
+      --accent-soft: #6D28D9;
+      --accent-dim: rgba(124,58,237,0.08);
+      --fg: #1A1208;
+      --fg2: #3A3020;
+      --muted: #8A7E6A;
+      --green: #16a34a;
+      --green-dim: rgba(22,163,74,0.08);
+      --red: #dc2626;
+      --red-dim: rgba(220,38,38,0.08);
+      --shadow: 0 1px 3px rgba(100,80,40,0.08);
+    }
+
+    [data-theme="dark"] {
       --bg: #08080E;
       --surface: #0F0F1A;
       --surface2: #13131F;
@@ -26,25 +44,6 @@
       --shadow: none;
     }
 
-    [data-theme="light"] {
-      --bg: #F4F4FA;
-      --surface: #FFFFFF;
-      --surface2: #EBEBF5;
-      --border: #DDD8F0;
-      --border2: #CBC5E8;
-      --accent: #7C3AED;
-      --accent-soft: #6D28D9;
-      --accent-dim: rgba(124,58,237,0.08);
-      --fg: #0A0A14;
-      --fg2: #2A2A3C;
-      --muted: #7070A0;
-      --green: #16a34a;
-      --green-dim: rgba(22,163,74,0.08);
-      --red: #dc2626;
-      --red-dim: rgba(220,38,38,0.08);
-      --shadow: 0 1px 4px rgba(0,0,0,0.07);
-    }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -58,23 +57,24 @@
       flex-direction: column;
       height: 100vh;
       overflow: hidden;
-      transition: background 0.2s, color 0.2s;
     }
 
     /* ── Update banner ── */
     .update-banner {
       display: none;
       padding: 8px 16px;
-      background: linear-gradient(90deg, rgba(124,58,237,0.15), rgba(167,139,250,0.1));
-      border-bottom: 1px solid rgba(124,58,237,0.25);
+      background: linear-gradient(90deg, rgba(124,58,237,0.12), rgba(124,58,237,0.06));
+      border-bottom: 1px solid rgba(124,58,237,0.2);
       font-size: 12px;
-      color: var(--accent-soft);
+      color: var(--accent);
       justify-content: space-between;
       align-items: center;
       gap: 8px;
+      flex-shrink: 0;
     }
     .update-banner.visible { display: flex; }
-    .update-banner button {
+
+    .update-btn {
       background: var(--accent);
       color: #fff;
       border: none;
@@ -85,11 +85,11 @@
       cursor: pointer;
       white-space: nowrap;
     }
-    .update-banner button:hover { opacity: 0.85; }
+    .update-btn:hover { opacity: 0.85; }
 
     /* ── Header ── */
     .header {
-      padding: 14px 18px 12px;
+      padding: 13px 18px 11px;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -114,16 +114,23 @@
       font-weight: 700;
       letter-spacing: -0.02em;
       line-height: 1.2;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    .header-text p {
-      font-size: 11px;
+    .header-text p { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+    .version-chip {
+      font-size: 10px;
       color: var(--muted);
-      margin-top: 1px;
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: 'SF Mono', 'Consolas', monospace;
+      font-weight: 400;
     }
 
-    .header-actions { display: flex; gap: 6px; }
-
-    .icon-btn {
+    .theme-toggle {
       background: none;
       border: 1px solid var(--border2);
       color: var(--muted);
@@ -133,8 +140,13 @@
       font-size: 14px;
       display: flex; align-items: center; justify-content: center;
       transition: color 0.15s, border-color 0.15s, background 0.15s;
+      flex-shrink: 0;
     }
-    .icon-btn:hover { color: var(--fg); border-color: var(--accent); background: var(--accent-dim); }
+    .theme-toggle:hover {
+      color: var(--fg);
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
 
     /* ── Status card ── */
     .status-card {
@@ -146,14 +158,11 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      transition: all 0.3s;
       flex-shrink: 0;
       box-shadow: var(--shadow);
+      transition: border-color 0.3s;
     }
-    .status-card.running {
-      border-color: rgba(34,197,94,0.35);
-      background: var(--green-dim);
-    }
+    .status-card.running { border-color: rgba(22,163,74,0.4); background: var(--green-dim); }
 
     .status-dot {
       width: 10px; height: 10px;
@@ -164,22 +173,17 @@
     }
     .status-dot.running {
       background: var(--green);
-      box-shadow: 0 0 0 3px rgba(34,197,94,0.2);
+      box-shadow: 0 0 0 3px rgba(22,163,74,0.2);
       animation: pulse-dot 1.8s ease-in-out infinite;
     }
 
     @keyframes pulse-dot {
-      0%,100% { box-shadow: 0 0 0 3px rgba(34,197,94,0.2); }
-      50%      { box-shadow: 0 0 0 6px rgba(34,197,94,0.05); }
+      0%,100% { box-shadow: 0 0 0 3px rgba(22,163,74,0.2); }
+      50%      { box-shadow: 0 0 0 6px rgba(22,163,74,0.05); }
     }
 
     .status-info { flex: 1; min-width: 0; }
-    .status-label {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--muted);
-      letter-spacing: 0.02em;
-    }
+    .status-label { font-size: 12px; font-weight: 700; color: var(--muted); }
     .status-card.running .status-label { color: var(--green); }
     .status-value {
       font-size: 12px;
@@ -192,8 +196,8 @@
     }
 
     .health-btn {
-      background: rgba(34,197,94,0.1);
-      border: 1px solid rgba(34,197,94,0.25);
+      background: rgba(22,163,74,0.08);
+      border: 1px solid rgba(22,163,74,0.25);
       color: var(--green);
       font-size: 11px;
       font-weight: 600;
@@ -202,9 +206,8 @@
       border-radius: 6px;
       display: none;
       white-space: nowrap;
-      transition: background 0.15s;
     }
-    .health-btn:hover { background: rgba(34,197,94,0.18); }
+    .health-btn:hover { background: rgba(22,163,74,0.15); }
     .health-btn.visible { display: block; }
 
     /* ── Form ── */
@@ -226,23 +229,10 @@
     }
 
     .field { display: flex; flex-direction: column; gap: 5px; }
+    .field-header { display: flex; align-items: baseline; justify-content: space-between; }
 
-    .field-header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-    }
-
-    label {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--fg2);
-    }
-
-    .field-hint {
-      font-size: 10px;
-      color: var(--muted);
-    }
+    label { font-size: 12px; font-weight: 600; color: var(--fg2); }
+    .field-hint { font-size: 10px; color: var(--muted); }
 
     .input-wrap { position: relative; }
 
@@ -259,21 +249,15 @@
       font-family: 'SF Mono', 'JetBrains Mono', 'Consolas', monospace;
       box-shadow: var(--shadow);
     }
-
-    input[type="password"] {
-      letter-spacing: 0.08em;
-      padding-right: 38px;
-    }
-
-    input::placeholder { color: var(--muted); font-family: inherit; }
+    input[type="password"] { letter-spacing: 0.08em; padding-right: 38px; }
+    input::placeholder { color: var(--muted); font-family: inherit; letter-spacing: 0; }
     input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(124,58,237,0.15); }
     input:disabled { opacity: 0.4; cursor: not-allowed; }
     input[readonly] { cursor: default; color: var(--accent-soft); }
 
     .toggle-eye {
       position: absolute;
-      right: 9px;
-      top: 50%;
+      right: 9px; top: 50%;
       transform: translateY(-50%);
       background: none;
       border: none;
@@ -281,8 +265,6 @@
       cursor: pointer;
       padding: 2px 4px;
       font-size: 14px;
-      line-height: 1;
-      transition: color 0.15s;
     }
     .toggle-eye:hover { color: var(--fg2); }
 
@@ -312,7 +294,6 @@
       align-items: center;
       justify-content: center;
       gap: 7px;
-      letter-spacing: -0.01em;
     }
     .btn:active { transform: scale(0.98); }
     .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
@@ -320,14 +301,14 @@
     .btn-start {
       background: var(--accent);
       color: #fff;
-      box-shadow: 0 2px 14px rgba(124,58,237,0.3);
+      box-shadow: 0 2px 10px rgba(124,58,237,0.25);
     }
     .btn-start:hover:not(:disabled) { opacity: 0.9; }
 
     .btn-stop {
       background: var(--surface2);
       color: var(--red);
-      border: 1px solid rgba(248,113,113,0.25);
+      border: 1px solid rgba(220,38,38,0.2);
     }
     .btn-stop:hover:not(:disabled) { background: var(--red-dim); }
 
@@ -335,7 +316,7 @@
       margin-top: 8px;
       padding: 7px 11px;
       background: var(--red-dim);
-      border: 1px solid rgba(248,113,113,0.25);
+      border: 1px solid rgba(220,38,38,0.2);
       border-radius: 7px;
       color: var(--red);
       font-size: 11px;
@@ -352,53 +333,35 @@
       text-align: center;
     }
 
-    /* ── Version chip ── */
-    .version-chip {
-      font-size: 10px;
-      color: var(--muted);
-      border: 1px solid var(--border2);
-      border-radius: 4px;
-      padding: 1px 5px;
-      font-family: 'SF Mono', 'Consolas', monospace;
-      letter-spacing: 0;
-    }
-
-    /* ── Spinner ── */
     @keyframes spin { to { transform: rotate(360deg); } }
     .spin { display: inline-block; animation: spin 0.7s linear infinite; }
   </style>
 </head>
 <body>
 
-  <!-- Update banner -->
   <div class="update-banner" id="update-banner">
     <span id="update-text">Có bản cập nhật mới</span>
-    <button onclick="openUpdate()">Tải về ↗</button>
+    <button class="update-btn" id="update-btn">Tải về ↗</button>
   </div>
 
-  <!-- Header -->
   <header class="header">
     <div class="logo-box">🔀</div>
     <div class="header-text">
       <h1>Jira Proxy <span class="version-chip" id="version-chip">v1.1.0</span></h1>
       <p>CORS proxy — kết nối Jira nội bộ từ trình duyệt</p>
     </div>
-    <div class="header-actions">
-      <button class="icon-btn" id="theme-toggle" onclick="toggleTheme()" title="Chuyển theme">🌙</button>
-    </div>
+    <button class="theme-toggle" id="theme-toggle" title="Chuyển theme">☀️</button>
   </header>
 
-  <!-- Status -->
   <div class="status-card" id="status-card">
     <div class="status-dot" id="status-dot"></div>
     <div class="status-info">
       <div class="status-label" id="status-label">Chưa chạy</div>
       <div class="status-value" id="status-value">Nhập thông tin và bấm Bắt đầu</div>
     </div>
-    <button class="health-btn" id="health-btn" onclick="openHealth()">Health ↗</button>
+    <button class="health-btn" id="health-btn">Health ↗</button>
   </div>
 
-  <!-- Form -->
   <div class="form-body">
     <div class="section-title">Cấu hình kết nối</div>
 
@@ -417,7 +380,7 @@
       </div>
       <div class="input-wrap">
         <input id="token" type="password" placeholder="Tùy chọn — để trống nếu dùng Basic Auth" autocomplete="off" spellcheck="false" />
-        <button class="toggle-eye" id="toggle-eye" onclick="toggleEye()" tabindex="-1" title="Hiện/ẩn token">👁</button>
+        <button class="toggle-eye" id="toggle-eye" tabindex="-1" title="Hiện/ẩn token">👁</button>
       </div>
     </div>
 
@@ -433,14 +396,9 @@
     </div>
   </div>
 
-  <!-- Footer -->
   <div class="footer">
-    <button class="btn btn-start" id="btn-start" onclick="startProxy()">
-      <span>▶</span><span>Bắt đầu</span>
-    </button>
-    <button class="btn btn-stop" id="btn-stop" style="display:none" onclick="stopProxy()">
-      <span>■</span><span>Dừng proxy</span>
-    </button>
+    <button class="btn btn-start" id="btn-start">▶ Bắt đầu</button>
+    <button class="btn btn-stop" id="btn-stop" style="display:none">■ Dừng proxy</button>
     <div class="error-box" id="error-box"></div>
     <p class="footer-note">Tắt cửa sổ không dừng proxy — app vẫn chạy nền trong system tray</p>
   </div>
