@@ -87,6 +87,8 @@ export function startServer(config: ProxyConfig): Promise<number> {
           }
         }
         fwdHeaders['Host'] = target.hostname
+        // Bypass Jira CSRF check for write operations (required for PUT/POST/DELETE with Bearer/PAT auth)
+        fwdHeaders['X-Atlassian-Token'] = 'no-check'
 
         const options: https.RequestOptions = {
           hostname: target.hostname,
