@@ -1,0 +1,109 @@
+name: Build Jira Proxy
+
+on:
+  push:
+    tags:
+      - 'jira-proxy-v*'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Create GitHub Release'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+          - os: macos-latest
+            platform: mac
+          - os: ubuntu-latest
+            platform: linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: tools/jira-proxy-electron/package.json
+
+      - name: Install dependencies
+        working-directory: tools/jira-proxy-electron
+        run: npm ci
+
+      - name: Build TypeScript
+        working-directory: tools/jira-proxy-electron
+        run: npm run build
+
+      - name: Build Electron (Windows)
+        if: matrix.platform == 'win'
+        working-directory: tools/jira-proxy-electron
+        run: npx electron-builder --win --publish never
+
+      - name: Build Electron (macOS)
+        if: matrix.platform == 'mac'
+        working-directory: tools/jira-proxy-electron
+        run: npx electron-builder --mac --publish never
+        env:
+          # Skip code signing for unsigned builds (remove for production signing)
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Build Electron (Linux)
+        if: matrix.platform == 'linux'
+        working-directory: tools/jira-proxy-electron
+        run: npx electron-builder --linux --publish never
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jira-proxy-${{ matrix.os }}
+          retention-days: 14
+          path: |
+            tools/jira-proxy-electron/dist-electron/*.exe
+            tools/jira-proxy-electron/dist-electron/*.dmg
+            tools/jira-proxy-electron/dist-electron/*.AppImage
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/jira-proxy-v') || (github.event_name == 'workflow_dispatch' && inputs.publish)
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name || 'jira-proxy-latest' }}
+          name: Jira Proxy ${{ github.ref_name || 'latest' }}
+          body: |
+            ## Jira Proxy — Local CORS Proxy
+
+            Tải file đúng platform và cài đặt:
+
+            | Platform | File | Cách dùng |
+            |---|---|---|
+            | Windows | `jira-proxy-setup.exe` | Double-click → Next → Install |
+            | macOS | `jira-proxy-mac.dmg` | Mount → kéo vào Applications → Open |
+            | Linux | `jira-proxy-linux.AppImage` | `chmod +x` → Double-click |
+
+            > **macOS lần đầu:** Right-click → Open (bỏ qua cảnh báo Gatekeeper, chỉ 1 lần)
+          files: artifacts/**
+          fail_on_unmatched_files: false

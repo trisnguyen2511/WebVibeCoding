@@ -796,32 +796,50 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
                 {/* Platform-specific download / setup */}
                 {osType === 'windows' ? (
                   <>
-                    <a href="/jira-proxy.zip" download
+                    <a href="https://github.com/trisnguyen2511/webvibecoding/releases/latest/download/jira-proxy-setup.exe"
+                      target="_blank" rel="noreferrer"
                       className="flex items-center justify-center gap-2 w-full rounded-lg bg-accent py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors">
-                      <Download size={13} />Tải jira-proxy.zip (Windows)
+                      <Download size={13} />Tải Jira Proxy (Windows)
                     </a>
-                    <p className="text-[11px] text-muted leading-relaxed bg-surface rounded-lg px-2.5 py-2 border border-border">
-                      Giải nén → chạy <code className="text-accent-soft font-mono">jira-proxy.exe --target https://jira.company.com --token YOUR_PAT</code>
-                    </p>
+                    <div className="rounded-lg bg-surface border border-border px-2.5 py-2 space-y-1">
+                      <p className="text-[10px] text-muted font-medium uppercase tracking-wide">Cách dùng:</p>
+                      <p className="text-[10px] text-muted leading-relaxed">1. Chạy installer → Next → Install → Finish</p>
+                      <p className="text-[10px] text-muted leading-relaxed">2. App mở, nhập Jira URL + PAT → bấm <strong className="text-fg">Bắt đầu</strong></p>
+                      <p className="text-[10px] text-muted leading-relaxed">3. App thu vào system tray, chạy ngầm mãi mãi</p>
+                    </div>
                     <p className="text-[11px] text-muted leading-relaxed bg-surface rounded-lg px-2.5 py-2 border border-border">
                       <span className="text-amber-400 font-medium">Lần đầu:</span> Chrome hiện dialog <em>&quot;Allow access to apps on this device?&quot;</em> — bấm <strong className="text-fg">Allow</strong>. Chỉ 1 lần.
                     </p>
                   </>
+                ) : osType === 'mac' ? (
+                  <>
+                    <a href="https://github.com/trisnguyen2511/webvibecoding/releases/latest/download/jira-proxy-mac.dmg"
+                      target="_blank" rel="noreferrer"
+                      className="flex items-center justify-center gap-2 w-full rounded-lg bg-accent py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors">
+                      <Download size={13} />Tải Jira Proxy (macOS)
+                    </a>
+                    <div className="rounded-lg bg-surface border border-border px-2.5 py-2 space-y-1">
+                      <p className="text-[10px] text-muted font-medium uppercase tracking-wide">Cách dùng:</p>
+                      <p className="text-[10px] text-muted leading-relaxed">1. Mở file .dmg → kéo Jira Proxy vào Applications</p>
+                      <p className="text-[10px] text-muted leading-relaxed">2. Mở app, nhập Jira URL + PAT → bấm <strong className="text-fg">Bắt đầu</strong></p>
+                      <p className="text-[10px] text-muted leading-relaxed">3. App thu vào menu bar, chạy ngầm mãi mãi</p>
+                    </div>
+                    <p className="text-[11px] text-muted leading-relaxed bg-surface rounded-lg px-2.5 py-2 border border-border">
+                      <span className="text-amber-400 font-medium">Lần đầu:</span> Right-click → <strong className="text-fg">Open</strong> (bỏ qua cảnh báo Gatekeeper). Chỉ 1 lần.
+                    </p>
+                  </>
                 ) : (
                   <>
-                    <a href="/jira-proxy-mac-linux.zip" download
+                    <a href="https://github.com/trisnguyen2511/webvibecoding/releases/latest/download/jira-proxy-linux.AppImage"
+                      target="_blank" rel="noreferrer"
                       className="flex items-center justify-center gap-2 w-full rounded-lg bg-accent py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors">
-                      <Download size={13} />Tải jira-proxy-mac-linux.zip
+                      <Download size={13} />Tải Jira Proxy (Linux)
                     </a>
-                    <div className="rounded-lg bg-surface border border-border px-2.5 py-2 space-y-1.5">
+                    <div className="rounded-lg bg-surface border border-border px-2.5 py-2 space-y-1">
                       <p className="text-[10px] text-muted font-medium uppercase tracking-wide">Cách dùng:</p>
-                      <p className="text-[10px] text-muted leading-relaxed">
-                        1. Giải nén → mở <code className="text-accent-soft">config.json</code> → điền <code className="text-accent-soft">target</code> và <code className="text-accent-soft">token</code>
-                      </p>
-                      <p className="text-[10px] text-muted leading-relaxed">
-                        2. Mở Terminal → <code className="text-accent-soft font-mono">bash start.sh</code>
-                      </p>
-                      <p className="text-[10px] text-muted">Yêu cầu: Node.js ≥ 16 · Không cần cài thêm package.</p>
+                      <p className="text-[10px] text-muted leading-relaxed">1. Tải file .AppImage về</p>
+                      <p className="text-[10px] text-muted leading-relaxed">2. Right-click → Properties → <strong className="text-fg">Allow executing as program</strong></p>
+                      <p className="text-[10px] text-muted leading-relaxed">3. Double-click để mở, nhập config → <strong className="text-fg">Bắt đầu</strong></p>
                     </div>
                   </>
                 )}
