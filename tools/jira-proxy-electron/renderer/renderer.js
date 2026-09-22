@@ -6,7 +6,6 @@ let currentPort = 8765
 // ── Init ───────────────────────────────────────────────────────────────────────
 
 async function init() {
-  // Load persisted config (target + port, NOT token)
   const saved = await api.loadConfig()
   if (saved) {
     if (saved.target) document.getElementById('target').value = saved.target
@@ -17,7 +16,6 @@ async function init() {
     }
   }
 
-  // Sync running state (proxy may have been started before window opened)
   const { running, config } = await api.getStatus()
   if (running && config) {
     currentPort = config.port
@@ -31,18 +29,33 @@ async function init() {
 // ── UI helpers ─────────────────────────────────────────────────────────────────
 
 function setRunning(running) {
-  const dot        = document.getElementById('dot')
-  const statusBar  = document.getElementById('status-bar')
-  const statusText = document.getElementById('status-text')
+  const card       = document.getElementById('status-card')
+  const icon       = document.getElementById('status-icon')
+  const label      = document.getElementById('status-label')
+  const value      = document.getElementById('status-value')
   const healthBtn  = document.getElementById('health-btn')
   const btnStart   = document.getElementById('btn-start')
   const btnStop    = document.getElementById('btn-stop')
+  const proxyAddr  = document.getElementById('proxy-addr')
 
-  dot.className        = 'dot' + (running ? ' running' : '')
-  statusBar.className  = 'status-bar' + (running ? ' running' : '')
-  statusText.className = 'status-text' + (running ? '' : ' muted')
-  statusText.textContent = running ? `Đang chạy — :${currentPort}` : 'Chưa chạy'
-  healthBtn.className  = 'health-btn' + (running ? ' visible' : '')
+  if (running) {
+    card.className = 'status-card running'
+    icon.textContent = '🟢'
+    icon.classList.add('pulse')
+    label.textContent = 'Đang chạy'
+    value.textContent = `http://127.0.0.1:${currentPort}`
+    healthBtn.classList.add('visible')
+    proxyAddr.textContent = `✅ Proxy đang lắng nghe tại http://127.0.0.1:${currentPort}`
+    proxyAddr.classList.add('visible')
+  } else {
+    card.className = 'status-card'
+    icon.textContent = '⚫'
+    icon.classList.remove('pulse')
+    label.textContent = 'Chưa chạy'
+    value.textContent = 'Nhập thông tin và bấm Bắt đầu'
+    healthBtn.classList.remove('visible')
+    proxyAddr.classList.remove('visible')
+  }
 
   btnStart.style.display = running ? 'none' : 'flex'
   btnStop.style.display  = running ? 'flex'  : 'none'
@@ -50,6 +63,7 @@ function setRunning(running) {
   ;['target', 'token', 'port'].forEach(id => {
     document.getElementById(id).disabled = running
   })
+  document.getElementById('toggle-eye').disabled = running
 }
 
 function showError(msg) {
@@ -58,13 +72,28 @@ function showError(msg) {
   box.className = 'error-box' + (msg ? ' visible' : '')
 }
 
+function setLoading(loading) {
+  const btn = document.getElementById('btn-start')
+  btn.disabled = loading
+  btn.innerHTML = loading
+    ? '<span class="spin">⟳</span> Đang khởi động…'
+    : '<span>▶</span> Bắt đầu'
+}
+
 function updateAddr() {
   const p = parseInt(document.getElementById('port').value, 10) || 8765
   currentPort = p
-  document.getElementById('addr').textContent = `→ http://127.0.0.1:${p}`
+  document.getElementById('addr-input').value = `http://127.0.0.1:${p}`
 }
 
 document.getElementById('port').addEventListener('input', updateAddr)
+
+// ── Eye toggle ─────────────────────────────────────────────────────────────────
+
+function toggleEye() {
+  const input = document.getElementById('token')
+  input.type = input.type === 'password' ? 'text' : 'password'
+}
 
 // ── Actions ────────────────────────────────────────────────────────────────────
 
@@ -73,30 +102,41 @@ async function startProxy() {
   const token  = document.getElementById('token').value.trim()
   const port   = parseInt(document.getElementById('port').value, 10) || 8765
 
-  if (!target) { showError('Nhập Jira URL trước'); return }
-  if (!token)  { showError('Nhập PAT token trước'); return }
-
   showError('')
+
+  if (!target) { showError('⚠️ Vui lòng nhập Jira URL'); return }
+  if (!token)  { showError('⚠️ Vui lòng nhập PAT token'); return }
+
+  setLoading(true)
   currentPort = port
 
-  // Persist config (no token for security)
   await api.saveConfig({ target, port: String(port) })
 
   const result = await api.startProxy({ target, token, port })
+  setLoading(false)
+
   if (result.ok) {
     setRunning(true)
   } else {
-    showError(result.error || 'Không thể khởi động proxy')
+    showError('❌ ' + (result.error || 'Không thể khởi động proxy'))
   }
 }
 
 async function stopProxy() {
   showError('')
+  const btn = document.getElementById('btn-stop')
+  btn.disabled = true
+  btn.innerHTML = '<span class="spin">⟳</span> Đang dừng…'
+
   const result = await api.stopProxy()
+
+  btn.disabled = false
+  btn.innerHTML = '<span>■</span> Dừng proxy'
+
   if (result.ok) {
     setRunning(false)
   } else {
-    showError(result.error || 'Không thể dừng proxy')
+    showError('❌ ' + (result.error || 'Không thể dừng proxy'))
   }
 }
 

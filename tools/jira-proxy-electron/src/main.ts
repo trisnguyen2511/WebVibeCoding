@@ -116,8 +116,8 @@ function createWindow() {
   const iconFile = assetPath('icon.png')
 
   win = new BrowserWindow({
-    width: 440,
-    height: 520,
+    width: 460,
+    height: 560,
     resizable: false,
     title: 'Jira Proxy',
     ...(fs.existsSync(iconFile) ? { icon: iconFile } : {}),
