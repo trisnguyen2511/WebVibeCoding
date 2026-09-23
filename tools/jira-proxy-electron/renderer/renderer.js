@@ -129,11 +129,11 @@ async function init() {
   api.onUpdateAvailable(function(info) {
     resetCheckBtn()
     updateState = 'available'
-    document.getElementById('update-text').textContent = 'Có bản cập nhật mới: v' + info.version
+    document.getElementById('update-text').textContent = 'Có bản cập nhật mới: v' + info.version + ' — đang tải về…'
     document.getElementById('update-banner').classList.add('visible')
-    document.getElementById('update-btn').textContent = 'Mở trang tải về'
-    document.getElementById('update-btn').disabled = false
-    showToast('Có bản cập nhật mới: v' + info.version, 'info', 4000)
+    document.getElementById('update-btn').textContent = '0%'
+    document.getElementById('update-btn').disabled = true
+    showToast('Có bản cập nhật mới: v' + info.version + ' — đang tải về…', 'info', 4000)
   })
 
   api.onDownloadProgress(function(progress) {
@@ -148,8 +148,10 @@ async function init() {
   api.onUpdateDownloaded(function() {
     updateState = 'downloaded'
     document.getElementById('update-progress').style.display = 'none'
+    document.getElementById('update-text').textContent = 'Bản cập nhật đã tải xong'
     document.getElementById('update-btn').textContent = '↺ Cài & Khởi động lại'
     document.getElementById('update-btn').disabled = false
+    showToast('Tải xong! Bấm "Cài & Khởi động lại" để cập nhật.', 'success', 5000)
   })
 
   api.onUpdateNotAvailable(function() {
@@ -275,10 +277,8 @@ document.getElementById('health-btn').addEventListener('click', function() {
 })
 
 document.getElementById('update-btn').addEventListener('click', function() {
-  if (updateState === 'available') {
-    api.downloadUpdate()
-    document.getElementById('update-banner').classList.remove('visible')
-    showToast('Đang mở trang tải về…', 'info', 2500)
+  if (updateState === 'downloaded') {
+    api.installUpdate()
   }
 })
 
