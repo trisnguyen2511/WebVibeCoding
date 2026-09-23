@@ -88,7 +88,16 @@ function setupAutoUpdater() {
   })
 
   autoUpdater.on('error', (err) => {
-    win?.webContents.send('update-error', { message: err.message })
+    const raw = err.message || 'Không rõ'
+    let clean: string
+    if (raw.includes('404')) {
+      clean = 'Chưa có phiên bản nào được phát hành trên GitHub (404)'
+    } else if (raw.includes('ENOTFOUND') || raw.includes('ECONNREFUSED') || raw.includes('ETIMEDOUT')) {
+      clean = 'Không thể kết nối để kiểm tra cập nhật'
+    } else {
+      clean = raw.split('\n')[0].substring(0, 100)
+    }
+    win?.webContents.send('update-error', { message: clean })
   })
 
   if (!app.isPackaged) return
