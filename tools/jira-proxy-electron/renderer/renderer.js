@@ -9,7 +9,8 @@ let checkingUpdate = false
 
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme)
-  document.getElementById('theme-toggle').textContent = theme === 'light' ? '🌙' : '☀️'
+  document.getElementById('icon-moon').style.display = theme === 'dark' ? 'block' : 'none'
+  document.getElementById('icon-sun').style.display  = theme === 'light' ? 'block' : 'none'
 }
 
 function toggleTheme() {
@@ -21,16 +22,19 @@ function toggleTheme() {
 
 // ── Update check button ────────────────────────────────────────────────────────
 
+var SVG_REFRESH = '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h5M20 20v-5h-5M4.55 9A8 8 0 0120.67 14M19.45 15A8 8 0 013.33 10"/></svg>'
+var SVG_CHECK   = '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+
 function setCheckBtnLoading() {
   var btn = document.getElementById('check-update-btn')
-  btn.innerHTML = '<span class="spin">⟳</span>'
+  btn.innerHTML = '<span class="spin">' + SVG_REFRESH + '</span>'
   btn.classList.add('active')
   btn.disabled = true
 }
 
 function resetCheckBtn() {
   var btn = document.getElementById('check-update-btn')
-  btn.textContent = '↺'
+  btn.innerHTML = SVG_REFRESH
   btn.classList.remove('active', 'ok')
   btn.disabled = false
   checkingUpdate = false
@@ -38,7 +42,7 @@ function resetCheckBtn() {
 
 function setCheckBtnOk() {
   var btn = document.getElementById('check-update-btn')
-  btn.textContent = '✓'
+  btn.innerHTML = SVG_CHECK
   btn.classList.remove('active')
   btn.classList.add('ok')
   btn.disabled = false
@@ -178,12 +182,16 @@ function showError(msg) {
   box.className = 'error-box' + (msg ? ' visible' : '')
 }
 
+var SVG_PLAY = '<svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>'
+var SVG_STOP = '<svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>'
+var SVG_SPIN_SM = '<svg class="spin" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M4 4v5h5M20 20v-5h-5M4.55 9A8 8 0 0120.67 14M19.45 15A8 8 0 013.33 10"/></svg>'
+
 function setLoadingStart(loading) {
   var btn = document.getElementById('btn-start')
   btn.disabled = loading
   btn.innerHTML = loading
-    ? '<span class="spin">⟳</span> Đang khởi động…'
-    : '▶ Bắt đầu'
+    ? SVG_SPIN_SM + ' Đang khởi động…'
+    : SVG_PLAY + ' Bắt đầu'
 }
 
 function updateAddr() {
@@ -200,7 +208,7 @@ async function startProxy() {
   var port   = parseInt(document.getElementById('port').value, 10) || 8765
 
   showError('')
-  if (!target) { showError('⚠️  Vui lòng nhập Jira URL'); return }
+  if (!target) { showError('Vui lòng nhập Jira URL'); return }
 
   setLoadingStart(true)
   await api.saveConfig({ target: target, port: String(port) })
@@ -214,7 +222,7 @@ async function startProxy() {
     updateAddr()
     setRunning(true)
   } else {
-    showError('❌  ' + (result.error || 'Không thể khởi động proxy'))
+    showError(result.error || 'Không thể khởi động proxy')
   }
 }
 
@@ -222,16 +230,16 @@ async function stopProxy() {
   showError('')
   var btn = document.getElementById('btn-stop')
   btn.disabled = true
-  btn.innerHTML = '<span class="spin">⟳</span> Đang dừng…'
+  btn.innerHTML = SVG_SPIN_SM + ' Đang dừng…'
 
   var result = await api.stopProxy()
   btn.disabled = false
-  btn.innerHTML = '■ Dừng proxy'
+  btn.innerHTML = SVG_STOP + ' Dừng proxy'
 
   if (result.ok) {
     setRunning(false)
   } else {
-    showError('❌  ' + (result.error || 'Không thể dừng proxy'))
+    showError(result.error || 'Không thể dừng proxy')
   }
 }
 
@@ -264,9 +272,10 @@ document.getElementById('theme-toggle').addEventListener('click', toggleTheme)
 
 document.getElementById('toggle-eye').addEventListener('click', function() {
   var input = document.getElementById('token')
-  var btn   = document.getElementById('toggle-eye')
   input.type = input.type === 'password' ? 'text' : 'password'
-  btn.textContent = input.type === 'password' ? '👁' : '🙈'
+  var isHidden = input.type === 'password'
+  document.getElementById('icon-eye').style.display     = isHidden ? 'block' : 'none'
+  document.getElementById('icon-eye-off').style.display = isHidden ? 'none'  : 'block'
 })
 
 document.getElementById('port').addEventListener('input', updateAddr)
@@ -288,6 +297,7 @@ api.onProxyLog(function(entry) {
   var panel = document.getElementById('log-panel')
   var empty = document.getElementById('log-empty')
   if (empty) empty.remove()
+  document.getElementById('log-dot').classList.add('live')
 
   var reqPath = entry.path.length > 40 ? entry.path.substring(0, 40) + '…' : entry.path
   var cls = entry.status >= 400 ? 'log-err'

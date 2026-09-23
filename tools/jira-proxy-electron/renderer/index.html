@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi" data-theme="light">
+<html lang="vi" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,50 +7,60 @@
   <title>Jira Proxy</title>
   <style>
     :root {
-      --bg: #FBF7EE;
-      --surface: #FFFFFF;
-      --surface2: #F5F0E8;
-      --border: #E8E0D0;
-      --border2: #D8CFC0;
-      --accent: #7C3AED;
-      --accent-soft: #6D28D9;
-      --accent-dim: rgba(124,58,237,0.08);
-      --fg: #1A1208;
-      --fg2: #3A3020;
-      --muted: #8A7E6A;
-      --green: #16a34a;
-      --green-dim: rgba(22,163,74,0.08);
-      --red: #dc2626;
-      --red-dim: rgba(220,38,38,0.08);
-      --shadow: 0 1px 3px rgba(100,80,40,0.08);
+      --bg:          #F0F2F8;
+      --surface:     #FFFFFF;
+      --surface2:    #E8EBF5;
+      --surface3:    #EDF0F8;
+      --border:      #D2D7EC;
+      --border2:     #B4BAD5;
+      --accent:      #5F2FD4;
+      --accent-soft: #4B25A8;
+      --accent-dim:  rgba(95,47,212,0.09);
+      --fg:          #14152B;
+      --fg2:         #3A3E64;
+      --muted:       #737BA0;
+      --green:       #0A8C54;
+      --green-dim:   rgba(10,140,84,0.09);
+      --red:         #C22828;
+      --red-dim:     rgba(194,40,40,0.09);
+      --shadow:      0 1px 3px rgba(20,25,80,0.08), 0 0 0 1px rgba(20,25,80,0.05);
+      --shadow-sm:   0 1px 2px rgba(20,25,80,0.06);
+      --radius:      10px;
+      --radius-sm:   7px;
     }
 
     [data-theme="dark"] {
-      --bg: #1C1C2E;
-      --surface: #252540;
-      --surface2: #2A2A48;
-      --border: #38385A;
-      --border2: #44446A;
-      --accent: #8B5CF6;
-      --accent-soft: #C4B5FD;
-      --accent-dim: rgba(139,92,246,0.15);
-      --fg: #E8E8F2;
-      --fg2: #AAAAC0;
-      --muted: #8888A8;
-      --green: #4ade80;
-      --green-dim: rgba(74,222,128,0.12);
-      --red: #f87171;
-      --red-dim: rgba(248,113,113,0.12);
-      --shadow: none;
+      --bg:          #0E0F1A;
+      --surface:     #161727;
+      --surface2:    #1C1D30;
+      --surface3:    #111220;
+      --border:      #232440;
+      --border2:     #323458;
+      --accent:      #7A5AF8;
+      --accent-soft: #A38BFB;
+      --accent-dim:  rgba(122,90,248,0.15);
+      --fg:          #D8DBF0;
+      --fg2:         #8C93B5;
+      --muted:       #595E80;
+      --green:       #2EC98A;
+      --green-dim:   rgba(46,201,138,0.10);
+      --red:         #EE6E6E;
+      --red-dim:     rgba(238,110,110,0.10);
+      --shadow:      none;
+      --shadow-sm:   none;
+      --radius:      10px;
+      --radius-sm:   7px;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       background: var(--bg);
       color: var(--fg);
-      font-family: -apple-system, 'Segoe UI', BlinkMacSystemFont, sans-serif;
+      font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
       font-size: 13px;
+      line-height: 1.5;
       -webkit-font-smoothing: antialiased;
       user-select: none;
       display: flex;
@@ -59,26 +69,35 @@
       overflow: hidden;
     }
 
-    /* ── Update banner ── */
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    /* ══════════════════════════════════════════
+       UPDATE BANNER
+    ══════════════════════════════════════════ */
     .update-banner {
       display: none;
-      padding: 8px 16px;
-      background: linear-gradient(90deg, rgba(124,58,237,0.12), rgba(124,58,237,0.06));
-      border-bottom: 1px solid rgba(124,58,237,0.2);
+      padding: 9px 16px;
+      background: var(--accent-dim);
+      border-bottom: 1px solid rgba(122,90,248,0.22);
       font-size: 12px;
-      color: var(--accent);
+      color: var(--accent-soft);
       justify-content: space-between;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       flex-shrink: 0;
     }
     .update-banner.visible { display: flex; }
 
-    .update-info { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .update-info { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+    .update-info span { font-weight: 500; }
 
     .update-progress {
-      height: 4px;
-      background: rgba(124,58,237,0.2);
+      height: 3px;
+      background: rgba(122,90,248,0.2);
       border-radius: 2px;
       overflow: hidden;
       display: none;
@@ -95,49 +114,58 @@
       background: var(--accent);
       color: #fff;
       border: none;
-      border-radius: 5px;
-      padding: 3px 10px;
-      font-size: 11px;
+      border-radius: 6px;
+      padding: 4px 12px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       white-space: nowrap;
       flex-shrink: 0;
+      transition: opacity 0.15s;
     }
     .update-btn:hover:not(:disabled) { opacity: 0.85; }
-    .update-btn:disabled { opacity: 0.5; cursor: default; }
+    .update-btn:disabled { opacity: 0.45; cursor: default; }
 
-    /* ── Header ── */
+    /* ══════════════════════════════════════════
+       HEADER
+    ══════════════════════════════════════════ */
     .header {
-      padding: 13px 18px 11px;
+      padding: 12px 16px;
       display: flex;
       align-items: center;
       gap: 10px;
       border-bottom: 1px solid var(--border);
       background: var(--surface);
       flex-shrink: 0;
-      box-shadow: var(--shadow);
+      box-shadow: var(--shadow-sm);
     }
 
     .logo-box {
-      width: 32px; height: 32px;
-      border-radius: 8px;
-      background: var(--accent);
+      width: 34px; height: 34px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent), #5B3BB5);
       display: flex; align-items: center; justify-content: center;
-      font-size: 17px;
       flex-shrink: 0;
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(122,90,248,0.35);
     }
 
     .header-text { flex: 1; min-width: 0; }
-    .header-text h1 {
-      font-size: 15px;
+    .header-title {
+      font-size: 14px;
       font-weight: 700;
       letter-spacing: -0.02em;
-      line-height: 1.2;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 7px;
+      line-height: 1.2;
     }
-    .header-text p { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .header-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+      font-weight: 400;
+    }
 
     .version-chip {
       font-size: 10px;
@@ -145,35 +173,35 @@
       border: 1px solid var(--border2);
       border-radius: 4px;
       padding: 1px 5px;
-      font-family: 'SF Mono', 'Consolas', monospace;
-      font-weight: 400;
+      font-family: 'Menlo', 'Consolas', 'SF Mono', monospace;
+      font-weight: 500;
     }
 
     .header-actions {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       flex-shrink: 0;
     }
 
     .icon-btn {
       background: none;
-      border: 1px solid var(--border2);
-      color: var(--muted);
-      border-radius: 7px;
+      border: 1px solid var(--border);
+      color: var(--fg2);
+      border-radius: var(--radius-sm);
       width: 30px; height: 30px;
       cursor: pointer;
-      font-size: 15px;
       display: flex; align-items: center; justify-content: center;
       transition: color 0.15s, border-color 0.15s, background 0.15s;
       flex-shrink: 0;
     }
+    .icon-btn svg { pointer-events: none; }
     .icon-btn:hover:not(:disabled) {
       color: var(--fg);
       border-color: var(--accent);
       background: var(--accent-dim);
     }
-    .icon-btn:disabled { opacity: 0.4; cursor: default; }
+    .icon-btn:disabled { opacity: 0.35; cursor: default; }
     .icon-btn.active {
       color: var(--accent);
       border-color: var(--accent);
@@ -184,153 +212,340 @@
       border-color: var(--green);
     }
 
-    /* ── Status card ── */
+    /* ══════════════════════════════════════════
+       STATUS CARD
+    ══════════════════════════════════════════ */
     .status-card {
-      margin: 14px 18px 0;
-      padding: 12px 14px;
-      border-radius: 12px;
+      margin: 12px 14px 0;
+      padding: 11px 14px;
+      border-radius: var(--radius);
       border: 1px solid var(--border);
       background: var(--surface);
       display: flex;
       align-items: center;
       gap: 12px;
       flex-shrink: 0;
-      box-shadow: var(--shadow);
-      transition: border-color 0.3s;
+      box-shadow: var(--shadow-sm);
+      transition: border-color 0.3s, background 0.3s;
     }
-    .status-card.running { border-color: rgba(22,163,74,0.4); background: var(--green-dim); }
+    .status-card.running {
+      border-color: rgba(46,201,138,0.35);
+      background: var(--green-dim);
+    }
 
     .status-dot {
-      width: 10px; height: 10px;
+      width: 9px; height: 9px;
       border-radius: 50%;
-      background: var(--muted);
+      background: var(--border2);
       flex-shrink: 0;
-      transition: background 0.3s;
+      transition: background 0.3s, box-shadow 0.3s;
     }
     .status-dot.running {
       background: var(--green);
-      box-shadow: 0 0 0 3px rgba(22,163,74,0.2);
-      animation: pulse-dot 1.8s ease-in-out infinite;
+      box-shadow: 0 0 0 3px rgba(46,201,138,0.2);
+      animation: pulse-dot 2s ease-in-out infinite;
     }
 
     @keyframes pulse-dot {
-      0%,100% { box-shadow: 0 0 0 3px rgba(22,163,74,0.2); }
-      50%      { box-shadow: 0 0 0 6px rgba(22,163,74,0.05); }
+      0%, 100% { box-shadow: 0 0 0 3px rgba(46,201,138,0.2); }
+      50%       { box-shadow: 0 0 0 6px rgba(46,201,138,0.05); }
     }
 
     .status-info { flex: 1; min-width: 0; }
-    .status-label { font-size: 12px; font-weight: 700; color: var(--muted); }
+    .status-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.01em;
+    }
     .status-card.running .status-label { color: var(--green); }
     .status-value {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--fg2);
-      margin-top: 2px;
-      font-family: 'SF Mono', 'JetBrains Mono', 'Consolas', monospace;
+      margin-top: 1px;
+      font-family: 'Menlo', 'Consolas', 'SF Mono', monospace;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
     .health-btn {
-      background: rgba(22,163,74,0.08);
-      border: 1px solid rgba(22,163,74,0.25);
+      display: none;
+      align-items: center;
+      gap: 4px;
+      background: rgba(46,201,138,0.1);
+      border: 1px solid rgba(46,201,138,0.3);
       color: var(--green);
       font-size: 11px;
       font-weight: 600;
       cursor: pointer;
       padding: 4px 10px;
       border-radius: 6px;
-      display: none;
       white-space: nowrap;
+      transition: background 0.15s;
     }
-    .health-btn:hover { background: rgba(22,163,74,0.15); }
-    .health-btn.visible { display: block; }
+    .health-btn:hover { background: rgba(46,201,138,0.18); }
+    .health-btn.visible { display: flex; }
 
-    /* ── Form body — flex column, no scroll: config fixed + log grows ── */
+    /* ══════════════════════════════════════════
+       MAIN FORM BODY
+    ══════════════════════════════════════════ */
     .form-body {
       flex: 1;
       min-height: 0;
       overflow: hidden;
-      padding: 14px 18px;
+      padding: 12px 14px;
       display: flex;
       flex-direction: column;
-      gap: 11px;
+      gap: 10px;
     }
 
-    .config-fields {
+    /* ── Config card ── */
+    .config-card {
       flex-shrink: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .card-header {
+      padding: 9px 14px 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .card-header-icon { color: var(--muted); display: flex; align-items: center; }
+    .card-header-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--fg2);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .card-body {
+      padding: 12px 14px;
       display: flex;
       flex-direction: column;
-      gap: 11px;
+      gap: 10px;
     }
 
-    .section-title {
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-
+    /* ── Fields ── */
     .field { display: flex; flex-direction: column; gap: 5px; }
-    .field-header { display: flex; align-items: baseline; justify-content: space-between; }
 
-    label { font-size: 12px; font-weight: 600; color: var(--fg2); }
-    .field-hint { font-size: 10px; color: var(--muted); }
+    .field-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--fg);
+    }
+
+    .field-hint {
+      font-size: 10px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
 
     .input-wrap { position: relative; }
 
     input {
       width: 100%;
-      background: var(--surface);
+      background: var(--surface3);
       border: 1px solid var(--border2);
       color: var(--fg);
-      padding: 8px 12px;
-      border-radius: 8px;
+      padding: 8px 11px;
+      border-radius: var(--radius-sm);
       font-size: 13px;
       outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      font-family: 'SF Mono', 'JetBrains Mono', 'Consolas', monospace;
-      box-shadow: var(--shadow);
+      transition: border-color 0.18s, box-shadow 0.18s;
+      font-family: 'Menlo', 'Consolas', 'SF Mono', monospace;
     }
-    input[type="password"] { letter-spacing: 0.08em; padding-right: 38px; }
-    input::placeholder { color: var(--muted); font-family: inherit; letter-spacing: 0; }
-    input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(124,58,237,0.15); }
-    input:disabled { opacity: 0.4; cursor: not-allowed; }
-    input[readonly] { cursor: default; color: var(--accent-soft); }
+    input[type="password"] { letter-spacing: 0.06em; padding-right: 36px; }
+    input[type="number"] { font-family: inherit; }
+    input::placeholder { color: var(--muted); font-family: inherit; letter-spacing: 0; font-size: 12px; }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 2.5px var(--accent-dim); }
+    input:disabled { opacity: 0.38; cursor: not-allowed; }
+    input[readonly] { cursor: default; color: var(--accent-soft); background: var(--surface2); }
 
-    .toggle-eye {
+    .eye-btn {
       position: absolute;
-      right: 9px; top: 50%;
+      right: 8px; top: 50%;
       transform: translateY(-50%);
       background: none;
       border: none;
       color: var(--muted);
       cursor: pointer;
-      padding: 2px 4px;
-      font-size: 14px;
+      padding: 3px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 4px;
+      transition: color 0.15s;
     }
-    .toggle-eye:hover { color: var(--fg2); }
+    .eye-btn:hover { color: var(--fg2); }
 
     .row-2 { display: flex; gap: 10px; }
-    .row-2 .field:first-child { flex: 0 0 96px; }
+    .row-2 .field:first-child { flex: 0 0 90px; }
     .row-2 .field:last-child  { flex: 1; }
 
-    /* ── Footer ── */
+    /* ── Log section ── */
+    .log-section {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .log-header {
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex-shrink: 0;
+      background: var(--surface);
+    }
+
+    .log-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--border2);
+    }
+    .log-dot.live { background: var(--green); }
+
+    .log-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--fg2);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .log-count {
+      font-size: 10px;
+      color: var(--muted);
+      font-family: 'Menlo', 'Consolas', monospace;
+    }
+
+    .log-clear-btn {
+      margin-left: auto;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 5px;
+      padding: 2px 8px;
+      font-size: 10px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .log-clear-btn:hover { color: var(--fg); border-color: var(--border2); }
+
+    .log-panel {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .log-empty {
+      font-size: 11px;
+      color: var(--muted);
+      font-style: italic;
+      padding: 4px 0;
+    }
+
+    .log-entry {
+      font-size: 11px;
+      font-family: 'Menlo', 'Consolas', 'SF Mono', monospace;
+      line-height: 1.55;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .log-ok   { color: var(--green); }
+    .log-warn { color: #D4880A; }
+    .log-err  { color: var(--red); }
+
+    /* ══════════════════════════════════════════
+       FOOTER
+    ══════════════════════════════════════════ */
     .footer {
-      padding: 12px 18px 14px;
+      padding: 11px 14px 13px;
       border-top: 1px solid var(--border);
       background: var(--surface);
       flex-shrink: 0;
-      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      box-shadow: var(--shadow-sm);
     }
 
+    /* Autostart toggle */
+    .autostart-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .autostart-row:hover { border-color: var(--border2); }
+
+    .autostart-icon { color: var(--muted); display: flex; align-items: center; flex-shrink: 0; }
+
+    .autostart-text { flex: 1; min-width: 0; }
+    .autostart-text strong { font-size: 12px; font-weight: 600; color: var(--fg); display: block; }
+    .autostart-text span  { font-size: 10px; color: var(--muted); }
+
+    /* Toggle switch */
+    .switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .slider {
+      position: absolute; inset: 0;
+      background: var(--border2);
+      border-radius: 20px;
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+    .slider::before {
+      content: '';
+      position: absolute;
+      width: 14px; height: 14px;
+      left: 3px; top: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    }
+    .switch input:checked + .slider { background: var(--accent); }
+    .switch input:checked + .slider::before { transform: translateX(16px); }
+
+    /* Action buttons */
     .btn {
       width: 100%;
-      padding: 11px;
-      border-radius: 9px;
+      padding: 10px;
+      border-radius: var(--radius-sm);
       border: none;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
       cursor: pointer;
       transition: opacity 0.15s, transform 0.1s;
@@ -338,30 +553,30 @@
       align-items: center;
       justify-content: center;
       gap: 7px;
+      letter-spacing: 0.01em;
     }
-    .btn:active { transform: scale(0.98); }
-    .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+    .btn:active:not(:disabled) { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.32; cursor: not-allowed; transform: none; }
 
     .btn-start {
       background: var(--accent);
       color: #fff;
-      box-shadow: 0 2px 10px rgba(124,58,237,0.25);
+      box-shadow: 0 2px 10px rgba(122,90,248,0.28);
     }
-    .btn-start:hover:not(:disabled) { opacity: 0.9; }
+    .btn-start:hover:not(:disabled) { opacity: 0.88; }
 
     .btn-stop {
       background: var(--surface2);
       color: var(--red);
-      border: 1px solid rgba(220,38,38,0.2);
+      border: 1px solid rgba(238,110,110,0.22);
     }
     .btn-stop:hover:not(:disabled) { background: var(--red-dim); }
 
     .error-box {
-      margin-top: 8px;
-      padding: 7px 11px;
+      padding: 8px 11px;
       background: var(--red-dim);
-      border: 1px solid rgba(220,38,38,0.2);
-      border-radius: 7px;
+      border: 1px solid rgba(238,110,110,0.22);
+      border-radius: var(--radius-sm);
       color: var(--red);
       font-size: 11px;
       display: none;
@@ -371,122 +586,19 @@
     .error-box.visible { display: block; }
 
     .footer-note {
-      margin-top: 8px;
       font-size: 10px;
       color: var(--muted);
       text-align: center;
     }
 
+    /* ── Animations ── */
     @keyframes spin { to { transform: rotate(360deg); } }
     .spin { display: inline-block; animation: spin 0.7s linear infinite; }
-
-    /* ── Auto-start toggle row ── */
-    .autostart-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 9px 12px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
-      user-select: none;
-    }
-    .autostart-row:hover { border-color: var(--border2); }
-    .autostart-row:active { opacity: 0.85; }
-
-    .autostart-label { display: flex; flex-direction: column; gap: 1px; }
-    .autostart-label strong { font-size: 12px; font-weight: 600; color: var(--fg2); }
-    .autostart-label span  { font-size: 10px; color: var(--muted); }
-
-    /* Toggle switch */
-    .switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
-    .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
-    .slider {
-      position: absolute; inset: 0;
-      background: var(--border2);
-      border-radius: 22px;
-      transition: background 0.2s;
-      cursor: pointer;
-    }
-    .slider::before {
-      content: '';
-      position: absolute;
-      width: 16px; height: 16px;
-      left: 3px; top: 3px;
-      background: white;
-      border-radius: 50%;
-      transition: transform 0.2s;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-    }
-    .switch input:checked + .slider { background: var(--accent); }
-    .switch input:checked + .slider::before { transform: translateX(16px); }
-
-    /* ── Log section — grows to fill remaining space ── */
-    .log-section {
-      flex: 1;
-      min-height: 120px;
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-      overflow: hidden;
-    }
-
-    .log-header {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-shrink: 0;
-    }
-
-    .log-clear-btn {
-      margin-left: auto;
-      background: none;
-      border: 1px solid var(--border2);
-      color: var(--muted);
-      border-radius: 5px;
-      padding: 1px 7px;
-      font-size: 10px;
-      cursor: pointer;
-    }
-    .log-clear-btn:hover { color: var(--fg2); border-color: var(--fg2); }
-
-    .log-panel {
-      flex: 1;
-      min-height: 60px;
-      overflow-y: auto;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 5px 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
-    }
-
-    .log-empty {
-      font-size: 10px;
-      color: var(--muted);
-      font-style: italic;
-      padding: 2px 0;
-    }
-
-    .log-entry {
-      font-size: 10px;
-      font-family: 'SF Mono', 'JetBrains Mono', 'Consolas', monospace;
-      line-height: 1.55;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .log-ok   { color: var(--green); }
-    .log-warn { color: #d97706; }
-    .log-err  { color: var(--red); }
   </style>
 </head>
 <body>
 
+  <!-- Update banner -->
   <div class="update-banner" id="update-banner">
     <div class="update-info">
       <span id="update-text">Có bản cập nhật mới</span>
@@ -497,90 +609,165 @@
     <button class="update-btn" id="update-btn">Tải về</button>
   </div>
 
+  <!-- Header -->
   <header class="header">
-    <div class="logo-box">🔀</div>
+    <div class="logo-box">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/>
+      </svg>
+    </div>
     <div class="header-text">
-      <h1>Jira Proxy <span class="version-chip" id="version-chip">v1.3.0</span></h1>
-      <p>CORS proxy — kết nối Jira nội bộ từ trình duyệt</p>
+      <div class="header-title">
+        Jira Proxy
+        <span class="version-chip" id="version-chip">v1.3.0</span>
+      </div>
+      <div class="header-sub">CORS proxy — kết nối Jira nội bộ từ trình duyệt</div>
     </div>
     <div class="header-actions">
-      <button class="icon-btn" id="check-update-btn" title="Kiểm tra cập nhật">↺</button>
-      <button class="icon-btn" id="theme-toggle" title="Chuyển theme sáng/tối">🌙</button>
+      <button class="icon-btn" id="check-update-btn" title="Kiểm tra cập nhật">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 4v5h5M20 20v-5h-5M4.55 9A8 8 0 0120.67 14M19.45 15A8 8 0 013.33 10"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="theme-toggle" title="Chuyển theme sáng/tối">
+        <svg id="icon-moon" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+        </svg>
+        <svg id="icon-sun" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </button>
     </div>
   </header>
 
+  <!-- Status card -->
   <div class="status-card" id="status-card">
     <div class="status-dot" id="status-dot"></div>
     <div class="status-info">
       <div class="status-label" id="status-label">Chưa chạy</div>
       <div class="status-value" id="status-value">Nhập thông tin và bấm Bắt đầu</div>
     </div>
-    <button class="health-btn" id="health-btn">Health ↗</button>
+    <button class="health-btn" id="health-btn">
+      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      Health
+    </button>
   </div>
 
+  <!-- Form body -->
   <div class="form-body">
-    <div class="config-fields">
-      <div class="section-title">Cấu hình kết nối</div>
 
-      <div class="field">
-        <div class="field-header">
-          <label for="target">Jira URL</label>
-          <span class="field-hint">Địa chỉ server Jira của công ty</span>
-        </div>
-        <input id="target" type="url" placeholder="https://jira.company.com" autocomplete="off" spellcheck="false" />
+    <!-- Config card -->
+    <div class="config-card">
+      <div class="card-header">
+        <span class="card-header-icon">
+          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M5.34 17.66l-1.41 1.41M21 12h-2M5 12H3m2.34-5.66L3.93 4.93M20.07 19.07l-1.41-1.41"/>
+          </svg>
+        </span>
+        <span class="card-header-title">Cấu hình kết nối</span>
       </div>
+      <div class="card-body">
 
-      <div class="field">
-        <div class="field-header">
-          <label for="token">Personal Access Token (PAT)</label>
-          <span class="field-hint">Không lưu — chỉ dùng khi đang chạy</span>
+        <div class="field">
+          <div class="field-header">
+            <label for="target">Jira URL</label>
+            <span class="field-hint">Địa chỉ server Jira của công ty</span>
+          </div>
+          <input id="target" type="url" placeholder="https://jira.company.com" autocomplete="off" spellcheck="false" />
         </div>
-        <div class="input-wrap">
-          <input id="token" type="password" placeholder="Tùy chọn — để trống nếu dùng Basic Auth" autocomplete="off" spellcheck="false" />
-          <button class="toggle-eye" id="toggle-eye" tabindex="-1" title="Hiện/ẩn token">👁</button>
-        </div>
-      </div>
 
-      <div class="row-2">
         <div class="field">
-          <div class="field-header"><label for="port">Port</label></div>
-          <input id="port" type="number" value="8765" min="1024" max="65535" />
+          <div class="field-header">
+            <label for="token">Personal Access Token (PAT)</label>
+            <span class="field-hint">Không lưu vào máy</span>
+          </div>
+          <div class="input-wrap">
+            <input id="token" type="password" placeholder="Để trống nếu dùng Basic Auth" autocomplete="off" spellcheck="false" />
+            <button class="eye-btn" id="toggle-eye" tabindex="-1" title="Hiện/ẩn token">
+              <svg id="icon-eye" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <svg id="icon-eye-off" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+                <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+            </button>
+          </div>
         </div>
-        <div class="field">
-          <div class="field-header"><label>Địa chỉ proxy</label></div>
-          <input id="addr-input" type="text" readonly value="http://127.0.0.1:8765" />
+
+        <div class="row-2">
+          <div class="field">
+            <div class="field-header"><label for="port">Port</label></div>
+            <input id="port" type="number" value="8765" min="1024" max="65535" />
+          </div>
+          <div class="field">
+            <div class="field-header"><label>Địa chỉ proxy</label></div>
+            <input id="addr-input" type="text" readonly value="http://127.0.0.1:8765" />
+          </div>
         </div>
+
       </div>
     </div>
 
+    <!-- Log section -->
     <div class="log-section">
       <div class="log-header">
-        <span class="section-title">Request log</span>
+        <div class="log-dot" id="log-dot"></div>
+        <span class="log-title">Request log</span>
+        <span class="log-count" id="log-count"></span>
         <button class="log-clear-btn" id="log-clear-btn">Xóa</button>
       </div>
       <div class="log-panel" id="log-panel">
         <div class="log-empty" id="log-empty">Chưa có request. Khi proxy chạy, mỗi request sẽ hiện ở đây.</div>
       </div>
     </div>
+
   </div>
 
+  <!-- Footer -->
   <div class="footer">
+
     <label class="autostart-row" id="autostart-row">
-      <div class="autostart-label">
-        <strong>🚀 Tự khởi động cùng máy</strong>
+      <span class="autostart-icon">
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+          <line x1="12" y1="2" x2="12" y2="12"/>
+        </svg>
+      </span>
+      <div class="autostart-text">
+        <strong>Tự khởi động cùng máy</strong>
         <span>Proxy tự chạy nền khi bật máy tính</span>
       </div>
-      <label class="switch">
+      <label class="switch" onclick="event.stopPropagation()">
         <input type="checkbox" id="autostart-toggle" />
         <span class="slider"></span>
       </label>
     </label>
 
-    <div style="height:10px"></div>
-    <button class="btn btn-start" id="btn-start">▶ Bắt đầu</button>
-    <button class="btn btn-stop" id="btn-stop" style="display:none">■ Dừng proxy</button>
+    <button class="btn btn-start" id="btn-start">
+      <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      Bắt đầu
+    </button>
+    <button class="btn btn-stop" id="btn-stop" style="display:none">
+      <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+      </svg>
+      Dừng proxy
+    </button>
+
     <div class="error-box" id="error-box"></div>
+
     <p class="footer-note">Tắt cửa sổ không dừng proxy — app vẫn chạy nền trong system tray</p>
+
   </div>
 
   <script src="renderer.js"></script>
