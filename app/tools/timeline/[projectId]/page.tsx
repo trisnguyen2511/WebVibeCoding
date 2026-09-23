@@ -9,9 +9,9 @@ import {
 import { ToolShell } from '@/components/tool-shell'
 import {
   getProject, getTasks, saveProject, saveTask, deleteTask,
-  upsertTimeEntry, deleteTimeEntry, exportData, PROXY_TOKEN_KEY,
+  upsertTimeEntry, deleteTimeEntry, exportData, importData, PROXY_TOKEN_KEY,
 } from '@/lib/timeline-storage'
-import type { Project, Task, Sprint, TimeEntry, JiraConfig } from '@/lib/timeline-types'
+import type { Project, Task, Sprint, TimeEntry, JiraConfig, ExportData } from '@/lib/timeline-types'
 import { GanttChart } from '../components/GanttChart'
 import { TaskForm } from '../components/TaskForm'
 import { TodayPanel } from '../components/TodayPanel'
@@ -66,6 +66,7 @@ export default function ProjectPage({ params }: PageProps) {
   const [showJira,        setShowJira]        = useState(false)
   const [showShortcuts,   setShowShortcuts]   = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
+  const [cloudLoading,    setCloudLoading]    = useState(false)
 
   type SyncState = 'idle' | 'syncing' | 'success' | 'error'
   const [syncState,  setSyncState]  = useState<SyncState>('idle')
@@ -73,12 +74,31 @@ export default function ProjectPage({ params }: PageProps) {
 
   useEffect(() => {
     const p = getProject(projectId)
-    if (!p) { router.push('/tools/timeline'); return }
-    setProject(p)
-    setTasks(getTasks(projectId))
-    const today = new Date().toISOString().slice(0, 10)
-    const cur = p.sprints.find(s => s.startDate <= today && s.endDate >= today)
-    if (cur) setSelectedSprintId(cur.id)
+    if (p) {
+      setProject(p)
+      setTasks(getTasks(projectId))
+      const today = new Date().toISOString().slice(0, 10)
+      const cur = p.sprints.find(s => s.startDate <= today && s.endDate >= today)
+      if (cur) setSelectedSprintId(cur.id)
+      return
+    }
+
+    // Not in localStorage — try pulling from cloud
+    setCloudLoading(true)
+    fetch(`/api/timeline-cloud?id=${encodeURIComponent(projectId)}`)
+      .then(res => { if (!res.ok) throw new Error('not found'); return res.json() })
+      .then((row: { data: ExportData }) => {
+        importData(row.data)
+        const loaded = getProject(projectId)
+        if (!loaded) throw new Error('import failed')
+        setProject(loaded)
+        setTasks(getTasks(projectId))
+        const today = new Date().toISOString().slice(0, 10)
+        const cur = loaded.sprints.find(s => s.startDate <= today && s.endDate >= today)
+        if (cur) setSelectedSprintId(cur.id)
+      })
+      .catch(() => router.push('/tools/timeline'))
+      .finally(() => setCloudLoading(false))
   }, [projectId, router])
 
   function reload() {
@@ -192,6 +212,22 @@ export default function ProjectPage({ params }: PageProps) {
       setSyncState('error')
       setTimeout(() => setSyncState('idle'), 3000)
     }
+  }
+
+  if (cloudLoading) {
+    return (
+      <ToolShell name="Timeline" icon="📅" wide fullBleed>
+        <div className="flex flex-col items-center justify-center h-full gap-4">
+          <div className="w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center">
+            <CloudUpload size={20} className="text-accent animate-pulse" />
+          </div>
+          <div className="text-center">
+            <p className="font-display font-semibold text-fg">Đang tải từ cloud…</p>
+            <p className="text-sm text-muted mt-1">Pulling snapshot for <span className="font-mono text-accent-soft">{projectId}</span></p>
+          </div>
+        </div>
+      </ToolShell>
+    )
   }
 
   if (!project) return null
