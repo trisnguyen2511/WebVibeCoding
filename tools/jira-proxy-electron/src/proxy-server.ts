@@ -2,6 +2,7 @@ import http from 'http'
 import https from 'https'
 import { URL } from 'url'
 import { IncomingMessage } from 'http'
+import { gunzip } from 'zlib'
 
 export interface ProxyConfig {
   target: string
@@ -17,6 +18,7 @@ export interface ProxyLogEntry {
   mode: 'T' | 'P'   // T=token(proxy injects Bearer), P=passthrough
   auth: string       // first 30 chars of Authorization sent to Jira, or 'none'
   xat: boolean       // X-Atlassian-Token: no-check was sent
+  body?: string      // decoded response body preview for 4xx/5xx
 }
 
 let logCallback: ((entry: ProxyLogEntry) => void) | null = null
@@ -97,11 +99,17 @@ export function startServer(config: ProxyConfig): Promise<number> {
           // Bypass Jira CSRF check — required for PUT/POST/DELETE with Bearer/PAT auth
           fwdHeaders['X-Atlassian-Token'] = 'no-check'
         } else {
-          // Passthrough mode: copy all headers unchanged (same as old pkg proxy)
+          // Passthrough mode: copy all headers, stripping browser fingerprint headers
+          // (Origin/Referer/Sec-* from a cross-origin page can trigger Jira CSRF checks
+          // even when X-Atlassian-Token: no-check is present in Jira 9.x+)
           for (const [k, v] of Object.entries(req.headers)) {
-            if (k !== 'host' && v !== undefined) {
+            if (!BROWSER_HEADERS.has(k.toLowerCase()) && k !== 'host' && v !== undefined) {
               fwdHeaders[k] = v as string | string[]
             }
+          }
+          // Ensure CSRF bypass header is always set for write operations
+          if (req.method !== 'GET' && req.method !== 'HEAD') {
+            fwdHeaders['x-atlassian-token'] = 'no-check'
           }
         }
         // Use target.host (includes port if non-standard) so Jira's virtual-host routing works
@@ -127,27 +135,51 @@ export function startServer(config: ProxyConfig): Promise<number> {
           }
           Object.assign(outHeaders, corsHeaders)
           delete outHeaders['transfer-encoding']
-          res.writeHead(proxyRes.statusCode ?? 502, outHeaders)
-          proxyRes.pipe(res)
 
-          // Emit log entry
-          if (logCallback) {
-            const now = new Date()
-            const hh = String(now.getHours()).padStart(2, '0')
-            const mm = String(now.getMinutes()).padStart(2, '0')
-            const ss = String(now.getSeconds()).padStart(2, '0')
-            const authVal = ((fwdHeaders['Authorization'] ?? fwdHeaders['authorization']) as string | undefined) ?? ''
-            const auth = authVal ? authVal.substring(0, 30) + '…' : 'none'
-            const xat = 'X-Atlassian-Token' in fwdHeaders || 'x-atlassian-token' in fwdHeaders
-            logCallback({
-              time: `${hh}:${mm}:${ss}`,
-              method: req.method ?? 'GET',
-              path: req.url ?? '/',
-              status: proxyRes.statusCode ?? 0,
-              mode: config.token ? 'T' : 'P',
-              auth,
-              xat,
+          const statusCode = proxyRes.statusCode ?? 502
+          res.writeHead(statusCode, outHeaders)
+
+          // Build log metadata now (fwdHeaders in scope)
+          const now = new Date()
+          const hh = String(now.getHours()).padStart(2, '0')
+          const mm = String(now.getMinutes()).padStart(2, '0')
+          const ss = String(now.getSeconds()).padStart(2, '0')
+          const authVal = ((fwdHeaders['Authorization'] ?? fwdHeaders['authorization']) as string | undefined) ?? ''
+          const auth = authVal ? authVal.substring(0, 30) + '…' : 'none'
+          const xat = 'X-Atlassian-Token' in fwdHeaders || 'x-atlassian-token' in fwdHeaders
+          const logMeta = {
+            time: `${hh}:${mm}:${ss}`,
+            method: req.method ?? 'GET',
+            path: req.url ?? '/',
+            status: statusCode,
+            mode: config.token ? 'T' as const : 'P' as const,
+            auth,
+            xat,
+          }
+
+          const cb = logCallback
+          if (cb && statusCode >= 400) {
+            // For error responses: manually forward + capture body for log
+            const isGzip = String(proxyRes.headers['content-encoding'] ?? '').includes('gzip')
+            const rawChunks: Buffer[] = []
+            proxyRes.on('data', (chunk: Buffer) => {
+              rawChunks.push(chunk)
+              res.write(chunk)
             })
+            proxyRes.on('end', () => {
+              res.end()
+              const raw = Buffer.concat(rawChunks)
+              const emit = (text: string) => cb({ ...logMeta, body: text.substring(0, 400) })
+              if (isGzip && raw.length > 0) {
+                gunzip(raw, (err, buf) => emit(err ? `[gzip err] ${err.message}` : buf.toString('utf8')))
+              } else {
+                emit(raw.toString('utf8'))
+              }
+            })
+            proxyRes.on('error', () => { res.end(); cb({ ...logMeta, body: '[stream error]' }) })
+          } else {
+            proxyRes.pipe(res)
+            logCallback?.(logMeta)
           }
         })
 

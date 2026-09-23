@@ -234,24 +234,38 @@ api.onProxyLog(function(entry) {
   var empty = document.getElementById('log-empty')
   if (empty) empty.remove()
 
-  var path = entry.path.length > 38 ? entry.path.substring(0, 38) + '…' : entry.path
-  var cls = entry.status >= 500 ? 'log-err'
-           : entry.status >= 400 ? 'log-err'
+  var path = entry.path.length > 35 ? entry.path.substring(0, 35) + '…' : entry.path
+  var cls = entry.status >= 400 ? 'log-err'
            : entry.status >= 300 ? 'log-warn'
            : 'log-ok'
   var xt  = entry.xat ? 'XT:✓' : 'XT:✗'
   var mode = '[' + entry.mode + ']'
   var line = entry.time + ' ' + entry.method + ' ' + path + ' → ' + entry.status + ' ' + mode + ' ' + entry.auth + ' ' + xt
 
+  var wrap = document.createElement('div')
+  wrap.style.cssText = 'margin-bottom:3px'
+
   var item = document.createElement('div')
   item.className = 'log-entry ' + cls
-  item.title = line   // full text on hover
+  item.title = entry.path + (entry.body ? '\n\n' + entry.body : '')
   item.textContent = line
+  wrap.appendChild(item)
 
-  panel.insertBefore(item, panel.firstChild)
+  // Show response body for 4xx/5xx as indented second line
+  if (entry.body && entry.status >= 400) {
+    var bodyEl = document.createElement('div')
+    bodyEl.className = 'log-entry log-err'
+    bodyEl.style.cssText = 'padding-left:14px; opacity:0.75; font-size:9px'
+    var bodyText = entry.body.replace(/\s+/g, ' ').trim()
+    bodyEl.textContent = bodyText.length > 120 ? bodyText.substring(0, 120) + '…' : bodyText
+    bodyEl.title = entry.body
+    wrap.appendChild(bodyEl)
+  }
 
-  // Keep max 100 entries
-  while (panel.children.length > 100) {
+  panel.insertBefore(wrap, panel.firstChild)
+
+  // Keep max 80 entries (wraps)
+  while (panel.children.length > 80) {
     panel.removeChild(panel.lastChild)
   }
 })
