@@ -1,4 +1,5 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, nativeTheme, net } from 'electron'
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, nativeTheme } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import path from 'path'
 import fs from 'fs'
 import { startServer, stopServer, isRunning, getConfig, setLogCallback } from './proxy-server'
@@ -60,39 +61,35 @@ function writeSavedConfig(cfg: SavedConfig): void {
   } catch { /* noop */ }
 }
 
-// ── Version check via raw.githubusercontent.com ────────────────────────────────
+// ── Auto updater (electron-updater + GitHub Releases) ─────────────────────────
 
-const LATEST_VERSION_URL = 'https://raw.githubusercontent.com/trisnguyen2511/WebVibeCoding/master/tools/jira-proxy-electron/latest-version.json'
-const RELEASES_URL = 'https://github.com/trisnguyen2511/WebVibeCoding/releases/latest'
+function setupAutoUpdater(): void {
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
 
-function compareVersions(a: string, b: string): number {
-  const pa = a.split('.').map(Number)
-  const pb = b.split('.').map(Number)
-  for (let i = 0; i < 3; i++) {
-    const diff = (pa[i] || 0) - (pb[i] || 0)
-    if (diff !== 0) return diff
-  }
-  return 0
-}
-
-async function checkForUpdate(): Promise<void> {
-  win?.webContents.send('checking-for-update', {})
-  try {
-    const resp = await net.fetch(LATEST_VERSION_URL)
-    if (!resp.ok) {
-      win?.webContents.send('update-not-available', {})
-      return
-    }
-    const data = await resp.json() as { version: string }
-    const current = app.getVersion()
-    if (data.version && compareVersions(data.version, current) > 0) {
-      win?.webContents.send('update-available', { version: data.version })
-    } else {
-      win?.webContents.send('update-not-available', {})
-    }
-  } catch {
+  autoUpdater.on('checking-for-update', () => {
+    win?.webContents.send('checking-for-update', {})
+  })
+  autoUpdater.on('update-available', (info) => {
+    win?.webContents.send('update-available', info)
+  })
+  autoUpdater.on('download-progress', (progress) => {
+    win?.webContents.send('download-progress', progress)
+  })
+  autoUpdater.on('update-downloaded', () => {
+    win?.webContents.send('update-downloaded', {})
+  })
+  autoUpdater.on('update-not-available', () => {
     win?.webContents.send('update-not-available', {})
-  }
+  })
+  autoUpdater.on('error', (err) => {
+    // 404 = no release yet, treat silently as not-available
+    if (err.message.includes('404') || err.message.includes('ERR_')) {
+      win?.webContents.send('update-not-available', {})
+    } else {
+      win?.webContents.send('update-error', { message: err.message })
+    }
+  })
 }
 
 // ── Tray ────────────────────────────────────────────────────────────────────────
@@ -207,7 +204,8 @@ app.whenReady().then(() => {
   })
 
   if (app.isPackaged) {
-    setTimeout(() => checkForUpdate().catch(() => {}), 3000)
+    setupAutoUpdater()
+    setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 3000)
   }
 })
 
@@ -266,16 +264,15 @@ ipcMain.handle('check-update', async () => {
     setTimeout(() => win?.webContents.send('update-not-available', {}), 800)
     return
   }
-  await checkForUpdate()
+  try { await autoUpdater.checkForUpdates() } catch { /* noop */ }
 })
 
 ipcMain.handle('download-update', async () => {
-  shell.openExternal(RELEASES_URL)
-  return { ok: true }
+  try { await autoUpdater.downloadUpdate() } catch { /* noop */ }
 })
 
 ipcMain.handle('install-update', () => {
-  shell.openExternal(RELEASES_URL)
+  autoUpdater.quitAndInstall()
 })
 
 ipcMain.handle('get-version', () => {
