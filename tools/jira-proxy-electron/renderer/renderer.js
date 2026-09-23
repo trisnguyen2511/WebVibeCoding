@@ -3,6 +3,7 @@
 
 let currentPort = 8765
 let updateState = 'none' // 'none' | 'available' | 'downloading' | 'downloaded'
+let checkingUpdate = false
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
 
@@ -12,28 +13,59 @@ function applyTheme(theme) {
 }
 
 function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme') || 'light'
-  const next = current === 'light' ? 'dark' : 'light'
+  var current = document.documentElement.getAttribute('data-theme') || 'light'
+  var next = current === 'light' ? 'dark' : 'light'
   localStorage.setItem('theme', next)
   applyTheme(next)
+}
+
+// ── Update check button ────────────────────────────────────────────────────────
+
+function setCheckBtnLoading() {
+  var btn = document.getElementById('check-update-btn')
+  btn.innerHTML = '<span class="spin">⟳</span>'
+  btn.classList.add('active')
+  btn.disabled = true
+}
+
+function resetCheckBtn() {
+  var btn = document.getElementById('check-update-btn')
+  btn.textContent = '↺'
+  btn.classList.remove('active', 'ok')
+  btn.disabled = false
+  checkingUpdate = false
+}
+
+function setCheckBtnOk() {
+  var btn = document.getElementById('check-update-btn')
+  btn.textContent = '✓'
+  btn.classList.remove('active')
+  btn.classList.add('ok')
+  btn.disabled = false
+  checkingUpdate = false
+  setTimeout(resetCheckBtn, 2500)
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────────
 
 async function init() {
-  // Default: light theme. Only switch if user explicitly chose dark.
-  const savedTheme = localStorage.getItem('theme') || 'light'
+  // Theme: respect saved preference, fall back to system preference
+  var savedTheme = localStorage.getItem('theme')
+  if (!savedTheme) {
+    savedTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark' : 'light'
+  }
   applyTheme(savedTheme)
 
   // Show version
   try {
-    const version = await api.getVersion()
-    document.getElementById('version-chip').textContent = `v${version}`
+    var version = await api.getVersion()
+    document.getElementById('version-chip').textContent = 'v' + version
   } catch { /* noop */ }
 
   // Load saved/default config (target + port, never token)
   try {
-    const saved = await api.loadConfig()
+    var saved = await api.loadConfig()
     if (saved) {
       if (saved.target) document.getElementById('target').value = saved.target
       if (saved.port) {
@@ -46,14 +78,14 @@ async function init() {
 
   // Sync with any running proxy (window may have been reopened)
   try {
-    const { running, config } = await api.getStatus()
-    if (running && config) {
-      currentPort = config.port
-      document.getElementById('port').value = String(config.port)
-      document.getElementById('target').value = config.target
+    var status = await api.getStatus()
+    if (status.running && status.config) {
+      currentPort = status.config.port
+      document.getElementById('port').value = String(status.config.port)
+      document.getElementById('target').value = status.config.target
       updateAddr()
     }
-    setRunning(running)
+    setRunning(status.running)
   } catch { /* noop */ }
 
   // Load auto-start state
@@ -62,8 +94,15 @@ async function init() {
     document.getElementById('autostart-toggle').checked = autoStart
   } catch { /* noop */ }
 
-  // Register push-based update listeners (electron-updater events from main process)
+  // ── Update event listeners ──
+
+  api.onCheckingForUpdate(function() {
+    checkingUpdate = true
+    setCheckBtnLoading()
+  })
+
   api.onUpdateAvailable(function(info) {
+    resetCheckBtn()
     updateState = 'available'
     document.getElementById('update-text').textContent = 'Có bản cập nhật mới: v' + info.version
     document.getElementById('update-banner').classList.add('visible')
@@ -85,6 +124,16 @@ async function init() {
     document.getElementById('update-progress').style.display = 'none'
     document.getElementById('update-btn').textContent = '↺ Cài & Khởi động lại'
     document.getElementById('update-btn').disabled = false
+  })
+
+  api.onUpdateNotAvailable(function() {
+    setCheckBtnOk()
+  })
+
+  api.onUpdateError(function(err) {
+    resetCheckBtn()
+    showError('Lỗi kiểm tra cập nhật: ' + (err.message || 'Không rõ'))
+    setTimeout(function() { showError('') }, 5000)
   })
 }
 
@@ -204,6 +253,13 @@ document.getElementById('update-btn').addEventListener('click', function() {
   }
 })
 
+document.getElementById('check-update-btn').addEventListener('click', async function() {
+  if (checkingUpdate) return
+  checkingUpdate = true
+  setCheckBtnLoading()
+  try { await api.checkUpdate() } catch { resetCheckBtn() }
+})
+
 document.getElementById('theme-toggle').addEventListener('click', toggleTheme)
 
 document.getElementById('toggle-eye').addEventListener('click', function() {
@@ -218,7 +274,6 @@ document.getElementById('port').addEventListener('input', updateAddr)
 document.getElementById('autostart-toggle').addEventListener('change', async function() {
   var enabled = this.checked
   var actual = await api.setAutoStart(enabled)
-  // Sync checkbox to actual system state (may differ on Linux)
   this.checked = actual
 })
 
@@ -234,13 +289,13 @@ api.onProxyLog(function(entry) {
   var empty = document.getElementById('log-empty')
   if (empty) empty.remove()
 
-  var path = entry.path.length > 35 ? entry.path.substring(0, 35) + '…' : entry.path
+  var reqPath = entry.path.length > 40 ? entry.path.substring(0, 40) + '…' : entry.path
   var cls = entry.status >= 400 ? 'log-err'
            : entry.status >= 300 ? 'log-warn'
            : 'log-ok'
-  var xt  = entry.xat ? 'XT:✓' : 'XT:✗'
+  var xt   = entry.xat ? 'XT:✓' : 'XT:✗'
   var mode = '[' + entry.mode + ']'
-  var line = entry.time + ' ' + entry.method + ' ' + path + ' → ' + entry.status + ' ' + mode + ' ' + entry.auth + ' ' + xt
+  var line = entry.time + ' ' + entry.method + ' ' + reqPath + ' → ' + entry.status + ' ' + mode + ' ' + entry.auth + ' ' + xt
 
   var wrap = document.createElement('div')
   wrap.style.cssText = 'margin-bottom:3px'
@@ -264,7 +319,7 @@ api.onProxyLog(function(entry) {
 
   panel.insertBefore(wrap, panel.firstChild)
 
-  // Keep max 80 entries (wraps)
+  // Keep max 80 entries
   while (panel.children.length > 80) {
     panel.removeChild(panel.lastChild)
   }

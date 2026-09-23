@@ -40,6 +40,10 @@ contextBridge.exposeInMainWorld('api', {
   setAutoStart: (enable: boolean) =>
     ipcRenderer.invoke('set-auto-start', enable),
 
+  onCheckingForUpdate: (cb: () => void) => {
+    ipcRenderer.on('checking-for-update', () => cb())
+  },
+
   onUpdateAvailable: (cb: (info: { version: string }) => void) => {
     ipcRenderer.on('update-available', (_, info) => cb(info))
   },
@@ -52,7 +56,15 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('update-downloaded', () => cb())
   },
 
-  onProxyLog: (cb: (entry: { time: string; method: string; path: string; status: number; mode: string; auth: string; xat: boolean }) => void) => {
+  onUpdateNotAvailable: (cb: () => void) => {
+    ipcRenderer.on('update-not-available', () => cb())
+  },
+
+  onUpdateError: (cb: (err: { message: string }) => void) => {
+    ipcRenderer.on('update-error', (_, err) => cb(err))
+  },
+
+  onProxyLog: (cb: (entry: { time: string; method: string; path: string; status: number; mode: string; auth: string; xat: boolean; body?: string }) => void) => {
     ipcRenderer.on('proxy-log', (_, entry) => cb(entry))
   },
 })

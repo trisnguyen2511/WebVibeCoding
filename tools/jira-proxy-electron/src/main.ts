@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, nativeTheme } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import path from 'path'
 import fs from 'fs'
@@ -64,10 +64,12 @@ function writeSavedConfig(cfg: SavedConfig): void {
 // ── Auto-updater ───────────────────────────────────────────────────────────────
 
 function setupAutoUpdater() {
-  if (!app.isPackaged) return
-
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = false
+
+  autoUpdater.on('checking-for-update', () => {
+    win?.webContents.send('checking-for-update', {})
+  })
 
   autoUpdater.on('update-available', (info) => {
     win?.webContents.send('update-available', { version: info.version })
@@ -80,6 +82,16 @@ function setupAutoUpdater() {
   autoUpdater.on('update-downloaded', () => {
     win?.webContents.send('update-downloaded', {})
   })
+
+  autoUpdater.on('update-not-available', () => {
+    win?.webContents.send('update-not-available', {})
+  })
+
+  autoUpdater.on('error', (err) => {
+    win?.webContents.send('update-error', { message: err.message })
+  })
+
+  if (!app.isPackaged) return
 
   // Check on startup after window is ready
   setTimeout(() => {
@@ -153,11 +165,14 @@ function createTray() {
 
 function createWindow() {
   const iconFile = assetPath('icon.png')
+  const isDark = nativeTheme.shouldUseDarkColors
 
   win = new BrowserWindow({
-    width: 460,
-    height: 760,
-    resizable: false,
+    width: 480,
+    height: 720,
+    minWidth: 380,
+    minHeight: 560,
+    resizable: true,
     title: 'Jira Proxy',
     ...(fs.existsSync(iconFile) ? { icon: iconFile } : {}),
     webPreferences: {
@@ -166,10 +181,14 @@ function createWindow() {
       nodeIntegration: false,
     },
     show: false,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#08080E' : '#FBF7EE',
   })
 
   win.loadFile(rendererPath('index.html'))
+
+  win.once('ready-to-show', () => {
+    win?.show()
+  })
 
   win.on('close', (e) => {
     if (!isQuitting) {
@@ -191,8 +210,6 @@ app.whenReady().then(() => {
   setLogCallback((entry) => {
     win?.webContents.send('proxy-log', entry)
   })
-
-  win?.show()
 })
 
 app.on('window-all-closed', () => {
@@ -246,8 +263,16 @@ ipcMain.handle('load-config', () => {
 })
 
 ipcMain.handle('check-update', async () => {
-  if (!app.isPackaged) return
-  try { await autoUpdater.checkForUpdates() } catch { /* noop */ }
+  if (!app.isPackaged) {
+    // Dev mode: simulate feedback after a short delay
+    setTimeout(() => win?.webContents.send('update-not-available', {}), 800)
+    return
+  }
+  try {
+    await autoUpdater.checkForUpdates()
+  } catch (err) {
+    win?.webContents.send('update-error', { message: (err as Error).message })
+  }
 })
 
 ipcMain.handle('download-update', async () => {
@@ -278,7 +303,7 @@ ipcMain.handle('get-auto-start', () => {
 ipcMain.handle('set-auto-start', (_, enable: boolean) => {
   app.setLoginItemSettings({
     openAtLogin: enable,
-    openAsHidden: true, // Start hidden in tray, don't show window
+    openAsHidden: true,
   })
   return app.getLoginItemSettings().openAtLogin
 })

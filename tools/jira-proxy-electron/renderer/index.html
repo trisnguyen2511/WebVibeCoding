@@ -127,7 +127,7 @@
       flex-shrink: 0;
     }
 
-    .header-text { flex: 1; }
+    .header-text { flex: 1; min-width: 0; }
     .header-text h1 {
       font-size: 15px;
       font-weight: 700;
@@ -149,22 +149,39 @@
       font-weight: 400;
     }
 
-    .theme-toggle {
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .icon-btn {
       background: none;
       border: 1px solid var(--border2);
       color: var(--muted);
       border-radius: 7px;
       width: 30px; height: 30px;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 15px;
       display: flex; align-items: center; justify-content: center;
       transition: color 0.15s, border-color 0.15s, background 0.15s;
       flex-shrink: 0;
     }
-    .theme-toggle:hover {
+    .icon-btn:hover:not(:disabled) {
       color: var(--fg);
       border-color: var(--accent);
       background: var(--accent-dim);
+    }
+    .icon-btn:disabled { opacity: 0.4; cursor: default; }
+    .icon-btn.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+    .icon-btn.ok {
+      color: var(--green);
+      border-color: var(--green);
     }
 
     /* ── Status card ── */
@@ -229,11 +246,19 @@
     .health-btn:hover { background: rgba(22,163,74,0.15); }
     .health-btn.visible { display: block; }
 
-    /* ── Form ── */
+    /* ── Form body — flex column, no scroll: config fixed + log grows ── */
     .form-body {
       flex: 1;
-      overflow-y: auto;
+      min-height: 0;
+      overflow: hidden;
       padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+
+    .config-fields {
+      flex-shrink: 0;
       display: flex;
       flex-direction: column;
       gap: 11px;
@@ -398,18 +423,21 @@
     .switch input:checked + .slider { background: var(--accent); }
     .switch input:checked + .slider::before { transform: translateX(16px); }
 
-    /* ── Log panel ── */
+    /* ── Log section — grows to fill remaining space ── */
     .log-section {
+      flex: 1;
+      min-height: 120px;
       display: flex;
       flex-direction: column;
       gap: 5px;
-      margin-top: 4px;
+      overflow: hidden;
     }
 
     .log-header {
       display: flex;
       align-items: center;
       gap: 6px;
+      flex-shrink: 0;
     }
 
     .log-clear-btn {
@@ -425,7 +453,8 @@
     .log-clear-btn:hover { color: var(--fg2); border-color: var(--fg2); }
 
     .log-panel {
-      height: 120px;
+      flex: 1;
+      min-height: 60px;
       overflow-y: auto;
       background: var(--surface);
       border: 1px solid var(--border);
@@ -471,10 +500,13 @@
   <header class="header">
     <div class="logo-box">🔀</div>
     <div class="header-text">
-      <h1>Jira Proxy <span class="version-chip" id="version-chip">v1.2.2</span></h1>
+      <h1>Jira Proxy <span class="version-chip" id="version-chip">v1.3.0</span></h1>
       <p>CORS proxy — kết nối Jira nội bộ từ trình duyệt</p>
     </div>
-    <button class="theme-toggle" id="theme-toggle" title="Chuyển theme">☀️</button>
+    <div class="header-actions">
+      <button class="icon-btn" id="check-update-btn" title="Kiểm tra cập nhật">↺</button>
+      <button class="icon-btn" id="theme-toggle" title="Chuyển theme sáng/tối">🌙</button>
+    </div>
   </header>
 
   <div class="status-card" id="status-card">
@@ -487,35 +519,37 @@
   </div>
 
   <div class="form-body">
-    <div class="section-title">Cấu hình kết nối</div>
+    <div class="config-fields">
+      <div class="section-title">Cấu hình kết nối</div>
 
-    <div class="field">
-      <div class="field-header">
-        <label for="target">Jira URL</label>
-        <span class="field-hint">Địa chỉ server Jira của công ty</span>
-      </div>
-      <input id="target" type="url" placeholder="https://jira.company.com" autocomplete="off" spellcheck="false" />
-    </div>
-
-    <div class="field">
-      <div class="field-header">
-        <label for="token">Personal Access Token (PAT)</label>
-        <span class="field-hint">Không lưu — chỉ dùng khi đang chạy</span>
-      </div>
-      <div class="input-wrap">
-        <input id="token" type="password" placeholder="Tùy chọn — để trống nếu dùng Basic Auth" autocomplete="off" spellcheck="false" />
-        <button class="toggle-eye" id="toggle-eye" tabindex="-1" title="Hiện/ẩn token">👁</button>
-      </div>
-    </div>
-
-    <div class="row-2">
       <div class="field">
-        <div class="field-header"><label for="port">Port</label></div>
-        <input id="port" type="number" value="8765" min="1024" max="65535" />
+        <div class="field-header">
+          <label for="target">Jira URL</label>
+          <span class="field-hint">Địa chỉ server Jira của công ty</span>
+        </div>
+        <input id="target" type="url" placeholder="https://jira.company.com" autocomplete="off" spellcheck="false" />
       </div>
+
       <div class="field">
-        <div class="field-header"><label>Địa chỉ proxy</label></div>
-        <input id="addr-input" type="text" readonly value="http://127.0.0.1:8765" />
+        <div class="field-header">
+          <label for="token">Personal Access Token (PAT)</label>
+          <span class="field-hint">Không lưu — chỉ dùng khi đang chạy</span>
+        </div>
+        <div class="input-wrap">
+          <input id="token" type="password" placeholder="Tùy chọn — để trống nếu dùng Basic Auth" autocomplete="off" spellcheck="false" />
+          <button class="toggle-eye" id="toggle-eye" tabindex="-1" title="Hiện/ẩn token">👁</button>
+        </div>
+      </div>
+
+      <div class="row-2">
+        <div class="field">
+          <div class="field-header"><label for="port">Port</label></div>
+          <input id="port" type="number" value="8765" min="1024" max="65535" />
+        </div>
+        <div class="field">
+          <div class="field-header"><label>Địa chỉ proxy</label></div>
+          <input id="addr-input" type="text" readonly value="http://127.0.0.1:8765" />
+        </div>
       </div>
     </div>
 
