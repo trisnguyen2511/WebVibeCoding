@@ -131,7 +131,7 @@ async function init() {
     updateState = 'available'
     document.getElementById('update-text').textContent = 'Có bản cập nhật mới: v' + info.version
     document.getElementById('update-banner').classList.add('visible')
-    document.getElementById('update-btn').textContent = 'Tải về'
+    document.getElementById('update-btn').textContent = 'Mở trang tải về'
     document.getElementById('update-btn').disabled = false
     showToast('Có bản cập nhật mới: v' + info.version, 'info', 4000)
   })
@@ -275,11 +275,10 @@ document.getElementById('health-btn').addEventListener('click', function() {
 })
 
 document.getElementById('update-btn').addEventListener('click', function() {
-  if (updateState === 'downloaded') {
-    api.installUpdate()
-  } else if (updateState === 'available') {
-    updateState = 'downloading'
+  if (updateState === 'available') {
     api.downloadUpdate()
+    document.getElementById('update-banner').classList.remove('visible')
+    showToast('Đang mở trang tải về…', 'info', 2500)
   }
 })
 
