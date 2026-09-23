@@ -307,6 +307,12 @@ document.getElementById('autostart-toggle').addEventListener('change', async fun
   this.checked = actual
 })
 
+// Stop clicks on the inner switch label from bubbling to the outer label
+// (CSP blocks inline onclick, so we wire it here instead)
+document.querySelector('.switch').addEventListener('click', function(e) {
+  e.stopPropagation()
+})
+
 document.getElementById('log-clear-btn').addEventListener('click', function() {
   var panel = document.getElementById('log-panel')
   panel.innerHTML = '<div class="log-empty" id="log-empty">Đã xóa log.</div>'
