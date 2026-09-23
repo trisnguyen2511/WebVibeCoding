@@ -67,10 +67,10 @@ async function jiraRequest(
   const text = await res.text()
   let json: unknown
   try { json = JSON.parse(text) } catch { json = {} }
-  const j = json as { errorMessages?: string[]; message?: string; error?: string; errors?: Record<string, string> }
+  const j = json as { errorMessages?: string[]; errors?: Record<string, string>; message?: string; error?: string }
   if (!res.ok) {
-    const fieldErr = j.errors ? Object.values(j.errors)[0] : undefined
-    throw new Error(j.errorMessages?.[0] ?? fieldErr ?? j.message ?? j.error ?? `HTTP ${res.status}`)
+    const fieldErr = j.errors ? Object.values(j.errors).join('; ') : undefined
+    throw new Error(fieldErr ?? j.errorMessages?.[0] ?? j.message ?? j.error ?? `HTTP ${res.status}`)
   }
   return json
 }
@@ -447,9 +447,18 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
         await req(`/issue/${jiraId}`, 'PUT', { fields })
         logs.push({ action: 'update_fields', jiraKey, date: label, hours: 0 })
         return true
-      } catch (e) {
-        logs.push({ action: 'skip', jiraKey, date: label, hours: 0, reason: e instanceof Error ? e.message : 'error' })
-        return false
+      } catch {
+        // Retry with 'update' operation format — works in some Jira versions when field is not on the Edit screen
+        try {
+          const update: Record<string, unknown[]> = {}
+          for (const [k, v] of Object.entries(fields)) update[k] = [{ set: v }]
+          await req(`/issue/${jiraId}`, 'PUT', { update })
+          logs.push({ action: 'update_fields', jiraKey, date: label, hours: 0 })
+          return true
+        } catch (e2) {
+          logs.push({ action: 'skip', jiraKey, date: label, hours: 0, reason: e2 instanceof Error ? e2.message : 'error' })
+          return false
+        }
       }
     }
 
@@ -482,7 +491,7 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
         }))
       }
 
-      // 2. Original Estimate — try timeoriginalestimate (seconds), fallback to timetracking composite field
+      // 2. Original Estimate — try timeoriginalestimate (seconds), fallback to timetracking, then update-op format
       if ((task.estimateHours ?? null) !== (b?.estimateHours ?? null) && task.estimateHours != null) {
         const secs = Math.round(task.estimateHours * 3600)
         const hStr = task.estimateHours % 1 === 0 ? `${task.estimateHours}h` : `${Math.floor(task.estimateHours)}h ${Math.round((task.estimateHours % 1) * 60)}m`
@@ -494,6 +503,12 @@ export function JiraPanel({ project, tasks, onUpdateConfig, onSyncTasks, onSyncT
         if (!estOk) {
           try {
             await req(`/issue/${task.jiraId}`, 'PUT', { fields: { timetracking: { originalEstimate: hStr } } })
+            estOk = true
+          } catch { /* try update operation format */ }
+        }
+        if (!estOk) {
+          try {
+            await req(`/issue/${task.jiraId}`, 'PUT', { update: { timeoriginalestimate: [{ set: secs }] } })
             estOk = true
           } catch { /* neither field accessible via API */ }
         }
