@@ -5,6 +5,27 @@ let currentPort = 8765
 let updateState = 'none' // 'none' | 'available' | 'downloading' | 'downloaded'
 let checkingUpdate = false
 
+// ── Toast ──────────────────────────────────────────────────────────────────────
+
+var toastTimer = null
+
+function showToast(msg, type, duration) {
+  var el = document.getElementById('toast')
+  if (!el) return
+  if (toastTimer) { clearTimeout(toastTimer); toastTimer = null }
+
+  el.textContent = msg
+  el.className = 'toast' + (type ? ' ' + type : '')
+  // Force reflow so the transition fires
+  void el.offsetWidth
+  el.classList.add('show')
+
+  toastTimer = setTimeout(function() {
+    el.classList.remove('show')
+    toastTimer = null
+  }, duration || 3000)
+}
+
 // ── Theme ──────────────────────────────────────────────────────────────────────
 
 function applyTheme(theme) {
@@ -112,6 +133,7 @@ async function init() {
     document.getElementById('update-banner').classList.add('visible')
     document.getElementById('update-btn').textContent = 'Tải về'
     document.getElementById('update-btn').disabled = false
+    showToast('Có bản cập nhật mới: v' + info.version, 'info', 4000)
   })
 
   api.onDownloadProgress(function(progress) {
@@ -132,12 +154,12 @@ async function init() {
 
   api.onUpdateNotAvailable(function() {
     setCheckBtnOk()
+    showToast('Bạn đang dùng phiên bản mới nhất ✓', 'success', 3500)
   })
 
   api.onUpdateError(function(err) {
     resetCheckBtn()
-    showError('Lỗi kiểm tra cập nhật: ' + (err.message || 'Không rõ'))
-    setTimeout(function() { showError('') }, 5000)
+    showToast('Lỗi kiểm tra cập nhật: ' + (err.message || 'Không rõ'), 'error', 5000)
   })
 }
 

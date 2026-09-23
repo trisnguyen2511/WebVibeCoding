@@ -30,18 +30,18 @@
     }
 
     [data-theme="dark"] {
-      --bg:          #0E0F1A;
-      --surface:     #161727;
-      --surface2:    #1C1D30;
-      --surface3:    #111220;
-      --border:      #232440;
-      --border2:     #323458;
+      --bg:          #12131F;
+      --surface:     #191A2C;
+      --surface2:    #1E2036;
+      --surface3:    #141527;
+      --border:      #272849;
+      --border2:     #363860;
       --accent:      #7A5AF8;
       --accent-soft: #A38BFB;
       --accent-dim:  rgba(122,90,248,0.15);
-      --fg:          #D8DBF0;
-      --fg2:         #8C93B5;
-      --muted:       #595E80;
+      --fg:          #DFE2F5;
+      --fg2:         #9AA0C4;
+      --muted:       #6670A0;
       --green:       #2EC98A;
       --green-dim:   rgba(46,201,138,0.10);
       --red:         #EE6E6E;
@@ -591,12 +591,49 @@
       text-align: center;
     }
 
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--fg);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 9px 16px;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+      white-space: nowrap;
+      max-width: calc(100% - 40px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .toast.success { border-color: rgba(46,201,138,0.4); color: var(--green); }
+    .toast.error   { border-color: rgba(238,110,110,0.4); color: var(--red); }
+    .toast.info    { border-color: rgba(122,90,248,0.4);  color: var(--accent-soft); }
+
     /* ── Animations ── */
     @keyframes spin { to { transform: rotate(360deg); } }
     .spin { display: inline-block; animation: spin 0.7s linear infinite; }
   </style>
 </head>
 <body>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
 
   <!-- Update banner -->
   <div class="update-banner" id="update-banner">
