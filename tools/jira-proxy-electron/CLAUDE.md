@@ -22,3 +22,4 @@ Mỗi lần chỉnh sửa bất kỳ file nào trong thư mục này → tăng v
 | 1.6.0   | 2026-09-23 | Thay electron-updater bằng fetch raw.githubusercontent.com; nút "Tải về" mở browser; xóa lỗi 404 hiện trong UI |
 | 1.7.0   | 2026-09-23 | Fix toast position:fixed (chuyển xuống cuối body); fix autostart toggle CSP inline-onclick; đổi text update-btn thành "Mở trang tải về" |
 | 1.8.0   | 2026-09-23 | Version bump để test update notification flow (v1.7.0 → v1.8.0) |
+| 1.9.0   | 2026-09-23 | Thêm lại electron-updater: auto-download + auto-install khi có bản mới; fix Vercel build (exclude tsconfig) |
