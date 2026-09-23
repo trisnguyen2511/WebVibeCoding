@@ -222,6 +222,40 @@ document.getElementById('autostart-toggle').addEventListener('change', async fun
   this.checked = actual
 })
 
+document.getElementById('log-clear-btn').addEventListener('click', function() {
+  var panel = document.getElementById('log-panel')
+  panel.innerHTML = '<div class="log-empty" id="log-empty">Đã xóa log.</div>'
+})
+
+// ── Log panel ─────────────────────────────────────────────────────────────────
+
+api.onProxyLog(function(entry) {
+  var panel = document.getElementById('log-panel')
+  var empty = document.getElementById('log-empty')
+  if (empty) empty.remove()
+
+  var path = entry.path.length > 38 ? entry.path.substring(0, 38) + '…' : entry.path
+  var cls = entry.status >= 500 ? 'log-err'
+           : entry.status >= 400 ? 'log-err'
+           : entry.status >= 300 ? 'log-warn'
+           : 'log-ok'
+  var xt  = entry.xat ? 'XT:✓' : 'XT:✗'
+  var mode = '[' + entry.mode + ']'
+  var line = entry.time + ' ' + entry.method + ' ' + path + ' → ' + entry.status + ' ' + mode + ' ' + entry.auth + ' ' + xt
+
+  var item = document.createElement('div')
+  item.className = 'log-entry ' + cls
+  item.title = line   // full text on hover
+  item.textContent = line
+
+  panel.insertBefore(item, panel.firstChild)
+
+  // Keep max 100 entries
+  while (panel.children.length > 100) {
+    panel.removeChild(panel.lastChild)
+  }
+})
+
 // ── Boot ───────────────────────────────────────────────────────────────────────
 
 init()

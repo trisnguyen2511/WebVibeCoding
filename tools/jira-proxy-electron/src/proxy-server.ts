@@ -9,6 +9,22 @@ export interface ProxyConfig {
   port: number
 }
 
+export interface ProxyLogEntry {
+  time: string
+  method: string
+  path: string
+  status: number
+  mode: 'T' | 'P'   // T=token(proxy injects Bearer), P=passthrough
+  auth: string       // first 30 chars of Authorization sent to Jira, or 'none'
+  xat: boolean       // X-Atlassian-Token: no-check was sent
+}
+
+let logCallback: ((entry: ProxyLogEntry) => void) | null = null
+
+export function setLogCallback(cb: (entry: ProxyLogEntry) => void): void {
+  logCallback = cb
+}
+
 // Headers that reveal browser identity — stripped when token mode is active
 const BROWSER_HEADERS = new Set([
   'origin', 'referer',
@@ -89,7 +105,7 @@ export function startServer(config: ProxyConfig): Promise<number> {
           }
         }
         // Use target.host (includes port if non-standard) so Jira's virtual-host routing works
-        fwdHeaders['Host'] = target.host
+        fwdHeaders['host'] = target.host
 
         const options: https.RequestOptions = {
           hostname: target.hostname,
@@ -113,6 +129,26 @@ export function startServer(config: ProxyConfig): Promise<number> {
           delete outHeaders['transfer-encoding']
           res.writeHead(proxyRes.statusCode ?? 502, outHeaders)
           proxyRes.pipe(res)
+
+          // Emit log entry
+          if (logCallback) {
+            const now = new Date()
+            const hh = String(now.getHours()).padStart(2, '0')
+            const mm = String(now.getMinutes()).padStart(2, '0')
+            const ss = String(now.getSeconds()).padStart(2, '0')
+            const authVal = ((fwdHeaders['Authorization'] ?? fwdHeaders['authorization']) as string | undefined) ?? ''
+            const auth = authVal ? authVal.substring(0, 30) + '…' : 'none'
+            const xat = 'X-Atlassian-Token' in fwdHeaders || 'x-atlassian-token' in fwdHeaders
+            logCallback({
+              time: `${hh}:${mm}:${ss}`,
+              method: req.method ?? 'GET',
+              path: req.url ?? '/',
+              status: proxyRes.statusCode ?? 0,
+              mode: config.token ? 'T' : 'P',
+              auth,
+              xat,
+            })
+          }
         })
 
         proxy.on('error', (err) => {

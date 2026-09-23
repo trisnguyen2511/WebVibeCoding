@@ -51,4 +51,8 @@ contextBridge.exposeInMainWorld('api', {
   onUpdateDownloaded: (cb: () => void) => {
     ipcRenderer.on('update-downloaded', () => cb())
   },
+
+  onProxyLog: (cb: (entry: { time: string; method: string; path: string; status: number; mode: string; auth: string; xat: boolean }) => void) => {
+    ipcRenderer.on('proxy-log', (_, entry) => cb(entry))
+  },
 })

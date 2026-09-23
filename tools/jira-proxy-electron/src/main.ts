@@ -2,7 +2,7 @@ import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell } from 'ele
 import { autoUpdater } from 'electron-updater'
 import path from 'path'
 import fs from 'fs'
-import { startServer, stopServer, isRunning, getConfig } from './proxy-server'
+import { startServer, stopServer, isRunning, getConfig, setLogCallback } from './proxy-server'
 
 let tray: Tray | null = null
 let win: BrowserWindow | null = null
@@ -156,7 +156,7 @@ function createWindow() {
 
   win = new BrowserWindow({
     width: 460,
-    height: 620,
+    height: 760,
     resizable: false,
     title: 'Jira Proxy',
     ...(fs.existsSync(iconFile) ? { icon: iconFile } : {}),
@@ -187,6 +187,10 @@ app.whenReady().then(() => {
   createWindow()
   createTray()
   setupAutoUpdater()
+
+  setLogCallback((entry) => {
+    win?.webContents.send('proxy-log', entry)
+  })
 
   win?.show()
 })

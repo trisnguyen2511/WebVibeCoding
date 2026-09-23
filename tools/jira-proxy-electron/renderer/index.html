@@ -397,6 +397,63 @@
     }
     .switch input:checked + .slider { background: var(--accent); }
     .switch input:checked + .slider::before { transform: translateX(16px); }
+
+    /* ── Log panel ── */
+    .log-section {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-top: 4px;
+    }
+
+    .log-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .log-clear-btn {
+      margin-left: auto;
+      background: none;
+      border: 1px solid var(--border2);
+      color: var(--muted);
+      border-radius: 5px;
+      padding: 1px 7px;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .log-clear-btn:hover { color: var(--fg2); border-color: var(--fg2); }
+
+    .log-panel {
+      height: 120px;
+      overflow-y: auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .log-empty {
+      font-size: 10px;
+      color: var(--muted);
+      font-style: italic;
+      padding: 2px 0;
+    }
+
+    .log-entry {
+      font-size: 10px;
+      font-family: 'SF Mono', 'JetBrains Mono', 'Consolas', monospace;
+      line-height: 1.55;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .log-ok   { color: var(--green); }
+    .log-warn { color: #d97706; }
+    .log-err  { color: var(--red); }
   </style>
 </head>
 <body>
@@ -414,7 +471,7 @@
   <header class="header">
     <div class="logo-box">🔀</div>
     <div class="header-text">
-      <h1>Jira Proxy <span class="version-chip" id="version-chip">v1.2.0</span></h1>
+      <h1>Jira Proxy <span class="version-chip" id="version-chip">v1.2.1</span></h1>
       <p>CORS proxy — kết nối Jira nội bộ từ trình duyệt</p>
     </div>
     <button class="theme-toggle" id="theme-toggle" title="Chuyển theme">☀️</button>
@@ -459,6 +516,16 @@
       <div class="field">
         <div class="field-header"><label>Địa chỉ proxy</label></div>
         <input id="addr-input" type="text" readonly value="http://127.0.0.1:8765" />
+      </div>
+    </div>
+
+    <div class="log-section">
+      <div class="log-header">
+        <span class="section-title">Request log</span>
+        <button class="log-clear-btn" id="log-clear-btn">Xóa</button>
+      </div>
+      <div class="log-panel" id="log-panel">
+        <div class="log-empty" id="log-empty">Chưa có request. Khi proxy chạy, mỗi request sẽ hiện ở đây.</div>
       </div>
     </div>
   </div>
