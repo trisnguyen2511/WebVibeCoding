@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+node_modules/
 /.pnp
 .pnp.js
 .yarn/install-state.gz
@@ -34,6 +35,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# electron build output
+tools/jira-proxy-electron/dist/
+tools/jira-proxy-electron/dist-electron/
 
 # PWA generated files
 public/sw.js
