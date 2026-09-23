@@ -67,8 +67,11 @@ async function jiraRequest(
   const text = await res.text()
   let json: unknown
   try { json = JSON.parse(text) } catch { json = {} }
-  const j = json as { errorMessages?: string[]; message?: string; error?: string }
-  if (!res.ok) throw new Error(j.errorMessages?.[0] ?? j.message ?? j.error ?? `HTTP ${res.status}`)
+  const j = json as { errorMessages?: string[]; message?: string; error?: string; errors?: Record<string, string> }
+  if (!res.ok) {
+    const fieldErr = j.errors ? Object.values(j.errors)[0] : undefined
+    throw new Error(j.errorMessages?.[0] ?? fieldErr ?? j.message ?? j.error ?? `HTTP ${res.status}`)
+  }
   return json
 }
 
