@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" />
   <title>Jira Proxy</title>
   <style>
     /* ── Design tokens ── */
@@ -601,9 +601,6 @@
 </head>
 <body>
 
-  <!-- Toast -->
-  <div class="toast" id="toast"></div>
-
   <!-- Update banner -->
   <div class="update-banner" id="update-banner">
     <div class="update-info">
@@ -612,7 +609,7 @@
         <div class="update-progress-bar" id="update-progress-bar"></div>
       </div>
     </div>
-    <button class="update-btn" id="update-btn">Tải về</button>
+    <button class="update-btn" id="update-btn">Mở trang tải về</button>
   </div>
 
   <!-- Header -->
@@ -625,7 +622,7 @@
     <div class="header-text">
       <div class="header-title">
         Jira Proxy
-        <span class="version-chip" id="version-chip">v1.6.0</span>
+        <span class="version-chip" id="version-chip">v1.7.0</span>
       </div>
       <div class="header-sub">CORS proxy — kết nối Jira nội bộ từ trình duyệt</div>
     </div>
@@ -752,7 +749,7 @@
         <strong>Tự khởi động cùng máy</strong>
         <span>Proxy tự chạy nền khi bật máy tính</span>
       </div>
-      <label class="switch" onclick="event.stopPropagation()">
+      <label class="switch">
         <input type="checkbox" id="autostart-toggle" />
         <span class="slider"></span>
       </label>
@@ -778,5 +775,8 @@
   </div>
 
   <script src="renderer.js"></script>
+
+  <!-- Toast: must be last child so position:fixed stacks above all content in Electron -->
+  <div class="toast" id="toast"></div>
 </body>
 </html>

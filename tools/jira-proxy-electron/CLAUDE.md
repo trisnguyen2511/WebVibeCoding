@@ -20,3 +20,4 @@ Mỗi lần chỉnh sửa bất kỳ file nào trong thư mục này → tăng v
 | 1.4.0   | 2026-09-23 | Toast notification cho update check; làm sạch error message từ updater; tăng độ sáng dark palette |
 | 1.5.0   | 2026-09-23 | UI rewrite khớp với approved preview (exact CSS tokens); 404 từ updater → "no update" thay vì error |
 | 1.6.0   | 2026-09-23 | Thay electron-updater bằng fetch raw.githubusercontent.com; nút "Tải về" mở browser; xóa lỗi 404 hiện trong UI |
+| 1.7.0   | 2026-09-23 | Fix toast position:fixed (chuyển xuống cuối body); fix autostart toggle CSP inline-onclick; đổi text update-btn thành "Mở trang tải về" |
