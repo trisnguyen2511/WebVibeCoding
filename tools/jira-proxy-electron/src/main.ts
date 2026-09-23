@@ -88,14 +88,17 @@ function setupAutoUpdater() {
   })
 
   autoUpdater.on('error', (err) => {
-    const raw = err.message || 'Không rõ'
+    const raw = err.message || ''
+    // 404 = no releases published yet — treat as "up to date" silently
+    if (raw.includes('404') || raw.toLowerCase().includes('cannot find latest')) {
+      win?.webContents.send('update-not-available', {})
+      return
+    }
     let clean: string
-    if (raw.includes('404')) {
-      clean = 'Chưa có phiên bản nào được phát hành trên GitHub (404)'
-    } else if (raw.includes('ENOTFOUND') || raw.includes('ECONNREFUSED') || raw.includes('ETIMEDOUT')) {
+    if (raw.includes('ENOTFOUND') || raw.includes('ECONNREFUSED') || raw.includes('ETIMEDOUT')) {
       clean = 'Không thể kết nối để kiểm tra cập nhật'
     } else {
-      clean = raw.split('\n')[0].substring(0, 100)
+      clean = raw.split('\n')[0].substring(0, 100) || 'Lỗi không xác định'
     }
     win?.webContents.send('update-error', { message: clean })
   })
