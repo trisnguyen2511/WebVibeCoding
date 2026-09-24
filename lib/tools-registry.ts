@@ -135,4 +135,11 @@ export const tools: Tool[] = [
     description: 'Scrum project manager with Gantt chart, sprint tracking, and Jira sync',
     category: 'productivity',
   },
+  {
+    name: 'Task Queue',
+    slug: 'task-queue',
+    icon: '📋',
+    description: 'Sắp xếp công việc theo hàng đợi — thêm/xóa/sửa, kéo thả đổi thứ tự, bấm giờ, xuất nhập JSON',
+    category: 'productivity',
+  },
 ]
