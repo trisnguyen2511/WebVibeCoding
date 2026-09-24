@@ -168,7 +168,7 @@ function TaskRow({
         {/* Name / edit input */}
         {isEditing ? (
           <input
-            ref={editInputRef}
+            ref={editInputRef as React.Ref<HTMLInputElement>}
             className="flex-1 bg-background border border-accent/60 rounded-md px-2 py-0.5 text-sm text-fg outline-none"
             value={editName}
             onChange={e => onSetEditName(e.target.value)}

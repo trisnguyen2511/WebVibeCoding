@@ -51,14 +51,17 @@ feature/xxx  →  staging  →  master (prod)
 
 ### Steps for every new feature
 1. Develop on `claude/<feature>` branch
-2. Merge `claude/<feature>` → `staging` (auto-deploy to Vercel Preview)
-3. Notify the user that the feature is on staging and ready for review
-4. **STOP and wait** — do NOT touch `master` until the user explicitly says so
-5. After user says "lên prod" / "lên production" / "merge to master": merge `staging` → `master`
+2. **Run `npm run build` — must pass with zero errors before any merge**
+3. If build fails: fix the error immediately, re-run build, confirm green before continuing
+4. Merge `claude/<feature>` → `staging` (auto-deploy to Vercel Preview)
+5. Notify the user that the feature is on staging and ready for review
+6. **STOP and wait** — do NOT touch `master` until the user explicitly says so
+7. After user says "lên prod" / "lên production" / "merge to master": merge `staging` → `master`
 
 ### HARD DEPLOY RULES — never break these
 - **Default for every task**: push to `staging` only, notify the user, then STOP
 - **NEVER** merge `staging` → `master` unless the user explicitly says "lên prod" (or equivalent)
+- **NEVER merge to `staging` if `npm run build` fails** — fix first, then merge
 - This applies to every change, no matter how small (typo fix, removing a section, etc.)
 - The user will say if they want an exception — otherwise always stop at staging
 
