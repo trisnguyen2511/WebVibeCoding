@@ -233,8 +233,14 @@ function TaskRow({
             >Esc</button>
           </div>
         ) : isDone ? (
-          <div className="flex gap-0.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
-            <button className="p-1.5 rounded-md text-muted hover:text-fg hover:bg-border transition-all text-sm" title="Khôi phục" onClick={onRestore}>↩</button>
+          <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+            <button
+              className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border border-accent/30 text-accent-soft bg-accent/10 hover:bg-accent/20 hover:border-accent/60 transition-all active:scale-95"
+              title="Đưa task lên đầu hàng đợi"
+              onClick={onRestore}
+            >
+              ↑ Khôi phục
+            </button>
             <button className="p-1.5 rounded-md text-muted hover:text-red-400 hover:bg-red-500/10 transition-all text-sm" title="Xóa" onClick={onRemove}>🗑</button>
           </div>
         ) : (
@@ -420,7 +426,7 @@ export default function TaskQueuePage() {
       if (!task) return prev
       const q = prev.filter(t => t.state !== 'done')
       const d = prev.filter(t => t.state === 'done' && t.id !== id)
-      return [...q, { ...task, state: 'pending' as TaskState }, ...d]
+      return [{ ...task, state: 'pending' as TaskState }, ...q, ...d]
     })
   }, [])
 
