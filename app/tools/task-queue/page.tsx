@@ -58,6 +58,7 @@ const SHORTCUT_GROUPS = [
     label: 'Toàn cục',
     items: [
       { key: 'N',   desc: 'Thêm task mới (focus input)' },
+      { key: 'F',   desc: 'Tìm kiếm / lọc task' },
       { key: 'Esc', desc: 'Thoát input / đóng panel (kích hoạt shortcut ngay)' },
       { key: '?',   desc: 'Hiện / ẩn shortcuts' },
     ],
@@ -375,12 +376,15 @@ export default function TaskQueuePage() {
   const [newIds,      setNewIds]      = useState<Set<string>>(new Set())
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set())
   const [statKey,     setStatKey]     = useState(0)
+  const [filterOpen,  setFilterOpen]  = useState(false)
+  const [filterQuery, setFilterQuery] = useState('')
 
   const dragIdRef      = useRef<string | null>(null)
   const lastTickRef    = useRef<number>(Date.now())
   const addInputRef    = useRef<HTMLTextAreaElement>(null)
   const editInputRef   = useRef<HTMLTextAreaElement>(null)
   const insertInputRef = useRef<HTMLTextAreaElement>(null)
+  const filterInputRef = useRef<HTMLInputElement>(null)
   const prevStats      = useRef({ pending: 0, partial: 0, done: 0 })
 
   /* ── Load / Save ───────────────────────────────────── */
@@ -415,6 +419,10 @@ export default function TaskQueuePage() {
 
   const queue    = useMemo(() => tasks.filter(t => t.state !== 'done'), [tasks])
   const doneList = useMemo(() => tasks.filter(t => t.state === 'done'),  [tasks])
+
+  const fq = filterQuery.trim().toLowerCase()
+  const filteredQueue    = useMemo(() => fq ? queue.filter(t => t.name.toLowerCase().includes(fq)) : queue, [queue, fq])
+  const filteredDoneList = useMemo(() => fq ? doneList.filter(t => t.name.toLowerCase().includes(fq)) : doneList, [doneList, fq])
   const stats    = useMemo(() => ({
     pending: tasks.filter(t => t.state === 'pending').length,
     partial: tasks.filter(t => t.state === 'partial').length,
@@ -597,11 +605,18 @@ export default function TaskQueuePage() {
       if (e.key === '?') { e.preventDefault(); setShowKeys(p => !p); return }
       if (e.key === 'Escape') {
         setShowKeys(false); setEditId(null); setInsertAfter(null); setPartialId(null)
+        setFilterOpen(false); setFilterQuery('')
         if (isInput) { (e.target as HTMLElement).blur(); return }
         return
       }
       if (isInput) return
       if (e.key === 'n' || e.key === 'N') { e.preventDefault(); addInputRef.current?.focus(); return }
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault()
+        setFilterOpen(true)
+        setTimeout(() => filterInputRef.current?.focus(), 30)
+        return
+      }
       // 1–9: select queue task by position
       const digit = Number(e.key)
       if (digit >= 1 && digit <= 9) {
@@ -734,27 +749,59 @@ export default function TaskQueuePage() {
           >+ Thêm</button>
         </div>
 
+        {/* ── Filter bar ── */}
+        {filterOpen && (
+          <div className="flex gap-2 items-center bg-surface border border-accent/40 rounded-xl px-3 py-2 animate-panel-in">
+            <span className="text-accent-soft text-sm flex-shrink-0">🔍</span>
+            <input
+              ref={filterInputRef}
+              value={filterQuery}
+              onChange={e => setFilterQuery(e.target.value)}
+              placeholder="Tìm task… (Esc để đóng)"
+              className="flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-muted"
+              onKeyDown={e => {
+                if (e.key === 'Escape') { e.preventDefault(); setFilterOpen(false); setFilterQuery(''); (e.target as HTMLElement).blur() }
+              }}
+            />
+            {filterQuery
+              ? <span className="text-[11px] text-muted font-mono flex-shrink-0">{filteredQueue.length + filteredDoneList.length} kết quả</span>
+              : <span className="text-[11px] text-muted flex-shrink-0">nhấn Esc để đóng</span>
+            }
+            <button
+              className="text-muted hover:text-fg transition-colors text-sm flex-shrink-0"
+              onClick={() => { setFilterOpen(false); setFilterQuery('') }}
+            >✕</button>
+          </div>
+        )}
+
         {/* ── Queue label ── */}
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-semibold text-muted uppercase tracking-wider whitespace-nowrap">
-            Hàng đợi ({queue.length})
+            {fq ? `Kết quả (${filteredQueue.length})` : `Hàng đợi (${queue.length})`}
           </span>
           <div className="flex-1 h-px bg-border" />
+          {!filterOpen && (
+            <button
+              className="text-[11px] text-muted hover:text-accent-soft transition-colors flex-shrink-0"
+              title="Tìm kiếm (F)"
+              onClick={() => { setFilterOpen(true); setTimeout(() => filterInputRef.current?.focus(), 30) }}
+            >🔍</button>
+          )}
         </div>
 
         {/* ── Queue list ── */}
-        {queue.length === 0 ? (
+        {filteredQueue.length === 0 ? (
           <div className="text-center py-10 text-muted border border-dashed border-border rounded-xl animate-panel-in">
-            <div className="text-3xl mb-2">📭</div>
-            <div className="text-sm">Chưa có task nào — thêm ở trên!</div>
+            <div className="text-3xl mb-2">{fq ? '🔍' : '📭'}</div>
+            <div className="text-sm">{fq ? `Không tìm thấy task nào khớp với "${filterQuery}"` : 'Chưa có task nào — thêm ở trên!'}</div>
           </div>
         ) : (
           <div>
-            {queue.map((task, idx) => (
+            {filteredQueue.map((task, idx) => (
               <div key={task.id}>
                 <TaskRow
                   task={task}
-                  queueIdx={idx}
+                  queueIdx={fq ? queue.indexOf(task) : idx}
                   isSelected={selectedId === task.id}
                   isDragOver={dragOverId === task.id}
                   isNew={newIds.has(task.id)}
@@ -780,8 +827,8 @@ export default function TaskQueuePage() {
                   onDragEnd={onDragEnd}
                 />
 
-                {/* Insert between */}
-                {idx < queue.length - 1 && (
+                {/* Insert between — only when not filtering */}
+                {!fq && idx < filteredQueue.length - 1 && (
                   insertAfter === idx ? (
                     <div className="my-1 animate-task-in">
                       <div className="flex gap-2 bg-surface border border-accent/40 rounded-xl px-3 py-2 items-start">
@@ -819,19 +866,19 @@ export default function TaskQueuePage() {
         )}
 
         {/* ── Done section ── */}
-        {doneList.length > 0 && (
+        {filteredDoneList.length > 0 && (
           <div className="mt-1">
             <button
               className="w-full flex items-center gap-2 text-[11px] font-semibold text-muted uppercase tracking-wider mb-2 hover:text-fg transition-colors group"
               onClick={() => setShowDone(p => !p)}
             >
               <span className={`transition-transform duration-200 ${showDone ? '' : '-rotate-90'}`}>▾</span>
-              Đã hoàn thành ({doneList.length})
+              Đã hoàn thành ({filteredDoneList.length}{fq && doneList.length !== filteredDoneList.length ? `/${doneList.length}` : ''})
               <div className="flex-1 h-px bg-border group-hover:bg-emerald-500/20 transition-colors" />
             </button>
             {showDone && (
               <div className="space-y-1.5 animate-panel-in">
-                {doneList.map((task, idx) => (
+                {filteredDoneList.map((task, idx) => (
                   <TaskRow
                     key={task.id}
                     task={task}
