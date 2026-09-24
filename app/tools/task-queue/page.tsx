@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { ToolShell } from '@/components/tool-shell'
 
 /* ─── Types ─────────────────────────────────────────── */
@@ -15,6 +15,7 @@ interface Task {
   timerMs: number
   timerRunning: boolean
   createdAt: number
+  linkTitles?: Record<string, string>
 }
 
 interface ExportPayload {
@@ -75,6 +76,50 @@ function fmtTime(ms: number): string {
   const m = Math.floor((total % 3600) / 60)
   const s = total % 60
   return [h, m, s].map(n => String(n).padStart(2, '0')).join(':')
+}
+
+function extractUrls(text: string): string[] {
+  return Array.from(text.matchAll(/https?:\/\/[^\s]+/g), m => m[0])
+}
+
+function renderTaskName(
+  name: string,
+  linkTitles: Record<string, string> | undefined,
+  isDone: boolean,
+) {
+  const re = /https?:\/\/[^\s]+/g
+  const nodes: React.ReactNode[] = []
+  let last = 0
+  let m: RegExpExecArray | null
+  // eslint-disable-next-line no-cond-assign
+  while ((m = re.exec(name)) !== null) {
+    if (m.index > last) nodes.push(<span key={`t${last}`}>{name.slice(last, m.index)}</span>)
+    const url = m[0]
+    const title = linkTitles?.[url]
+    let label: string
+    try { label = title || new URL(url).hostname } catch { label = url.slice(0, 40) }
+    nodes.push(
+      <a
+        key={`l${m.index}`}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md no-underline ${
+          isDone
+            ? 'bg-border/20 text-muted border border-border/30'
+            : 'bg-accent/10 border border-accent/25 text-accent-soft hover:bg-accent/20 hover:border-accent/50'
+        } transition-all`}
+        onClick={e => e.stopPropagation()}
+      >
+        <span>🔗</span>
+        <span className="max-w-[200px] truncate font-medium">{label}</span>
+        <span className="opacity-50 text-[9px]">↗</span>
+      </a>
+    )
+    last = m.index + url.length
+  }
+  if (last < name.length) nodes.push(<span key={`t${last}`}>{name.slice(last)}</span>)
+  return nodes.length > 0 ? <>{nodes}</> : name
 }
 
 /* ─── TaskRow sub-component ──────────────────────────── */
@@ -185,7 +230,7 @@ function TaskRow({
         ) : (
           <div className="relative flex-1 min-w-0 group/taskname">
             <span className={`block line-clamp-3 text-sm leading-snug whitespace-pre-wrap transition-colors duration-200 ${isDone ? 'line-through text-muted' : 'text-fg'}`}>
-              {task.name}
+              {renderTaskName(task.name, task.linkTitles, isDone)}
             </span>
             {/* Hover tooltip — shows full text */}
             <div className="pointer-events-none absolute left-0 top-[calc(100%+6px)] z-50 opacity-0 scale-95 group-hover/taskname:opacity-100 group-hover/taskname:scale-100 transition-all duration-150 ease-out bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-fg whitespace-pre-wrap shadow-2xl shadow-black/60 w-max max-w-[min(300px,calc(100vw-48px))] leading-relaxed">
@@ -384,6 +429,25 @@ export default function TaskQueuePage() {
     }
   }, [stats])
 
+  /* ── Link preview ─────────────────────────────────── */
+
+  const fetchLinkTitles = useCallback(async (taskId: string, name: string) => {
+    const urls = extractUrls(name)
+    if (urls.length === 0) return
+    for (const url of urls) {
+      try {
+        const res = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
+        if (!res.ok) continue
+        const data = await res.json() as { title?: string }
+        const title = data.title?.trim()
+        if (!title) continue
+        setTasks(prev => prev.map(t =>
+          t.id === taskId ? { ...t, linkTitles: { ...t.linkTitles, [url]: title } } : t
+        ))
+      } catch { /* ignore */ }
+    }
+  }, [])
+
   /* ── Mutations ─────────────────────────────────────── */
 
   const flashNew = (id: string) => {
@@ -407,7 +471,8 @@ export default function TaskQueuePage() {
     setNewName('')
     setInsertName('')
     setInsertAfter(null)
-  }, [])
+    fetchLinkTitles(id, trimmed)
+  }, [fetchLinkTitles])
 
   const removeTask = useCallback((id: string) => {
     setRemovingIds(prev => new Set(prev).add(id))
@@ -453,9 +518,12 @@ export default function TaskQueuePage() {
   const saveEdit = useCallback(() => {
     if (!editId) return
     const trimmed = editName.trim()
-    if (trimmed) setTasks(prev => prev.map(t => t.id === editId ? { ...t, name: trimmed } : t))
+    if (trimmed) {
+      setTasks(prev => prev.map(t => t.id === editId ? { ...t, name: trimmed } : t))
+      fetchLinkTitles(editId, trimmed)
+    }
     setEditId(null)
-  }, [editId, editName])
+  }, [editId, editName, fetchLinkTitles])
 
   const moveTask = useCallback((id: string, dir: -1 | 1) => {
     setTasks(prev => {
