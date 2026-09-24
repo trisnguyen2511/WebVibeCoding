@@ -87,7 +87,7 @@ interface TaskRowProps {
   isEditing: boolean
   editName: string
   isPartialOpen: boolean
-  editInputRef: React.RefObject<HTMLInputElement | null>
+  editInputRef: React.RefObject<HTMLTextAreaElement | null>
   onSelect: () => void
   onSetEditName: (v: string) => void
   onSaveEdit: () => void
@@ -165,24 +165,31 @@ function TaskRow({
           {isDone ? '✓' : isPartial ? '◑' : queueIdx + 1}
         </div>
 
-        {/* Name / edit input */}
+        {/* Name / edit textarea */}
         {isEditing ? (
-          <input
-            ref={editInputRef as React.Ref<HTMLInputElement>}
-            className="flex-1 bg-background border border-accent/60 rounded-md px-2 py-0.5 text-sm text-fg outline-none"
+          <textarea
+            ref={editInputRef as React.Ref<HTMLTextAreaElement>}
+            className="flex-1 min-w-0 bg-background border border-accent/60 rounded-md px-2 py-1 text-sm text-fg outline-none resize-none leading-snug"
             value={editName}
+            rows={Math.max(1, editName.split('\n').length)}
             onChange={e => onSetEditName(e.target.value)}
             onKeyDown={e => {
-              if (e.key === 'Enter') onSaveEdit()
-              if (e.key === 'Escape') onCancelEdit()
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSaveEdit() }
+              if (e.key === 'Escape') { e.preventDefault(); onCancelEdit() }
             }}
             onBlur={onSaveEdit}
             onClick={e => e.stopPropagation()}
           />
         ) : (
-          <span className={`flex-1 text-sm leading-snug transition-all duration-300 ${isDone ? 'line-through text-muted' : 'text-fg'}`}>
-            {task.name}
-          </span>
+          <div className="relative flex-1 min-w-0 group/taskname">
+            <span className={`block truncate text-sm leading-snug transition-colors duration-200 ${isDone ? 'line-through text-muted' : 'text-fg'}`}>
+              {task.name.replace(/\n/g, ' · ')}
+            </span>
+            {/* Hover tooltip — shows full text */}
+            <div className="pointer-events-none absolute left-0 top-[calc(100%+6px)] z-50 opacity-0 scale-95 group-hover/taskname:opacity-100 group-hover/taskname:scale-100 transition-all duration-150 ease-out bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-fg whitespace-pre-wrap shadow-2xl shadow-black/60 w-max max-w-[min(300px,calc(100vw-48px))] leading-relaxed">
+              {task.name}
+            </div>
+          </div>
         )}
 
         {/* Partial % label */}
@@ -324,9 +331,9 @@ export default function TaskQueuePage() {
 
   const dragIdRef      = useRef<string | null>(null)
   const lastTickRef    = useRef<number>(Date.now())
-  const addInputRef    = useRef<HTMLInputElement>(null)
-  const editInputRef   = useRef<HTMLInputElement>(null)
-  const insertInputRef = useRef<HTMLInputElement>(null)
+  const addInputRef    = useRef<HTMLTextAreaElement>(null)
+  const editInputRef   = useRef<HTMLTextAreaElement>(null)
+  const insertInputRef = useRef<HTMLTextAreaElement>(null)
   const prevStats      = useRef({ pending: 0, partial: 0, done: 0 })
 
   /* ── Load / Save ───────────────────────────────────── */
@@ -628,17 +635,20 @@ export default function TaskQueuePage() {
         </div>
 
         {/* ── Add form ── */}
-        <div className="flex gap-2 bg-surface border border-border rounded-xl px-3 py-2 items-center focus-within:border-accent/50 transition-colors duration-200">
-          <input
+        <div className="flex gap-2 bg-surface border border-border rounded-xl px-3 py-2 items-start focus-within:border-accent/50 transition-colors duration-200">
+          <textarea
             ref={addInputRef}
-            className="flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-muted"
-            placeholder="Nhập tên task mới… (Enter để thêm)"
+            className="flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-muted resize-none leading-snug pt-0.5"
+            placeholder="Nhập tên task mới… (Enter thêm · Shift+Enter xuống dòng)"
             value={newName}
+            rows={Math.max(1, newName.split('\n').length)}
             onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') addTask(newName) }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addTask(newName) }
+            }}
           />
           <button
-            className="bg-accent text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:opacity-90 hover:shadow-[0_0_14px_#7C3AED66] transition-all active:scale-95"
+            className="bg-accent text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:opacity-90 hover:shadow-[0_0_14px_#7C3AED66] transition-all active:scale-95 flex-shrink-0 mt-0.5"
             onClick={() => addTask(newName)}
           >+ Thêm</button>
         </div>
@@ -693,21 +703,22 @@ export default function TaskQueuePage() {
                 {idx < queue.length - 1 && (
                   insertAfter === idx ? (
                     <div className="my-1 animate-task-in">
-                      <div className="flex gap-2 bg-surface border border-accent/40 rounded-xl px-3 py-2 items-center">
-                        <input
+                      <div className="flex gap-2 bg-surface border border-accent/40 rounded-xl px-3 py-2 items-start">
+                        <textarea
                           ref={insertInputRef}
                           autoFocus
-                          className="flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-muted"
-                          placeholder="Tên task…"
+                          className="flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-muted resize-none leading-snug pt-0.5"
+                          placeholder="Tên task… (Enter thêm · Shift+Enter xuống dòng)"
                           value={insertName}
+                          rows={Math.max(1, insertName.split('\n').length)}
                           onChange={e => setInsertName(e.target.value)}
                           onKeyDown={e => {
-                            if (e.key === 'Enter')  addTask(insertName, idx)
+                            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addTask(insertName, idx) }
                             if (e.key === 'Escape') { setInsertAfter(null); setInsertName('') }
                           }}
                         />
-                        <button className="text-xs bg-accent text-white px-2.5 py-1.5 rounded-lg hover:opacity-85 active:scale-95 transition-all" onClick={() => addTask(insertName, idx)}>Thêm</button>
-                        <button className="text-xs border border-border text-muted px-2 py-1.5 rounded-lg hover:text-fg transition-colors" onClick={() => { setInsertAfter(null); setInsertName('') }}>Hủy</button>
+                        <button className="text-xs bg-accent text-white px-2.5 py-1.5 rounded-lg hover:opacity-85 active:scale-95 transition-all flex-shrink-0 mt-0.5" onClick={() => addTask(insertName, idx)}>Thêm</button>
+                        <button className="text-xs border border-border text-muted px-2 py-1.5 rounded-lg hover:text-fg transition-colors flex-shrink-0 mt-0.5" onClick={() => { setInsertAfter(null); setInsertName('') }}>Hủy</button>
                       </div>
                     </div>
                   ) : (
