@@ -50,13 +50,15 @@ const SHORTCUT_GROUPS = [
     items: [
       { key: '↑ ↓',     desc: 'Chọn task trên / dưới' },
       { key: 'Ctrl+↑↓', desc: 'Dời task lên / xuống hàng đợi' },
+      { key: '1–9',      desc: 'Chọn nhanh task số 1–9 trong hàng đợi' },
     ],
   },
   {
     label: 'Toàn cục',
     items: [
-      { key: 'N', desc: 'Thêm task mới (focus input)' },
-      { key: '?', desc: 'Hiện / ẩn shortcuts' },
+      { key: 'N',   desc: 'Thêm task mới (focus input)' },
+      { key: 'Esc', desc: 'Thoát input / đóng panel (kích hoạt shortcut ngay)' },
+      { key: '?',   desc: 'Hiện / ẩn shortcuts' },
     ],
   },
 ]
@@ -182,8 +184,8 @@ function TaskRow({
           />
         ) : (
           <div className="relative flex-1 min-w-0 group/taskname">
-            <span className={`block truncate text-sm leading-snug transition-colors duration-200 ${isDone ? 'line-through text-muted' : 'text-fg'}`}>
-              {task.name.replace(/\n/g, ' · ')}
+            <span className={`block line-clamp-3 text-sm leading-snug whitespace-pre-wrap transition-colors duration-200 ${isDone ? 'line-through text-muted' : 'text-fg'}`}>
+              {task.name}
             </span>
             {/* Hover tooltip — shows full text */}
             <div className="pointer-events-none absolute left-0 top-[calc(100%+6px)] z-50 opacity-0 scale-95 group-hover/taskname:opacity-100 group-hover/taskname:scale-100 transition-all duration-150 ease-out bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-fg whitespace-pre-wrap shadow-2xl shadow-black/60 w-max max-w-[min(300px,calc(100vw-48px))] leading-relaxed">
@@ -524,10 +526,21 @@ export default function TaskQueuePage() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const isInput = (e.target as HTMLElement).matches('input, textarea')
-      if (e.key === '?')      { e.preventDefault(); setShowKeys(p => !p); return }
-      if (e.key === 'Escape') { setShowKeys(false); setEditId(null); setInsertAfter(null); setPartialId(null); return }
+      if (e.key === '?') { e.preventDefault(); setShowKeys(p => !p); return }
+      if (e.key === 'Escape') {
+        setShowKeys(false); setEditId(null); setInsertAfter(null); setPartialId(null)
+        if (isInput) { (e.target as HTMLElement).blur(); return }
+        return
+      }
       if (isInput) return
       if (e.key === 'n' || e.key === 'N') { e.preventDefault(); addInputRef.current?.focus(); return }
+      // 1–9: select queue task by position
+      const digit = Number(e.key)
+      if (digit >= 1 && digit <= 9) {
+        const target = queue[digit - 1]
+        if (target) { e.preventDefault(); setSelectedId(target.id) }
+        return
+      }
       if (!selectedId) return
       const task = tasks.find(t => t.id === selectedId)
       if (!task) return
