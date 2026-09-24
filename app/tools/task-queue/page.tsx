@@ -612,7 +612,7 @@ export default function TaskQueuePage() {
         .animate-stat-bounce{ animation: stat-bounce 0.38s cubic-bezier(0.34,1.56,0.64,1); }
       `}</style>
 
-      <div className="max-w-xl mx-auto space-y-3 pb-12">
+      <div className="w-full max-w-[900px] mx-auto space-y-3 pb-12">
 
         {/* ── Stats cards ── */}
         <div className="grid grid-cols-3 gap-2">
