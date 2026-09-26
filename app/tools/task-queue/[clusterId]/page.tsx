@@ -371,7 +371,7 @@ function TaskRow({
   )
 }
 
-/* ─── Page ──────────────────────────────────────��────── */
+/* ─── Page ──────────────────────────────────────���────── */
 
 export default function TaskQueuePage() {
   const params    = useParams()
@@ -406,13 +406,15 @@ export default function TaskQueuePage() {
   const insertInputRef = useRef<HTMLTextAreaElement>(null)
   const filterInputRef = useRef<HTMLInputElement>(null)
   const prevStats      = useRef({ pending: 0, partial: 0, done: 0 })
+  const taskRowRefs    = useRef(new Map<string, HTMLDivElement>())
 
   useEffect(() => {
     if (!selectedId) return
     const frame = requestAnimationFrame(() => {
-      document.querySelector<HTMLElement>(`[data-task-id="${selectedId}"]`)?.scrollIntoView({
+      taskRowRefs.current.get(selectedId)?.scrollIntoView({
         behavior: 'smooth',
-        block: 'nearest',
+        block: 'center',
+        inline: 'nearest',
       })
     })
     return () => cancelAnimationFrame(frame)
@@ -932,7 +934,13 @@ export default function TaskQueuePage() {
         ) : (
           <div>
             {filteredQueue.map((task, idx) => (
-              <div key={task.id} data-task-id={task.id}>
+              <div
+                key={task.id}
+                ref={(node) => {
+                  if (node) taskRowRefs.current.set(task.id, node)
+                  else taskRowRefs.current.delete(task.id)
+                }}
+              >
                 <TaskRow
                   task={task}
                   queueIdx={fq ? queue.indexOf(task) : idx}
