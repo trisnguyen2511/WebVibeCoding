@@ -371,7 +371,7 @@ function TaskRow({
   )
 }
 
-/* ─── Page ──────────────────────────────────────���������────── */
+/* ─── Page ──────────────────────────────────────����������────── */
 
 export default function TaskQueuePage() {
   const params    = useParams()
@@ -418,9 +418,18 @@ export default function TaskQueuePage() {
       const edgePadding = 16
       const selectedIndex = queue.findIndex((task) => task.id === selectedId)
       if (selectedIndex === 0) {
+        // Do not call scrollIntoView here: it can scroll the nearest nested
+        // container back down after the page has been moved to the top.
+        const scrollParents: HTMLElement[] = []
+        for (let parent = row.parentElement; parent; parent = parent.parentElement) {
+          const style = getComputedStyle(parent)
+          if (/(auto|scroll|overlay)/.test(`${style.overflowY}${style.overflow}`)) {
+            scrollParents.push(parent)
+          }
+        }
+        scrollParents.forEach((parent) => parent.scrollTo({ top: 0, behavior: 'smooth' }))
         window.scrollTo({ top: 0, behavior: 'smooth' })
         document.documentElement.scrollTo({ top: 0, behavior: 'smooth' })
-        row.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' })
         return
       }
 
@@ -443,7 +452,7 @@ export default function TaskQueuePage() {
       }
     })
     return () => cancelAnimationFrame(frame)
-  }, [selectedId])
+  }, [selectedId, queue])
 
   /* ── Load / Save ───────────────────────────────────── */
 
