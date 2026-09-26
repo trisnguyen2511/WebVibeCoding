@@ -16,14 +16,59 @@ interface Props {
 export function TimeEntryModal({ task, date, existingEntry, onSave, onDelete, onClose }: Props) {
   const [hours, setHours] = useState(existingEntry?.hours.toString() ?? '')
   const [note, setNote] = useState(existingEntry?.note ?? '')
+  const hoursInputRef = useRef<HTMLInputElement>(null)
+  const noteInputRef = useRef<HTMLInputElement>(null)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
+  // Auto-focus and scroll into view
   useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onCloseRef.current() }
+    if (hoursInputRef.current) {
+      hoursInputRef.current.focus()
+      hoursInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [])
+
+  // Handle focus to scroll into view
+  const handleFocus = (ref: React.RefObject<HTMLInputElement>) => {
+    setTimeout(() => {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 0)
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onCloseRef.current()
+      
+      // Number keys 1-10 to quickly set hours
+      const num = parseInt(e.key)
+      if (!isNaN(num) && num >= 1 && num <= 9) {
+        e.preventDefault()
+        setHours(num.toString())
+        hoursInputRef.current?.focus()
+      }
+      
+      // Arrow up/down to navigate quick select buttons
+      if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && hoursInputRef.current) {
+        e.preventDefault()
+        const quickValues = [0.5, 1, 2, 4, 8]
+        const currentVal = hours ? parseFloat(hours) : 0
+        const currentIdx = quickValues.indexOf(currentVal)
+        
+        if (e.key === 'ArrowUp') {
+          const nextIdx = currentIdx >= 0 ? Math.max(0, currentIdx - 1) : quickValues.length - 1
+          setHours(quickValues[nextIdx].toString())
+        } else {
+          const nextIdx = currentIdx >= 0 ? Math.min(quickValues.length - 1, currentIdx + 1) : 0
+          setHours(quickValues[nextIdx].toString())
+        }
+        hoursInputRef.current?.focus()
+        hoursInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [hours])
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -54,13 +99,14 @@ export function TimeEntryModal({ task, date, existingEntry, onSave, onDelete, on
           <div className="space-y-1.5">
             <label className="text-xs text-muted">Hours worked</label>
             <input
+              ref={hoursInputRef}
               type="number"
               min={0.25}
               max={24}
               step={0.25}
               value={hours}
               onChange={e => setHours(e.target.value)}
-              autoFocus
+              onFocus={() => handleFocus(hoursInputRef)}
               required
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-lg text-fg font-mono focus:border-accent focus:outline-none text-center"
               placeholder="0"
@@ -82,8 +128,10 @@ export function TimeEntryModal({ task, date, existingEntry, onSave, onDelete, on
           <div className="space-y-1.5">
             <label className="text-xs text-muted">Note (optional)</label>
             <input
+              ref={noteInputRef}
               value={note}
               onChange={e => setNote(e.target.value)}
+              onFocus={() => handleFocus(noteInputRef)}
               placeholder="What did you work on?"
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none"
             />

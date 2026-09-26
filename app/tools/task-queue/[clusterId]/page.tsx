@@ -371,7 +371,7 @@ function TaskRow({
   )
 }
 
-/* ─── Page ───────────────────────────────────────────── */
+/* ─── Page ──────────────────────────────────────�����������────── */
 
 export default function TaskQueuePage() {
   const params    = useParams()
@@ -406,6 +406,8 @@ export default function TaskQueuePage() {
   const insertInputRef = useRef<HTMLTextAreaElement>(null)
   const filterInputRef = useRef<HTMLInputElement>(null)
   const prevStats      = useRef({ pending: 0, partial: 0, done: 0 })
+  const taskRowRefs    = useRef(new Map<string, HTMLDivElement>())
+
 
   /* ── Load / Save ───────────────────────────────────── */
 
@@ -476,6 +478,45 @@ export default function TaskQueuePage() {
   /* ── Derived ───────────────────────────────────────── */
 
   const queue    = useMemo(() => tasks.filter(t => t.state !== 'done'), [tasks])
+
+  useEffect(() => {
+    if (!selectedId) return
+    const frame = requestAnimationFrame(() => {
+      const row = taskRowRefs.current.get(selectedId)
+      if (!row) return
+
+      const rect = row.getBoundingClientRect()
+      const edgePadding = 16
+      const selectedIndex = queue.findIndex((task) => task.id === selectedId)
+      if (selectedIndex === 0) {
+        const scrollParents: HTMLElement[] = []
+        for (let parent = row.parentElement; parent; parent = parent.parentElement) {
+          const style = getComputedStyle(parent)
+          if (/(auto|scroll|overlay)/.test(`${style.overflowY}${style.overflow}`)) {
+            scrollParents.push(parent)
+          }
+        }
+        scrollParents.forEach((parent) => parent.scrollTo({ top: 0, behavior: 'smooth' }))
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        document.documentElement.scrollTo({ top: 0, behavior: 'smooth' })
+        return
+      }
+
+      const contextTask = queue[Math.max(0, selectedIndex - 3)]
+      const contextRow = contextTask ? taskRowRefs.current.get(contextTask.id) : null
+      const contextRect = contextRow?.getBoundingClientRect()
+      const isSelectedAbove = rect.top < edgePadding
+      const isSelectedBelow = rect.bottom > window.innerHeight - edgePadding
+      const needsMoreContextAbove = contextRect && contextRect.top < edgePadding
+      const targetRow = isSelectedAbove && needsMoreContextAbove ? contextRow : row
+
+      if (isSelectedAbove || isSelectedBelow || needsMoreContextAbove) {
+        targetRow?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+      }
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [selectedId, queue])
+
   const doneList = useMemo(() => tasks.filter(t => t.state === 'done'),  [tasks])
 
   const fq = filterQuery.trim().toLowerCase()
@@ -716,8 +757,8 @@ export default function TaskQueuePage() {
       }
       if (e.key === 's' || e.key === 'S') { e.preventDefault(); syncToCloud(); return }
       // 1–9: select queue task by position
-      const digit = Number(e.key)
-      if (digit >= 1 && digit <= 9) {
+      const digit = e.key === '0' ? 10 : Number(e.key)
+      if (digit >= 1 && digit <= 10) {
         const target = queue[digit - 1]
         if (target) { e.preventDefault(); setSelectedId(target.id) }
         return
@@ -751,7 +792,7 @@ export default function TaskQueuePage() {
     return () => window.removeEventListener('keydown', handler)
   }, [selectedId, tasks, queue, startEdit, setTaskState, toggleTimer, removeTask, moveTask, syncToCloud])
 
-  /* ─── Render ─────────────────────────────────────── */
+  /* ─── Render ──────────────────────────────────────�� */
 
   return (
     <ToolShell name="Task Queue" icon="📋" description="Sắp xếp & theo dõi công việc theo hàng đợi">
@@ -921,7 +962,13 @@ export default function TaskQueuePage() {
         ) : (
           <div>
             {filteredQueue.map((task, idx) => (
-              <div key={task.id}>
+              <div
+                key={task.id}
+                ref={(node) => {
+                  if (node) taskRowRefs.current.set(task.id, node)
+                  else taskRowRefs.current.delete(task.id)
+                }}
+              >
                 <TaskRow
                   task={task}
                   queueIdx={fq ? queue.indexOf(task) : idx}
