@@ -371,7 +371,7 @@ function TaskRow({
   )
 }
 
-/* ─── Page ──────────────────────────────────────���────── */
+/* ─── Page ──────────────────────────────────────����────── */
 
 export default function TaskQueuePage() {
   const params    = useParams()
@@ -411,11 +411,20 @@ export default function TaskQueuePage() {
   useEffect(() => {
     if (!selectedId) return
     const frame = requestAnimationFrame(() => {
-      taskRowRefs.current.get(selectedId)?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-        inline: 'nearest',
-      })
+      const row = taskRowRefs.current.get(selectedId)
+      if (!row) return
+
+      const rect = row.getBoundingClientRect()
+      const edgePadding = 16
+      const isVisible = rect.top >= edgePadding && rect.bottom <= window.innerHeight - edgePadding
+
+      if (!isVisible) {
+        row.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'nearest',
+        })
+      }
     })
     return () => cancelAnimationFrame(frame)
   }, [selectedId])
