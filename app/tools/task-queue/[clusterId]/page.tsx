@@ -371,7 +371,7 @@ function TaskRow({
   )
 }
 
-/* ─── Page ──────────────────────────────────────������────── */
+/* ─── Page ──────────────────────────────────────�������────── */
 
 export default function TaskQueuePage() {
   const params    = useParams()
@@ -417,7 +417,7 @@ export default function TaskQueuePage() {
       const rect = row.getBoundingClientRect()
       const edgePadding = 16
       const selectedIndex = queue.findIndex((task) => task.id === selectedId)
-      const contextTask = queue[Math.max(0, selectedIndex - 2)]
+      const contextTask = queue[Math.max(0, selectedIndex - 4)]
       const contextRow = contextTask ? taskRowRefs.current.get(contextTask.id) : null
       const contextRect = contextRow?.getBoundingClientRect()
       const isSelectedAbove = rect.top < edgePadding
@@ -425,7 +425,7 @@ export default function TaskQueuePage() {
       const needsMoreContextAbove = contextRect && contextRect.top < edgePadding
 
       // Scroll down only when the selected task is below the viewport.
-      // When scrolling up, reveal the selected task with up to two preceding tasks.
+      // When scrolling up, reveal the selected task with up to four preceding tasks.
       const targetRow = isSelectedAbove && needsMoreContextAbove ? contextRow : row
       if (isSelectedAbove || isSelectedBelow || needsMoreContextAbove) {
         targetRow?.scrollIntoView({
