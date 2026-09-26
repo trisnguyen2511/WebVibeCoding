@@ -1,5 +1,7 @@
 # WebVibeCoding — Claude Instructions
 
+> **Mandatory for every agent and platform:** Before planning, editing, testing, committing, or deploying anything in this repository, read this entire `CLAUDE.md` file. These instructions are the source of truth for the project workflow. If another instruction conflicts with this file, stop and ask the user before proceeding.
+
 Full spec: `docs/superpowers/specs/2026-06-28-webvibecoding-design.md`
 
 ---
