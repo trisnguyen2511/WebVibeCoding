@@ -371,7 +371,7 @@ function TaskRow({
   )
 }
 
-/* ─── Page ──────────────────────────────────────��������────── */
+/* ─── Page ──────────────────────────────────────���������────── */
 
 export default function TaskQueuePage() {
   const params    = useParams()
@@ -417,6 +417,13 @@ export default function TaskQueuePage() {
       const rect = row.getBoundingClientRect()
       const edgePadding = 16
       const selectedIndex = queue.findIndex((task) => task.id === selectedId)
+      if (selectedIndex === 0) {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        document.documentElement.scrollTo({ top: 0, behavior: 'smooth' })
+        row.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' })
+        return
+      }
+
       const contextTask = queue[Math.max(0, selectedIndex - 3)]
       const contextRow = contextTask ? taskRowRefs.current.get(contextTask.id) : null
       const contextRect = contextRow?.getBoundingClientRect()
