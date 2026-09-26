@@ -371,7 +371,7 @@ function TaskRow({
   )
 }
 
-/* ─── Page ───────────────────────────────────────────── */
+/* ─── Page ──────────────────────────────────────��────── */
 
 export default function TaskQueuePage() {
   const params    = useParams()
@@ -406,6 +406,17 @@ export default function TaskQueuePage() {
   const insertInputRef = useRef<HTMLTextAreaElement>(null)
   const filterInputRef = useRef<HTMLInputElement>(null)
   const prevStats      = useRef({ pending: 0, partial: 0, done: 0 })
+
+  useEffect(() => {
+    if (!selectedId) return
+    const frame = requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(`[data-task-id="${selectedId}"]`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [selectedId])
 
   /* ── Load / Save ───────────────────────────────────── */
 
@@ -716,8 +727,8 @@ export default function TaskQueuePage() {
       }
       if (e.key === 's' || e.key === 'S') { e.preventDefault(); syncToCloud(); return }
       // 1–9: select queue task by position
-      const digit = Number(e.key)
-      if (digit >= 1 && digit <= 9) {
+      const digit = e.key === '0' ? 10 : Number(e.key)
+      if (digit >= 1 && digit <= 10) {
         const target = queue[digit - 1]
         if (target) { e.preventDefault(); setSelectedId(target.id) }
         return
@@ -751,7 +762,7 @@ export default function TaskQueuePage() {
     return () => window.removeEventListener('keydown', handler)
   }, [selectedId, tasks, queue, startEdit, setTaskState, toggleTimer, removeTask, moveTask, syncToCloud])
 
-  /* ─── Render ─────────────────────────────────────── */
+  /* ─── Render ──────────────────────────────────────�� */
 
   return (
     <ToolShell name="Task Queue" icon="📋" description="Sắp xếp & theo dõi công việc theo hàng đợi">
@@ -921,7 +932,7 @@ export default function TaskQueuePage() {
         ) : (
           <div>
             {filteredQueue.map((task, idx) => (
-              <div key={task.id}>
+              <div key={task.id} data-task-id={task.id}>
                 <TaskRow
                   task={task}
                   queueIdx={fq ? queue.indexOf(task) : idx}
