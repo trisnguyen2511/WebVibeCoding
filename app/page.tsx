@@ -65,7 +65,7 @@ export default function HomePage() {
 
           {/* Subline */}
           <p className="max-w-[480px] text-base leading-relaxed text-muted sm:text-[1.05rem]">
-            Developer utilities, all running in your browser. No setup, no tracking.
+            Developer utilities, crypto tools, media & productivity — all running in your browser. No setup, no tracking.
           </p>
         </div>
       </section>
