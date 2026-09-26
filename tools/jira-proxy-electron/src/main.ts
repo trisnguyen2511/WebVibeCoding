@@ -1,7 +1,8 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell, nativeTheme } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import path from 'path'
 import fs from 'fs'
-import { startServer, stopServer, isRunning, getConfig } from './proxy-server'
+import { startServer, stopServer, isRunning, getConfig, setLogCallback } from './proxy-server'
 
 let tray: Tray | null = null
 let win: BrowserWindow | null = null
@@ -25,6 +26,12 @@ function configPath(): string {
   return path.join(app.getPath('userData'), 'config.json')
 }
 
+function defaultConfigPath(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'default-config.json')
+    : path.join(__dirname, '..', 'default-config.json')
+}
+
 // ── Config persistence ─────────────────────────────────────────────────────────
 
 interface SavedConfig {
@@ -33,18 +40,56 @@ interface SavedConfig {
 }
 
 function loadSavedConfig(): SavedConfig | null {
+  // 1. User's saved config (userData)
   try {
     const raw = fs.readFileSync(configPath(), 'utf8')
     return JSON.parse(raw) as SavedConfig
-  } catch {
-    return null
-  }
+  } catch { /* no saved config yet */ }
+
+  // 2. Bundled default config (shipped with app)
+  try {
+    const raw = fs.readFileSync(defaultConfigPath(), 'utf8')
+    return JSON.parse(raw) as SavedConfig
+  } catch { /* no default config */ }
+
+  return null
 }
 
 function writeSavedConfig(cfg: SavedConfig): void {
   try {
     fs.writeFileSync(configPath(), JSON.stringify(cfg, null, 2), 'utf8')
   } catch { /* noop */ }
+}
+
+// ── Auto updater (electron-updater + GitHub Releases) ─────────────────────────
+
+function setupAutoUpdater(): void {
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('checking-for-update', () => {
+    win?.webContents.send('checking-for-update', {})
+  })
+  autoUpdater.on('update-available', (info) => {
+    win?.webContents.send('update-available', info)
+  })
+  autoUpdater.on('download-progress', (progress) => {
+    win?.webContents.send('download-progress', progress)
+  })
+  autoUpdater.on('update-downloaded', () => {
+    win?.webContents.send('update-downloaded', {})
+  })
+  autoUpdater.on('update-not-available', () => {
+    win?.webContents.send('update-not-available', {})
+  })
+  autoUpdater.on('error', (err) => {
+    // 404 = no release yet, treat silently as not-available
+    if (err.message.includes('404') || err.message.includes('ERR_')) {
+      win?.webContents.send('update-not-available', {})
+    } else {
+      win?.webContents.send('update-error', { message: err.message })
+    }
+  })
 }
 
 // ── Tray ────────────────────────────────────────────────────────────────────────
@@ -93,7 +138,6 @@ function createTray() {
     icon = nativeImage.createFromPath(iconFile)
     if (process.platform === 'darwin') icon.setTemplateImage(true)
   } else {
-    // Fallback: tiny purple square generated from data URL
     icon = nativeImage.createFromDataURL(
       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA' +
       'MElEQVQ4T2NkYGD4z8BQDwAEgAF/QEABwAAAABJRU5ErkJggg=='
@@ -114,11 +158,14 @@ function createTray() {
 
 function createWindow() {
   const iconFile = assetPath('icon.png')
+  const isDark = nativeTheme.shouldUseDarkColors
 
   win = new BrowserWindow({
-    width: 440,
-    height: 520,
-    resizable: false,
+    width: 480,
+    height: 720,
+    minWidth: 380,
+    minHeight: 560,
+    resizable: true,
     title: 'Jira Proxy',
     ...(fs.existsSync(iconFile) ? { icon: iconFile } : {}),
     webPreferences: {
@@ -127,12 +174,15 @@ function createWindow() {
       nodeIntegration: false,
     },
     show: false,
-    backgroundColor: '#08080E',
+    backgroundColor: isDark ? '#0E0F1A' : '#F0F2F8',
   })
 
   win.loadFile(rendererPath('index.html'))
 
-  // Hide to tray on close
+  win.once('ready-to-show', () => {
+    win?.show()
+  })
+
   win.on('close', (e) => {
     if (!isQuitting) {
       e.preventDefault()
@@ -144,14 +194,19 @@ function createWindow() {
 // ── App lifecycle ───────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
-  // Hide from macOS dock — tray-only app
   if (process.platform === 'darwin') app.dock?.hide()
 
   createWindow()
   createTray()
 
-  // Show window on first launch
-  win?.show()
+  setLogCallback((entry) => {
+    win?.webContents.send('proxy-log', entry)
+  })
+
+  if (app.isPackaged) {
+    setupAutoUpdater()
+    setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 3000)
+  }
 })
 
 app.on('window-all-closed', () => {
@@ -169,9 +224,9 @@ app.on('before-quit', async () => {
 
 ipcMain.handle('start-proxy', async (_, config: { target: string; token: string; port: number }) => {
   try {
-    await startServer(config)
+    const actualPort = await startServer(config)
     refreshTray()
-    return { ok: true }
+    return { ok: true, port: actualPort }
   } catch (err) {
     return { ok: false, error: (err as Error).message }
   }
@@ -202,4 +257,40 @@ ipcMain.handle('save-config', (_, cfg: { target: string; port: string }) => {
 
 ipcMain.handle('load-config', () => {
   return loadSavedConfig()
+})
+
+ipcMain.handle('check-update', async () => {
+  if (!app.isPackaged) {
+    setTimeout(() => win?.webContents.send('update-not-available', {}), 800)
+    return
+  }
+  try { await autoUpdater.checkForUpdates() } catch { /* noop */ }
+})
+
+ipcMain.handle('download-update', async () => {
+  try { await autoUpdater.downloadUpdate() } catch { /* noop */ }
+})
+
+ipcMain.handle('install-update', () => {
+  autoUpdater.quitAndInstall()
+})
+
+ipcMain.handle('get-version', () => {
+  return app.getVersion()
+})
+
+ipcMain.handle('open-url', (_, url: string) => {
+  shell.openExternal(url)
+})
+
+ipcMain.handle('get-auto-start', () => {
+  return app.getLoginItemSettings().openAtLogin
+})
+
+ipcMain.handle('set-auto-start', (_, enable: boolean) => {
+  app.setLoginItemSettings({
+    openAtLogin: enable,
+    openAsHidden: true,
+  })
+  return app.getLoginItemSettings().openAtLogin
 })

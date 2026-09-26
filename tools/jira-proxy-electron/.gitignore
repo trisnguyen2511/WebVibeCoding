@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-electron/
+*.dmg
+*.exe
+*.AppImage
+*.deb
+*.rpm
+*.zip
+*.blockmap
+release/
+out/

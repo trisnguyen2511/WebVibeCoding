@@ -4,14 +4,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Plus, Calendar, RefreshCw, Download, ChevronRight,
-  ListTodo, Clock, Flag, Keyboard,
+  ListTodo, Clock, Flag, Keyboard, CloudUpload, CloudOff, Check,
 } from 'lucide-react'
 import { ToolShell } from '@/components/tool-shell'
 import {
   getProject, getTasks, saveProject, saveTask, deleteTask,
-  upsertTimeEntry, deleteTimeEntry, exportData, PROXY_TOKEN_KEY,
+  upsertTimeEntry, deleteTimeEntry, exportData, importData, PROXY_TOKEN_KEY,
 } from '@/lib/timeline-storage'
-import type { Project, Task, Sprint, TimeEntry, JiraConfig } from '@/lib/timeline-types'
+import type { Project, Task, Sprint, TimeEntry, JiraConfig, ExportData } from '@/lib/timeline-types'
 import { GanttChart } from '../components/GanttChart'
 import { TaskForm } from '../components/TaskForm'
 import { TodayPanel } from '../components/TodayPanel'
@@ -66,15 +66,39 @@ export default function ProjectPage({ params }: PageProps) {
   const [showJira,        setShowJira]        = useState(false)
   const [showShortcuts,   setShowShortcuts]   = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
+  const [cloudLoading,    setCloudLoading]    = useState(false)
+
+  type SyncState = 'idle' | 'syncing' | 'success' | 'error'
+  const [syncState,  setSyncState]  = useState<SyncState>('idle')
+  const [lastSynced, setLastSynced] = useState<string | null>(null)
 
   useEffect(() => {
     const p = getProject(projectId)
-    if (!p) { router.push('/tools/timeline'); return }
-    setProject(p)
-    setTasks(getTasks(projectId))
-    const today = new Date().toISOString().slice(0, 10)
-    const cur = p.sprints.find(s => s.startDate <= today && s.endDate >= today)
-    if (cur) setSelectedSprintId(cur.id)
+    if (p) {
+      setProject(p)
+      setTasks(getTasks(projectId))
+      const today = new Date().toISOString().slice(0, 10)
+      const cur = p.sprints.find(s => s.startDate <= today && s.endDate >= today)
+      if (cur) setSelectedSprintId(cur.id)
+      return
+    }
+
+    // Not in localStorage — try pulling from cloud
+    setCloudLoading(true)
+    fetch(`/api/timeline-cloud?id=${encodeURIComponent(projectId)}`)
+      .then(res => { if (!res.ok) throw new Error('not found'); return res.json() })
+      .then((row: { data: ExportData }) => {
+        importData(row.data)
+        const loaded = getProject(projectId)
+        if (!loaded) throw new Error('import failed')
+        setProject(loaded)
+        setTasks(getTasks(projectId))
+        const today = new Date().toISOString().slice(0, 10)
+        const cur = loaded.sprints.find(s => s.startDate <= today && s.endDate >= today)
+        if (cur) setSelectedSprintId(cur.id)
+      })
+      .catch(() => router.push('/tools/timeline'))
+      .finally(() => setCloudLoading(false))
   }, [projectId, router])
 
   function reload() {
@@ -89,6 +113,7 @@ export default function ProjectPage({ params }: PageProps) {
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
     switch (e.key.toLowerCase()) {
       case 'n': e.preventDefault(); setEditTask(null); setShowTaskForm(true);  break
+      case 's': e.preventDefault(); handleCloudSync();    break
       case 't': e.preventDefault(); setShowToday(true);  break
       case 'j': e.preventDefault(); setShowJira(true);   break
       case 'x': e.preventDefault(); handleExport();       break
@@ -169,6 +194,42 @@ export default function ProjectPage({ params }: PageProps) {
     setShowExportModal(false)
   }
 
+  async function handleCloudSync() {
+    if (!project || syncState === 'syncing') return
+    setSyncState('syncing')
+    try {
+      const data = exportData(projectId, { includeSensitive: false, includeProxyToken: false })
+      const res = await fetch('/api/timeline-cloud', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: projectId, data }),
+      })
+      if (!res.ok) throw new Error('sync failed')
+      setSyncState('success')
+      setLastSynced(new Date().toISOString())
+      setTimeout(() => setSyncState('idle'), 2500)
+    } catch {
+      setSyncState('error')
+      setTimeout(() => setSyncState('idle'), 3000)
+    }
+  }
+
+  if (cloudLoading) {
+    return (
+      <ToolShell name="Timeline" icon="📅" wide fullBleed>
+        <div className="flex flex-col items-center justify-center h-full gap-4">
+          <div className="w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center">
+            <CloudUpload size={20} className="text-accent animate-pulse" />
+          </div>
+          <div className="text-center">
+            <p className="font-display font-semibold text-fg">Đang tải từ cloud…</p>
+            <p className="text-sm text-muted mt-1">Pulling snapshot for <span className="font-mono text-accent-soft">{projectId}</span></p>
+          </div>
+        </div>
+      </ToolShell>
+    )
+  }
+
   if (!project) return null
 
   const filteredTasks = selectedSprintId
@@ -219,6 +280,29 @@ export default function ProjectPage({ params }: PageProps) {
 
           {/* Actions */}
           <div className="flex items-center gap-1.5 shrink-0 ml-2">
+            <button
+              onClick={handleCloudSync}
+              disabled={syncState === 'syncing'}
+              title={lastSynced ? `Synced ${new Date(lastSynced).toLocaleTimeString()}` : 'Sync to cloud (S)'}
+              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-all duration-150 disabled:opacity-60 ${
+                syncState === 'success' ? 'border-green-500/50 text-green-400 bg-green-500/10' :
+                syncState === 'error'   ? 'border-red-500/50 text-red-400 bg-red-500/10' :
+                'border-border text-muted hover:text-fg hover:border-accent/50 hover:bg-surface'
+              }`}
+            >
+              {syncState === 'syncing' ? <RefreshCw size={13} className="animate-spin" /> :
+               syncState === 'success' ? <Check size={13} /> :
+               syncState === 'error'   ? <CloudOff size={13} /> :
+               <CloudUpload size={13} />}
+              <span className="hidden sm:inline">
+                {syncState === 'syncing' ? 'Syncing…' :
+                 syncState === 'success' ? 'Synced!' :
+                 syncState === 'error'   ? 'Failed' : 'Sync'}
+              </span>
+              {syncState === 'idle' && (
+                <kbd className="hidden sm:block rounded bg-border/60 px-1 font-mono text-[10px]">S</kbd>
+              )}
+            </button>
             <Kbd label="Today" shortcut="T" icon={<Calendar size={13} />} onClick={() => setShowToday(true)} />
             <Kbd label="Jira"  shortcut="J" icon={<RefreshCw size={13} />} onClick={() => setShowJira(true)} />
             <Kbd label="Export" shortcut="X" icon={<Download size={13} />} onClick={handleExport} />
@@ -357,7 +441,7 @@ export default function ProjectPage({ params }: PageProps) {
             <div className="space-y-2">
               {[
                 ['N', 'New task'],
-                ['F', 'Filter tasks'],
+                ['S', 'Sync to cloud'],
                 ['T', 'Today panel'],
                 ['J', 'Jira sync'],
                 ['X', 'Export JSON'],

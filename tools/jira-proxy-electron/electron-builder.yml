@@ -13,6 +13,14 @@ files:
 extraResources:
   - from: renderer
     to: renderer
+  - from: default-config.json
+    to: default-config.json
+
+publish:
+  provider: github
+  owner: trisnguyen2511
+  repo: WebVibeCoding
+  releaseType: release
 
 win:
   target:
@@ -31,7 +39,9 @@ mac:
   target:
     - target: dmg
       arch: [universal]
-  artifactName: jira-proxy-mac.dmg
+    - target: zip
+      arch: [universal]
+  artifactName: jira-proxy-mac.${ext}
   category: public.app-category.developer-tools
 
 dmg:

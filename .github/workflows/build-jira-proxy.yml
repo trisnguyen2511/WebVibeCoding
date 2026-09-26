@@ -58,7 +58,6 @@ jobs:
         working-directory: tools/jira-proxy-electron
         run: npx electron-builder --mac --publish never
         env:
-          # Skip code signing for unsigned builds (remove for production signing)
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Build Electron (Linux)
@@ -71,10 +70,17 @@ jobs:
         with:
           name: jira-proxy-${{ matrix.os }}
           retention-days: 14
+          # Upload installers + auto-update yml files (required for electron-updater)
           path: |
             tools/jira-proxy-electron/dist-electron/*.exe
+            tools/jira-proxy-electron/dist-electron/*.exe.blockmap
             tools/jira-proxy-electron/dist-electron/*.dmg
+            tools/jira-proxy-electron/dist-electron/*.dmg.blockmap
+            tools/jira-proxy-electron/dist-electron/*.zip
+            tools/jira-proxy-electron/dist-electron/*.zip.blockmap
             tools/jira-proxy-electron/dist-electron/*.AppImage
+            tools/jira-proxy-electron/dist-electron/*.AppImage.blockmap
+            tools/jira-proxy-electron/dist-electron/latest*.yml
 
   release:
     needs: build
@@ -82,6 +88,16 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/jira-proxy-v') || (github.event_name == 'workflow_dispatch' && inputs.publish)
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version from package.json
+        id: ver
+        run: |
+          VERSION=$(node -p "require('./tools/jira-proxy-electron/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=jira-proxy-v$VERSION" >> $GITHUB_OUTPUT
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -91,10 +107,12 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name || 'jira-proxy-latest' }}
-          name: Jira Proxy ${{ github.ref_name || 'latest' }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || steps.ver.outputs.tag }}
+          name: Jira Proxy v${{ steps.ver.outputs.version }}
           body: |
-            ## Jira Proxy — Local CORS Proxy
+            ## Jira Proxy v${{ steps.ver.outputs.version }}
+
+            ### Cài đặt lần đầu
 
             Tải file đúng platform và cài đặt:
 
@@ -104,6 +122,10 @@ jobs:
             | macOS | `jira-proxy-mac.dmg` | Mount → kéo vào Applications → Open |
             | Linux | `jira-proxy-linux.AppImage` | `chmod +x` → Double-click |
 
-            > **macOS lần đầu:** Right-click → Open (bỏ qua cảnh báo Gatekeeper, chỉ 1 lần)
+            > **macOS lần đầu:** Right-click → Open (bỏ qua cảnh báo Gatekeeper)
+
+            ### Auto-update
+
+            Từ v1.2.0, app tự kiểm tra bản mới khi khởi động và tải về + cài đặt tự động trong nền — không cần tải lại bản setup.
           files: artifacts/**
           fail_on_unmatched_files: false
