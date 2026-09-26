@@ -371,7 +371,7 @@ function TaskRow({
   )
 }
 
-/* ─── Page ──────────────────────────────────────����������────── */
+/* ─── Page ──────────────────────────────────────�����������────── */
 
 export default function TaskQueuePage() {
   const params    = useParams()
@@ -408,51 +408,6 @@ export default function TaskQueuePage() {
   const prevStats      = useRef({ pending: 0, partial: 0, done: 0 })
   const taskRowRefs    = useRef(new Map<string, HTMLDivElement>())
 
-  useEffect(() => {
-    if (!selectedId) return
-    const frame = requestAnimationFrame(() => {
-      const row = taskRowRefs.current.get(selectedId)
-      if (!row) return
-
-      const rect = row.getBoundingClientRect()
-      const edgePadding = 16
-      const selectedIndex = queue.findIndex((task) => task.id === selectedId)
-      if (selectedIndex === 0) {
-        // Do not call scrollIntoView here: it can scroll the nearest nested
-        // container back down after the page has been moved to the top.
-        const scrollParents: HTMLElement[] = []
-        for (let parent = row.parentElement; parent; parent = parent.parentElement) {
-          const style = getComputedStyle(parent)
-          if (/(auto|scroll|overlay)/.test(`${style.overflowY}${style.overflow}`)) {
-            scrollParents.push(parent)
-          }
-        }
-        scrollParents.forEach((parent) => parent.scrollTo({ top: 0, behavior: 'smooth' }))
-        window.scrollTo({ top: 0, behavior: 'smooth' })
-        document.documentElement.scrollTo({ top: 0, behavior: 'smooth' })
-        return
-      }
-
-      const contextTask = queue[Math.max(0, selectedIndex - 3)]
-      const contextRow = contextTask ? taskRowRefs.current.get(contextTask.id) : null
-      const contextRect = contextRow?.getBoundingClientRect()
-      const isSelectedAbove = rect.top < edgePadding
-      const isSelectedBelow = rect.bottom > window.innerHeight - edgePadding
-      const needsMoreContextAbove = contextRect && contextRect.top < edgePadding
-
-      // Scroll down only when the selected task is below the viewport.
-      // When scrolling up, reveal the selected task plus one extra task block above.
-      const targetRow = isSelectedAbove && needsMoreContextAbove ? contextRow : row
-      if (isSelectedAbove || isSelectedBelow || needsMoreContextAbove) {
-        targetRow?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-          inline: 'nearest',
-        })
-      }
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [selectedId, queue])
 
   /* ── Load / Save ───────────────────────────────────── */
 
@@ -523,6 +478,45 @@ export default function TaskQueuePage() {
   /* ── Derived ───────────────────────────────────────── */
 
   const queue    = useMemo(() => tasks.filter(t => t.state !== 'done'), [tasks])
+
+  useEffect(() => {
+    if (!selectedId) return
+    const frame = requestAnimationFrame(() => {
+      const row = taskRowRefs.current.get(selectedId)
+      if (!row) return
+
+      const rect = row.getBoundingClientRect()
+      const edgePadding = 16
+      const selectedIndex = queue.findIndex((task) => task.id === selectedId)
+      if (selectedIndex === 0) {
+        const scrollParents: HTMLElement[] = []
+        for (let parent = row.parentElement; parent; parent = parent.parentElement) {
+          const style = getComputedStyle(parent)
+          if (/(auto|scroll|overlay)/.test(`${style.overflowY}${style.overflow}`)) {
+            scrollParents.push(parent)
+          }
+        }
+        scrollParents.forEach((parent) => parent.scrollTo({ top: 0, behavior: 'smooth' }))
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        document.documentElement.scrollTo({ top: 0, behavior: 'smooth' })
+        return
+      }
+
+      const contextTask = queue[Math.max(0, selectedIndex - 3)]
+      const contextRow = contextTask ? taskRowRefs.current.get(contextTask.id) : null
+      const contextRect = contextRow?.getBoundingClientRect()
+      const isSelectedAbove = rect.top < edgePadding
+      const isSelectedBelow = rect.bottom > window.innerHeight - edgePadding
+      const needsMoreContextAbove = contextRect && contextRect.top < edgePadding
+      const targetRow = isSelectedAbove && needsMoreContextAbove ? contextRow : row
+
+      if (isSelectedAbove || isSelectedBelow || needsMoreContextAbove) {
+        targetRow?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+      }
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [selectedId, queue])
+
   const doneList = useMemo(() => tasks.filter(t => t.state === 'done'),  [tasks])
 
   const fq = filterQuery.trim().toLowerCase()
