@@ -371,7 +371,7 @@ function TaskRow({
   )
 }
 
-/* ─── Page ──────────────────────────────────────����────── */
+/* ─── Page ──────────────────────────────────────�����────── */
 
 export default function TaskQueuePage() {
   const params    = useParams()
@@ -416,10 +416,17 @@ export default function TaskQueuePage() {
 
       const rect = row.getBoundingClientRect()
       const edgePadding = 16
-      const isVisible = rect.top >= edgePadding && rect.bottom <= window.innerHeight - edgePadding
+      const selectedIndex = queue.findIndex((task) => task.id === selectedId)
+      const contextTask = queue[Math.max(0, selectedIndex - 2)]
+      const contextRow = contextTask ? taskRowRefs.current.get(contextTask.id) : null
+      const contextRect = contextRow?.getBoundingClientRect()
+      const isSelectedVisible = rect.top >= edgePadding && rect.bottom <= window.innerHeight - edgePadding
+      const hasContextAbove = !contextRect || contextRect.top >= edgePadding
+      const hasContextBelow = !contextRect || contextRect.bottom <= window.innerHeight - edgePadding
 
-      if (!isVisible) {
-        row.scrollIntoView({
+      // Keep two preceding tasks visible when possible, while avoiding unnecessary scrolling.
+      if (!isSelectedVisible || !hasContextAbove || !hasContextBelow) {
+        ;(contextRow ?? row).scrollIntoView({
           behavior: 'smooth',
           block: 'nearest',
           inline: 'nearest',
