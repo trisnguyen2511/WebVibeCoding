@@ -371,7 +371,7 @@ function TaskRow({
   )
 }
 
-/* ─── Page ──────────────────────────────────────�����────── */
+/* ─── Page ──────────────────────────────────────������────── */
 
 export default function TaskQueuePage() {
   const params    = useParams()
@@ -420,13 +420,15 @@ export default function TaskQueuePage() {
       const contextTask = queue[Math.max(0, selectedIndex - 2)]
       const contextRow = contextTask ? taskRowRefs.current.get(contextTask.id) : null
       const contextRect = contextRow?.getBoundingClientRect()
-      const isSelectedVisible = rect.top >= edgePadding && rect.bottom <= window.innerHeight - edgePadding
-      const hasContextAbove = !contextRect || contextRect.top >= edgePadding
-      const hasContextBelow = !contextRect || contextRect.bottom <= window.innerHeight - edgePadding
+      const isSelectedAbove = rect.top < edgePadding
+      const isSelectedBelow = rect.bottom > window.innerHeight - edgePadding
+      const needsMoreContextAbove = contextRect && contextRect.top < edgePadding
 
-      // Keep two preceding tasks visible when possible, while avoiding unnecessary scrolling.
-      if (!isSelectedVisible || !hasContextAbove || !hasContextBelow) {
-        ;(contextRow ?? row).scrollIntoView({
+      // Scroll down only when the selected task is below the viewport.
+      // When scrolling up, reveal the selected task with up to two preceding tasks.
+      const targetRow = isSelectedAbove && needsMoreContextAbove ? contextRow : row
+      if (isSelectedAbove || isSelectedBelow || needsMoreContextAbove) {
+        targetRow?.scrollIntoView({
           behavior: 'smooth',
           block: 'nearest',
           inline: 'nearest',
