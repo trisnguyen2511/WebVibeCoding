@@ -126,7 +126,7 @@ function addScaled(acc: Outcome, o: Outcome, w: number): void {
 export interface AnalyzeInput {
   /** Con's current hand. */
   player: Rank[]
-  /** Cái's face-up card(s); the hidden card is treated as unknown. */
+  /** Cái's known face-up card(s); may be empty — unknown cards are drawn from the unseen deck. */
   dealerUp: Rank[]
   /** Other cards already seen on the table. */
   exposed: Rank[]
@@ -182,7 +182,7 @@ export function analyze(input: AnalyzeInput, rules: RuleSet = DEFAULT_RULES): An
       return { status: 'invalid', error: `Có quá 4 lá ${rankLabel(r)} — kiểm tra lại bài đã nhập.` }
     }
   }
-  if (input.player.length < 2 || input.dealerUp.length < 1) return { status: 'incomplete' }
+  if (input.player.length < 2) return { status: 'incomplete' }
 
   // counts[r] = number of rank r still unseen (index 0 unused).
   const counts = new Array<number>(14).fill(0)

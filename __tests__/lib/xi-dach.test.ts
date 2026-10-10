@@ -37,6 +37,12 @@ describe('analyze', () => {
   it('needs enough cards', () => {
     expect(analyze({ player: [10], dealerUp: [5], exposed: [] }).status).toBe('incomplete')
   })
+  it('works without any known dealer card', () => {
+    const a = analyze({ player: [10, 8], dealerUp: [], exposed: [] })
+    expect(a.status).toBe('ok')
+    expect(a.stand!.win + a.stand!.tie + a.stand!.lose).toBeCloseTo(1, 9)
+    expect(a.recommendation).toBe('STAND')
+  })
   it('rejects more than 4 of a rank', () => {
     const a = analyze({ player: [5, 5], dealerUp: [5], exposed: [5, 5] })
     expect(a.status).toBe('invalid')

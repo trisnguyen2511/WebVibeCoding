@@ -21,7 +21,7 @@ type Group = 'player' | 'dealerUp' | 'exposed'
 
 const GROUPS: { id: Group; label: string; hint: string }[] = [
   { id: 'player', label: 'Bài của con', hint: 'Các lá đang cầm trên tay' },
-  { id: 'dealerUp', label: 'Cái ngửa', hint: 'Lá ngửa của cái (lá úp là ẩn)' },
+  { id: 'dealerUp', label: 'Cái ngửa (tùy chọn)', hint: 'Không bắt buộc — để trống nếu chưa thấy lá nào' },
   { id: 'exposed', label: 'Đã lộ', hint: 'Bài người khác đã lật' },
 ]
 
@@ -253,7 +253,7 @@ export default function XiDachPage() {
         )}
         {analysis.status === 'incomplete' && (
           <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-fg/70">
-            Nhập <b className="text-fg">ít nhất 2 lá của con</b> và <b className="text-fg">1 lá ngửa của cái</b> để xem khuyến nghị.
+            Nhập <b className="text-fg">ít nhất 2 lá của con</b> để xem khuyến nghị. Lá ngửa của cái là tùy chọn — nhập thêm sẽ chính xác hơn.
           </div>
         )}
         {analysis.status === 'ok' && analysis.hand && (
@@ -331,7 +331,7 @@ export default function XiDachPage() {
         <p className="flex gap-2 text-[11px] leading-relaxed text-fg/60">
           <Scale size={14} className="mt-0.5 shrink-0" aria-hidden />
           Kết quả là mô hình xác suất theo luật đã chọn: cái rút tới ≥{rules.dealerStandAt} điểm, rút không hoàn lại từ bộ bài 52 lá,
-          lá úp của cái được coi là chưa biết. Không đảm bảo thắng ván thực tế.
+          các lá của cái chưa thấy được coi là chưa biết. Không đảm bảo thắng ván thực tế.
         </p>
       </div>
     </ToolShell>
