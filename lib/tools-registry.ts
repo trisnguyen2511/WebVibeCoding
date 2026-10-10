@@ -135,4 +135,11 @@ export const tools: Tool[] = [
     description: 'Scrum project manager with Gantt chart, sprint tracking, and Jira sync',
     category: 'productivity',
   },
+  {
+    name: 'Xì Dách',
+    slug: 'xi-dach',
+    icon: '🃏',
+    description: 'Tính xác suất quắc, thắng/thua và EV để quyết định rút hay dằn khi chơi xì dách',
+    category: 'game',
+  },
 ]
