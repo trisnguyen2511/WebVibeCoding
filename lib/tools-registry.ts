@@ -142,4 +142,11 @@ export const tools: Tool[] = [
     description: 'Sắp xếp công việc theo hàng đợi — thêm/xóa/sửa, kéo thả đổi thứ tự, bấm giờ, xuất nhập JSON',
     category: 'productivity',
   },
+  {
+    name: 'Xì Dách',
+    slug: 'xi-dach',
+    icon: '🃏',
+    description: 'Tính xác suất quắc, thắng/thua và EV để quyết định rút hay dằn khi chơi xì dách',
+    category: 'game',
+  },
 ]
