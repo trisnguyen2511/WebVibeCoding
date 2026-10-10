@@ -29,7 +29,17 @@ export interface SpecialRule {
   multiplier: number
 }
 
+export interface DenLangRule {
+  enabled: boolean
+  /** Con busts with this many points or more (hard total) => "đền làng". */
+  threshold: number
+  /** Loss multiplier (per 1 unit bet) when con is đền làng. */
+  multiplier: number
+}
+
 export interface RuleSet {
+  /** Đền làng: a very large bust loses more than a normal bust. */
+  denLang: DenLangRule
   xiBan: SpecialRule
   xiDach: SpecialRule
   nguLinh: SpecialRule
@@ -40,6 +50,7 @@ export interface RuleSet {
 }
 
 export const DEFAULT_RULES: RuleSet = {
+  denLang: { enabled: true, threshold: 28, multiplier: 2 },
   xiBan: { enabled: true, multiplier: 3 },
   xiDach: { enabled: true, multiplier: 2 },
   nguLinh: { enabled: true, multiplier: 2 },
@@ -98,9 +109,14 @@ function kindMultiplier(kind: HandKind, rules: RuleSet): number {
   return 1
 }
 
+/** Loss (positive number) of the con when busting with the given hard total. */
+export function bustLoss(hard: number, rules: RuleSet): number {
+  return rules.denLang.enabled && hard >= rules.denLang.threshold ? rules.denLang.multiplier : 1
+}
+
 /** Profit of the con (per 1 unit bet) after the cái has finished. */
 export function settle(p: HandInfo, d: HandInfo, rules: RuleSet): number {
-  if (p.kind === 'bust') return -1
+  if (p.kind === 'bust') return -bustLoss(p.hard, rules)
   if (d.kind === 'bust') return kindMultiplier(p.kind, rules)
   const rp = KIND_RANK[p.kind]
   const rd = KIND_RANK[d.kind]
@@ -139,6 +155,8 @@ export interface NextCardInfo {
   /** Expected profit if this exact rank is drawn and play continues optimally. */
   ev: number
   bust: boolean
+  /** Drawing this rank busts with a đền làng penalty. */
+  denLang: boolean
 }
 
 export type Recommendation = 'HIT' | 'STAND' | 'EQUAL' | 'DONE'
@@ -151,6 +169,8 @@ export interface Analysis {
   remainingByRank?: number[]
   /** Probability the next drawn card busts the con's hand. */
   bustProb?: number
+  /** Probability the next card busts the con into đền làng (penalty loss). */
+  denLangProb?: number
   safeProb?: number
   stand?: Outcome
   /** Hit, then play optimally afterwards. Null when hit is not possible. */
@@ -232,7 +252,7 @@ export function analyze(input: AnalyzeInput, rules: RuleSet = DEFAULT_RULES): An
   function playerValue(N: number, hard: number, aces: number, count: number): PlayerValue {
     const me = evalCards(hard, aces, count, rules)
     if (me.isBust) {
-      const o = terminalOutcome(-1)
+      const o = terminalOutcome(-bustLoss(hard, rules))
       return { best: o, stand: o, hit: null, chooseHit: false, mustHit: false, terminal: true }
     }
     const key = `${counts.join('')}|${hard}|${aces}|${count}`
@@ -281,10 +301,11 @@ export function analyze(input: AnalyzeInput, rules: RuleSet = DEFAULT_RULES): An
       terminal: true,
       canHit: false,
       mustHit: false,
-      stand: terminalOutcome(-1),
+      stand: terminalOutcome(-bustLoss(me.hard, rules)),
       hit: null,
       nextCards: [],
       bustProb: 0,
+      denLangProb: 0,
       safeProb: 0,
       recommendation: 'DONE',
       evDiff: 0,
@@ -295,6 +316,7 @@ export function analyze(input: AnalyzeInput, rules: RuleSet = DEFAULT_RULES): An
 
   const nextCards: NextCardInfo[] = []
   let bustCount = 0
+  let denLangCount = 0
   if (root.hit) {
     for (const r of RANKS) {
       const c = counts[r]
@@ -303,7 +325,8 @@ export function analyze(input: AnalyzeInput, rules: RuleSet = DEFAULT_RULES): An
       let ev: number
       let bust = false
       if (hardAfter > 21) {
-        ev = -1
+        ev = -bustLoss(hardAfter, rules)
+        if (bustLoss(hardAfter, rules) > 1) denLangCount += c
         bust = true
         bustCount += c
       } else {
@@ -311,7 +334,7 @@ export function analyze(input: AnalyzeInput, rules: RuleSet = DEFAULT_RULES): An
         ev = playerValue(N - 1, hardAfter, myAces + (r === 1 ? 1 : 0), input.player.length + 1).best.ev
         counts[r]++
       }
-      nextCards.push({ rank: r, count: c, prob: c / N, ev, bust })
+      nextCards.push({ rank: r, count: c, prob: c / N, ev, bust, denLang: bust && bustLoss(hardAfter, rules) > 1 })
     }
   }
 
@@ -328,6 +351,7 @@ export function analyze(input: AnalyzeInput, rules: RuleSet = DEFAULT_RULES): An
     remaining: N,
     remainingByRank,
     bustProb,
+    denLangProb: root.hit && N > 0 ? denLangCount / N : 0,
     safeProb: root.hit ? 1 - bustProb : 1,
     stand: root.stand,
     hit: root.hit,

@@ -1,4 +1,4 @@
-import { analyze, evaluateHand, settle, DEFAULT_RULES, Rank } from '@/lib/xi-dach'
+import { analyze, evaluateHand, settle, bustLoss, DEFAULT_RULES, Rank } from '@/lib/xi-dach'
 
 const R = DEFAULT_RULES
 const h = (...r: Rank[]) => evaluateHand(r, R)
@@ -81,5 +81,27 @@ describe('analyze', () => {
     const t0 = Date.now()
     analyze({ player: [2, 3], dealerUp: [6], exposed: [] })
     expect(Date.now() - t0).toBeLessThan(3000)
+  })
+})
+
+describe('đền làng', () => {
+  it('bust at 28+ loses the penalty multiplier', () => {
+    expect(bustLoss(27, R)).toBe(1)
+    expect(bustLoss(28, R)).toBe(2)
+    expect(settle(h(10, 10, 8), h(10, 8), R)).toBe(-2)
+    expect(settle(h(10, 10, 7), h(10, 8), R)).toBe(-1)
+  })
+  it('can be turned off', () => {
+    const off = { ...R, denLang: { ...R.denLang, enabled: false } }
+    expect(settle(evaluateHand([10, 10, 8], off), evaluateHand([10, 8], off), off)).toBe(-1)
+  })
+  it('reports the next-card đền làng probability', () => {
+    // 10+10 = 20; drawing 8, 9, 10-values => 28+ ; 2 busts at 22..27 are normal busts
+    const a = analyze({ player: [10, 10], dealerUp: [], exposed: [] })
+    const expected = a.nextCards!.filter((n) => n.denLang).reduce((s, n) => s + n.prob, 0)
+    expect(a.denLangProb).toBeCloseTo(expected, 9)
+    expect(a.denLangProb).toBeGreaterThan(0)
+    expect(a.nextCards!.find((n) => n.rank === 8)!.ev).toBe(-2)
+    expect(a.nextCards!.find((n) => n.rank === 2)!.ev).toBe(-1)
   })
 })
