@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowUp, Hand, RotateCcw, Scale, Settings2, Undo2 } from 'lucide-react'
+import { AlertTriangle, ArrowUp, Hand, RotateCcw, Scale, Settings2, Undo2 } from 'lucide-react'
 import { ToolShell } from '@/components/tool-shell'
 import {
   DEFAULT_RULES,
@@ -106,13 +106,41 @@ function ActionCard({ title, icon, o, best, disabled, note }: {
   )
 }
 
+function Warnings({ a, rules }: { a: Analysis; rules: RuleSet }) {
+  if (!a.hit || a.terminal) return null
+  const items: string[] = []
+  const dl = a.denLangProb ?? 0
+  if (dl > 0) {
+    items.push(`Rút có ${pct(dl)} nguy cơ đền làng (từ ${rules.denLang.threshold} điểm trở lên, thua ×${rules.denLang.multiplier}).`)
+  }
+  if (a.recommendation === 'HIT' && !a.mustHit && a.bustProb! >= 0.5) {
+    items.push(`Rút đang có lợi hơn nhưng xác suất quắc tới ${pct(a.bustProb!)} — rủi ro cao, biến động lớn.`)
+  }
+  if (a.recommendation === 'STAND' && a.stand!.ev < 0) {
+    items.push('Dằn chỉ là lựa chọn ít tệ hơn — EV vẫn âm.')
+  }
+  if (a.mustHit) items.push(`Dưới ${rules.playerMinStand} điểm nên bắt buộc rút theo luật bàn.`)
+  items.push('EV là trung bình sau nhiều ván giống hệt nhau; một ván đơn lẻ vẫn có thể thắng hoặc thua ngược khuyến nghị.')
+  return (
+    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5" role="note">
+      <div className="mb-1.5 flex items-center gap-2 font-display text-sm font-semibold text-amber-300">
+        <AlertTriangle size={16} aria-hidden /> Lưu ý
+      </div>
+      <ul className="list-disc space-y-1 pl-5 text-xs leading-relaxed text-fg/80">
+        {items.map((t) => <li key={t}>{t}</li>)}
+      </ul>
+    </div>
+  )
+}
+
 function Verdict({ a }: { a: Analysis }) {
   const rec = a.recommendation
   let title = ''
   let sub = ''
   if (a.hand?.isBust) {
-    title = 'Đã quắc'
-    sub = 'Bài vượt 21 điểm — con thua ván này.'
+    const dl = a.stand!.ev < -1
+    title = dl ? 'Đền làng' : 'Đã quắc'
+    sub = dl ? `Bài ${a.hand.hard} điểm — thua nặng ×${-a.stand!.ev}.` : 'Bài vượt 21 điểm — con thua ván này.'
   } else if (rec === 'DONE') {
     title = `${KIND_LABEL[a.hand!.kind]} — dừng`
     sub = 'Bài đặc biệt, không cần rút thêm.'
@@ -145,7 +173,10 @@ export default function XiDachPage() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_RULES)
-      if (raw) setRules({ ...DEFAULT_RULES, ...(JSON.parse(raw) as Partial<RuleSet>) })
+      if (raw) {
+        const saved = JSON.parse(raw) as Partial<RuleSet>
+        setRules({ ...DEFAULT_RULES, ...saved, denLang: { ...DEFAULT_RULES.denLang, ...saved.denLang } })
+      }
     } catch { /* ignore corrupt storage */ }
   }, [])
 
@@ -259,6 +290,7 @@ export default function XiDachPage() {
         {analysis.status === 'ok' && analysis.hand && (
           <section className="space-y-4" aria-label="Kết quả phân tích">
             <Verdict a={analysis} />
+            <Warnings a={analysis} rules={rules} />
 
             <div className="grid gap-3 sm:grid-cols-2">
               <ActionCard
@@ -303,11 +335,11 @@ export default function XiDachPage() {
                 <div className="mt-4 grid grid-cols-4 gap-1.5 sm:grid-cols-7">
                   {analysis.nextCards!.map((n) => (
                     <div key={n.rank}
-                      className={`rounded-lg border p-1.5 text-center ${n.bust ? 'border-red-500/30 bg-red-500/10' : 'border-border'}`}>
+                      className={`rounded-lg border p-1.5 text-center ${n.denLang ? 'border-red-500/60 bg-red-500/20' : n.bust ? 'border-red-500/30 bg-red-500/10' : 'border-border'}`}>
                       <div className="font-mono text-sm font-bold text-fg">{rankLabel(n.rank)}</div>
                       <div className="font-mono text-[11px] text-fg/70">{pct(n.prob)}</div>
                       <div className={`font-mono text-[11px] font-semibold ${n.ev > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {n.bust ? 'Quắc' : signed(n.ev)}
+                        {n.denLang ? 'Đền làng' : n.bust ? 'Quắc' : signed(n.ev)}
                       </div>
                     </div>
                   ))}
@@ -407,6 +439,27 @@ function RulesEditor({ rules, onChange }: { rules: RuleSet; onChange: (r: RuleSe
           </div>
         </div>
       ))}
+      <div className="space-y-2 rounded-lg border border-border p-3">
+        <label className="flex min-h-11 items-center gap-2.5 text-sm text-fg">
+          <input
+            type="checkbox"
+            checked={rules.denLang.enabled}
+            onChange={(e) => onChange({ ...rules, denLang: { ...rules.denLang, enabled: e.target.checked } })}
+            className="h-5 w-5 accent-accent"
+          />
+          <span>
+            Đền làng <span className="text-xs text-fg/60">(con quắc quá nặng thì thua nhiều hơn)</span>
+          </span>
+        </label>
+        {rules.denLang.enabled && (
+          <>
+            <NumberField label="Đền làng từ (điểm)" value={rules.denLang.threshold} min={22} max={40}
+              onChange={(v) => onChange({ ...rules, denLang: { ...rules.denLang, threshold: v } })} />
+            <NumberField label="Thua gấp (×)" value={rules.denLang.multiplier} min={1} max={10} step={0.5}
+              onChange={(v) => onChange({ ...rules, denLang: { ...rules.denLang, multiplier: v } })} />
+          </>
+        )}
+      </div>
       <NumberField label="Con được dằn từ (điểm, 0 = tự do)" value={rules.playerMinStand} min={0} max={21}
         onChange={(v) => onChange({ ...rules, playerMinStand: v })} />
       <NumberField label="Cái dằn từ (điểm)" value={rules.dealerStandAt} min={12} max={21}
