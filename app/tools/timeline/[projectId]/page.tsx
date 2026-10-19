@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Plus, Calendar, RefreshCw, Download, ChevronRight,
-  ListTodo, Clock, Flag, Keyboard, CloudUpload, CloudOff, Check,
+  ListTodo, Clock, Flag, Keyboard, CloudUpload, CloudDownload, CloudOff, Check,
 } from 'lucide-react'
 import { ToolShell } from '@/components/tool-shell'
 import {
@@ -71,6 +71,7 @@ export default function ProjectPage({ params }: PageProps) {
   type SyncState = 'idle' | 'syncing' | 'success' | 'error'
   const [syncState,  setSyncState]  = useState<SyncState>('idle')
   const [lastSynced, setLastSynced] = useState<string | null>(null)
+  const [pullState,  setPullState]  = useState<SyncState>('idle')
 
   useEffect(() => {
     const p = getProject(projectId)
@@ -114,6 +115,7 @@ export default function ProjectPage({ params }: PageProps) {
     switch (e.key.toLowerCase()) {
       case 'n': e.preventDefault(); setEditTask(null); setShowTaskForm(true);  break
       case 's': e.preventDefault(); handleCloudSync();    break
+      case 'p': e.preventDefault(); handleCloudPull();    break
       case 't': e.preventDefault(); setShowToday(true);  break
       case 'j': e.preventDefault(); setShowJira(true);   break
       case 'x': e.preventDefault(); handleExport();       break
@@ -214,6 +216,27 @@ export default function ProjectPage({ params }: PageProps) {
     }
   }
 
+  async function handleCloudPull() {
+    if (pullState === 'syncing') return
+    setPullState('syncing')
+    try {
+      const res = await fetch(`/api/timeline-cloud?id=${encodeURIComponent(projectId)}`)
+      if (!res.ok) throw new Error('not found')
+      const row: { data: ExportData } = await res.json()
+      // Keep local-only Jira config (token is stripped from cloud snapshots)
+      const localJira = getProject(projectId)?.jiraConfig
+      importData(row.data)
+      const pulled = getProject(projectId)
+      if (pulled && localJira) saveProject({ ...pulled, jiraConfig: { ...pulled.jiraConfig, ...localJira } })
+      reload()
+      setPullState('success')
+      setTimeout(() => setPullState('idle'), 2500)
+    } catch {
+      setPullState('error')
+      setTimeout(() => setPullState('idle'), 3000)
+    }
+  }
+
   if (cloudLoading) {
     return (
       <ToolShell name="Timeline" icon="📅" wide fullBleed>
@@ -280,6 +303,29 @@ export default function ProjectPage({ params }: PageProps) {
 
           {/* Actions */}
           <div className="flex items-center gap-1.5 shrink-0 ml-2">
+            <button
+              onClick={handleCloudPull}
+              disabled={pullState === 'syncing'}
+              title="Pull from cloud (P)"
+              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-all duration-150 disabled:opacity-60 ${
+                pullState === 'success' ? 'border-green-500/50 text-green-400 bg-green-500/10' :
+                pullState === 'error'   ? 'border-red-500/50 text-red-400 bg-red-500/10' :
+                'border-border text-muted hover:text-fg hover:border-accent/50 hover:bg-surface'
+              }`}
+            >
+              {pullState === 'syncing' ? <RefreshCw size={13} className="animate-spin" /> :
+               pullState === 'success' ? <Check size={13} /> :
+               pullState === 'error'   ? <CloudOff size={13} /> :
+               <CloudDownload size={13} />}
+              <span className="hidden sm:inline">
+                {pullState === 'syncing' ? 'Pulling…' :
+                 pullState === 'success' ? 'Pulled!' :
+                 pullState === 'error'   ? 'Failed' : 'Pull'}
+              </span>
+              {pullState === 'idle' && (
+                <kbd className="hidden sm:block rounded bg-border/60 px-1 font-mono text-[10px]">P</kbd>
+              )}
+            </button>
             <button
               onClick={handleCloudSync}
               disabled={syncState === 'syncing'}
@@ -442,6 +488,7 @@ export default function ProjectPage({ params }: PageProps) {
               {[
                 ['N', 'New task'],
                 ['S', 'Sync to cloud'],
+                ['P', 'Pull from cloud'],
                 ['T', 'Today panel'],
                 ['J', 'Jira sync'],
                 ['X', 'Export JSON'],
