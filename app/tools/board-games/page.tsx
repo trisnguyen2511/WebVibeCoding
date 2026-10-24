@@ -5,7 +5,7 @@ import { boardGames } from '@/lib/board-games-registry'
 
 export default function BoardGamesPage() {
   return (
-    <ToolShell name="Board Games" icon="🎲" description="Ma Sói, Xì Dách và các board game khác — chọn game để vào">
+    <ToolShell name="Board Games" icon="🎲" description="Ma Sói, Xì Dách, Meme Party và các board game khác — chọn game để vào">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {boardGames.map((game) => (
           <Link

@@ -139,7 +139,7 @@ export const tools: Tool[] = [
     name: 'Board Games',
     slug: 'board-games',
     icon: '🎲',
-    description: 'Ma Sói, Xì Dách và các board game khác — chọn game để vào',
+    description: 'Ma Sói, Xì Dách, Meme Party và các board game khác — chọn game để vào',
     category: 'game',
   },
 ]

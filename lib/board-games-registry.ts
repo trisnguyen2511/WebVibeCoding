@@ -22,4 +22,11 @@ export const boardGames: BoardGame[] = [
     description: 'Tính xác suất quắc, thắng/thua và EV để quyết định rút hay dằn khi chơi xì dách',
     href: '/tools/xi-dach',
   },
+  {
+    name: 'Meme Party',
+    slug: 'meme-party',
+    icon: '🎭',
+    description: 'Game meme cho hội bạn 5–12 người — chọn meme, bình chọn ẩn danh, 10 vòng hỗn hợp; điện thoại là tay cầm, TV là màn hình chung',
+    href: '/tools/meme-party',
+  },
 ]

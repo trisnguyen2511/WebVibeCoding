@@ -12,7 +12,7 @@ describe('tools-registry', () => {
       expect(typeof tool.slug).toBe('string')
       expect(typeof tool.icon).toBe('string')
       expect(typeof tool.description).toBe('string')
-      expect(['utility', 'crypto', 'game', 'media']).toContain(tool.category)
+      expect(['utility', 'crypto', 'game', 'media', 'dev', 'productivity', 'social']).toContain(tool.category)
     }
   })
 
