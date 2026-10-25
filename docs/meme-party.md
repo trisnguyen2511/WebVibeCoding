@@ -65,6 +65,7 @@ Import jobs hold normalised records/files only until you no longer need history;
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Existing — rooms, library, storage, broadcast nudge |
 | `MEME_ADMIN_PASSWORD` | Required to enable `/tools/meme-party/library`. Unset = library management is closed |
+| `MEME_PARTY_MIN_PLAYERS` | Minimum players to start (2–12, default 2). With fewer than 3 eligible players a round needs 2 valid submissions instead of 3 (voting needs ≥ 2 to choose from); in a 2-player room each votes for the other, so rounds are always a tie (+1 each) |
 | `MEME_PARTY_HOST_GRACE_SECONDS` | Host reconnection window (default 60) |
 | `MEME_IMPORT_MAX_RECORDS` / `MEME_IMPORT_MAX_FILE_KB` / `MEME_UPLOAD_MAX_MB` | Import/upload limits (2000 / 2048 / 4) |
 | `MEME_PARTY_STARTER_CONTENT` | `true` (default) lets the built-in starter pack fill categories the library lacks; `false`/`0`/`off` uses only the managed library (empty library ⇒ match cannot start) |

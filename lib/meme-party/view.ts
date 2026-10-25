@@ -1,4 +1,4 @@
-import { eligiblePlayers, isOnline } from './engine'
+import { eligiblePlayers, isOnline, requiredValid } from './engine'
 import { buildScoreboard } from './scoring'
 import {
   MODE_LABEL,
@@ -141,6 +141,7 @@ function roundView(state: RoomState, round: RoundState, me: Member | null, viewe
     eligibleCount,
     votedCount: Object.keys(round.votes).length,
     validCount: new Set(approved.map((s) => s.playerId)).size,
+    requiredValid: requiredValid(state),
     submissions,
     showcaseIndex: round.showcaseIndex,
     reviewList,

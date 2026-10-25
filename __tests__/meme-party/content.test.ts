@@ -311,8 +311,8 @@ describe('library content and live games', () => {
 
   it('lists with search and filters, hides deleted rows', async () => {
     const store = new MemoryContentStore()
-    const [a, b] = await store.insert([asset(1), asset(2, { category: 'x', tags: ['hot'], status: 'inactive' })])
-    expect((await store.list({ q: 'a1' })).items.map((i) => i.id)).toEqual([a.id])
+    const [a, b] = await store.insert([asset(1, { title: 'Mèo xyzzy' }), asset(2, { category: 'x', tags: ['hot'], status: 'inactive' })])
+    expect((await store.list({ q: 'xyzzy' })).items.map((i) => i.id)).toEqual([a.id])
     expect((await store.list({ category: 'x' })).total).toBe(1)
     expect((await store.list({ tag: 'hot' })).items[0].id).toBe(b.id)
     expect((await store.list({ status: 'inactive' })).total).toBe(1)

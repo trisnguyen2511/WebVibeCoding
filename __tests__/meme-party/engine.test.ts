@@ -8,8 +8,8 @@ import { lobby, makeCtx, makePool, nextCmdId, playerIds, run, seededRng, started
 const P5 = playerIds(5)
 
 describe('match setup', () => {
-  it('requires at least 5 players to start', () => {
-    const res = applyCommand(lobby(4), 'host', nextCmdId(), { type: 'START_MATCH' }, makeCtx())
+  it('requires at least 2 players to start', () => {
+    const res = applyCommand(lobby(1), 'host', nextCmdId(), { type: 'START_MATCH' }, makeCtx())
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.error.code).toBe('not_enough_players')
   })
@@ -73,6 +73,35 @@ describe('match setup', () => {
     const round = s.rounds[0]
     expect(round.prompt.text).toContain('prompt')
     for (const p of P5) expect(round.hands[p].length).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('small rooms (2 players)', () => {
+  it('starts with 2 players and needs 2 valid submissions instead of 3', () => {
+    let s = run(lobby(2), 'host', { type: 'START_MATCH' })
+    expect(viewFor(s, 'host', 1).round?.requiredValid).toBe(2)
+    s = submitAll(s, ['p1', 'p2'])
+    s = toVoting(s)
+    expect(s.phase).toBe('VOTING_OPEN')
+  })
+
+  it('each player can only vote for the other, a tie gives +1 each', () => {
+    let s = toVoting(submitAll(run(lobby(2), 'host', { type: 'START_MATCH' }), ['p1', 'p2']))
+    expect(applyCommand(s, 'p1', nextCmdId(), { type: 'VOTE', submissionId: submissionOf(s, 'p1') }, makeCtx()).ok).toBe(false)
+    s = run(s, 'p1', { type: 'VOTE', submissionId: submissionOf(s, 'p2') })
+    s = run(s, 'p2', { type: 'VOTE', submissionId: submissionOf(s, 'p1') })
+    s = run(s, 'host', { type: 'CLOSE_VOTING' })
+    expect(s.scores.p1.points).toBe(1)
+    expect(s.scores.p2.points).toBe(1)
+  })
+
+  it('still refuses to vote with one submission, and 3+ players still need 3', () => {
+    let s = submitAll(run(lobby(2), 'host', { type: 'START_MATCH' }), ['p1'])
+    s = run(run(s, 'host', { type: 'CLOSE_SUBMISSION' }), 'host', { type: 'APPROVE_ALL_PENDING' })
+    const res = applyCommand(s, 'host', nextCmdId(), { type: 'SKIP_SHOWCASE' }, makeCtx())
+    expect(!res.ok && res.error.code).toBe('not_enough_submissions')
+    expect(viewFor(started(5), 'host', 1).round?.requiredValid).toBe(3)
+    expect(viewFor(started(4), 'host', 1).round?.requiredValid).toBe(3)
   })
 })
 

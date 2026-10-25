@@ -44,7 +44,8 @@ function HostConsole({ session }: { session: StoredSession }) {
   const review = round?.reviewList ?? []
   const pending_ = review.filter((s) => s.status === 'pending').length
   const approvedNow = review.filter((s) => s.status === 'approved').length
-  const enoughNow = approvedNow >= 3
+  const needValid = round?.requiredValid ?? 3
+  const enoughNow = approvedNow >= needValid
   const players = view.members.filter((m) => m.role === 'player')
   const canPlayPhase = !locked && !paused
 
@@ -131,7 +132,7 @@ function HostConsole({ session }: { session: StoredSession }) {
 
           {phase === 'REVIEW' && (
             <>
-              <p className="text-sm text-muted">Duyệt ẩn danh — tác giả chỉ lộ sau khi công bố kết quả. Cần tối thiểu 3 bài hợp lệ.</p>
+              <p className="text-sm text-muted">Duyệt ẩn danh — tác giả chỉ lộ sau khi công bố kết quả. Cần tối thiểu {needValid} bài hợp lệ.</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {review.map((s) => (
                   <div key={s.id} className="space-y-2">
@@ -154,7 +155,7 @@ function HostConsole({ session }: { session: StoredSession }) {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Banner icon="⚠️" tone="warn" title={pending_ > 0 ? 'Còn bài chưa duyệt' : `Mới có ${approvedNow}/3 bài hợp lệ`} text={pending_ === 0 ? 'Mở lại nhận bài để thêm bài. Nếu mở lại vẫn không đủ, bạn có thể bỏ qua vòng (không ai được điểm).' : undefined} />
+                  <Banner icon="⚠️" tone="warn" title={pending_ > 0 ? 'Còn bài chưa duyệt' : `Mới có ${approvedNow}/${needValid} bài hợp lệ`} text={pending_ === 0 ? 'Mở lại nhận bài để thêm bài. Nếu mở lại vẫn không đủ, bạn có thể bỏ qua vòng (không ai được điểm).' : undefined} />
                   {pending_ === 0 && (
                     <div className="grid gap-2 sm:grid-cols-2">
                       <Btn disabled={pending || !canPlayPhase} onClick={act({ type: 'REOPEN_SUBMISSION' })}>Mở lại nhận bài</Btn>

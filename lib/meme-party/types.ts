@@ -311,6 +311,8 @@ export interface RoundView {
   eligibleCount: number
   votedCount: number
   validCount: number
+  /** Distinct valid submissions needed before voting (3, or fewer in small rooms). */
+  requiredValid: number
   /** Approved submissions, anonymous — only populated from Showcase/Voting on. */
   submissions: PublicSubmission[]
   showcaseIndex: number

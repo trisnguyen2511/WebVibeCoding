@@ -23,8 +23,12 @@ const defaultCtx = (now: number): EngineContext => ({
 })
 
 function settingsFromEnv(): Partial<RoomState['settings']> {
+  const out: Partial<RoomState['settings']> = {}
   const grace = Number(process.env.MEME_PARTY_HOST_GRACE_SECONDS)
-  return Number.isFinite(grace) && grace > 0 ? { hostGraceMs: grace * 1000 } : {}
+  if (Number.isFinite(grace) && grace > 0) out.hostGraceMs = grace * 1000
+  const min = Number(process.env.MEME_PARTY_MIN_PLAYERS)
+  if (Number.isInteger(min) && min >= 2 && min <= 12) out.minPlayers = min
+  return out
 }
 
 export async function createNewRoom(hostName: string, store: RoomStore = getRoomStore(), now = Date.now()) {

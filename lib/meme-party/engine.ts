@@ -22,6 +22,7 @@ import {
 
 export const HAND_SIZE = 6
 export const MIN_VALID_SUBMISSIONS = 3
+export const ABSOLUTE_MIN_PLAYERS = 2
 export const MAX_SPECTATORS = 40
 export const NAME_MAX = 20
 const PROCESSED_CAP = 300
@@ -29,7 +30,7 @@ const EVENT_CAP = 120
 const CHAOS_STYLES: ChaosStyle[] = ['tilt', 'mirror', 'rainbow', 'shake', 'zoom']
 
 export const DEFAULT_SETTINGS: RoomSettings = {
-  minPlayers: 5,
+  minPlayers: ABSOLUTE_MIN_PLAYERS,
   maxPlayers: 12,
   rounds: 10,
   hostGraceMs: 60_000,
@@ -304,6 +305,15 @@ function dealRound(state: RoomState, index: number, ctx: EngineContext): RoundSt
 
 // ── Command handling ────────────────────────────────────────────────────────
 
+/**
+ * Valid submissions (from distinct players) a round needs before voting.
+ * Normally 3, but never more than the eligible players, and never below 2
+ * (a vote needs at least two submissions to choose between).
+ */
+export function requiredValid(state: RoomState): number {
+  return Math.max(2, Math.min(MIN_VALID_SUBMISSIONS, eligiblePlayers(state).length))
+}
+
 const currentRound = (state: RoomState): RoundState | undefined => state.rounds[state.roundIndex]
 
 function validSubmissions(round: RoundState): Submission[] {
@@ -311,13 +321,14 @@ function validSubmissions(round: RoundState): Submission[] {
 }
 
 /** Review gate shared by "open showcase" and "skip showcase". */
-function reviewGate(round: RoundState): EngineError | null {
+function reviewGate(state: RoomState, round: RoundState): EngineError | null {
   if (round.submissions.some((s) => s.status === 'pending')) {
     return { code: 'review_incomplete', message: 'Còn bài chưa duyệt', status: 409 }
   }
   const authors = new Set(validSubmissions(round).map((s) => s.playerId))
-  if (authors.size < MIN_VALID_SUBMISSIONS) {
-    return { code: 'not_enough_submissions', message: `Cần tối thiểu ${MIN_VALID_SUBMISSIONS} bài hợp lệ từ ${MIN_VALID_SUBMISSIONS} người khác nhau`, status: 409 }
+  const need = requiredValid(state)
+  if (authors.size < need) {
+    return { code: 'not_enough_submissions', message: `Cần tối thiểu ${need} bài hợp lệ từ ${need} người khác nhau`, status: 409 }
   }
   return null
 }
@@ -432,7 +443,7 @@ function applyHost(state: RoomState, cmd: Command, ctx: EngineContext): EngineEr
     }
     case 'REOPEN_SUBMISSION': {
       if (state.phase !== 'REVIEW' || !round) return invalidPhase(state, cmd.type)
-      if (new Set(validSubmissions(round).map((s) => s.playerId)).size >= MIN_VALID_SUBMISSIONS) {
+      if (new Set(validSubmissions(round).map((s) => s.playerId)).size >= requiredValid(state)) {
         return { code: 'reopen_not_needed', message: 'Đã đủ bài hợp lệ, không cần mở lại', status: 409 }
       }
       round.reopenCount++
@@ -442,7 +453,7 @@ function applyHost(state: RoomState, cmd: Command, ctx: EngineContext): EngineEr
     }
     case 'SKIP_ROUND': {
       if (state.phase !== 'REVIEW' || !round) return invalidPhase(state, cmd.type)
-      if (new Set(validSubmissions(round).map((s) => s.playerId)).size >= MIN_VALID_SUBMISSIONS) {
+      if (new Set(validSubmissions(round).map((s) => s.playerId)).size >= requiredValid(state)) {
         return { code: 'skip_not_allowed', message: 'Đã đủ bài hợp lệ, không thể bỏ qua vòng', status: 409 }
       }
       if (round.reopenCount < 1) {
@@ -456,7 +467,7 @@ function applyHost(state: RoomState, cmd: Command, ctx: EngineContext): EngineEr
     }
     case 'OPEN_SHOWCASE': {
       if (state.phase !== 'REVIEW' || !round) return invalidPhase(state, cmd.type)
-      const gate = reviewGate(round)
+      const gate = reviewGate(state, round)
       if (gate) return gate
       round.showcaseIndex = 0
       state.phase = 'MEME_SHOWCASE'
@@ -465,7 +476,7 @@ function applyHost(state: RoomState, cmd: Command, ctx: EngineContext): EngineEr
     }
     case 'SKIP_SHOWCASE': {
       if (state.phase !== 'REVIEW' || !round) return invalidPhase(state, cmd.type)
-      const gate = reviewGate(round)
+      const gate = reviewGate(state, round)
       if (gate) return gate
       enterVoting(state, round, now)
       return null
