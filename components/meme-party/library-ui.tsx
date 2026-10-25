@@ -258,7 +258,7 @@ export function LibraryBrowser() {
       {editing && <ItemForm item={editing === 'new' ? null : editing} onCancel={() => setEditing(null)} onDone={() => { setEditing(null); load() }} />}
 
       {items.length === 0 ? (
-        <Banner icon="📚" title="Chưa có bản ghi nào khớp" text="Ván chơi dùng bộ starter có sẵn cho tới khi bạn thêm nội dung vào thư viện." />
+        <Banner icon="📚" title="Chưa có bản ghi nào khớp" text="Nếu MEME_PARTY_STARTER_CONTENT đang bật (mặc định), ván dùng bộ starter có sẵn cho loại còn thiếu. Đặt false để chỉ dùng nội dung trong thư viện." />
       ) : layout === 'grid' ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {items.map((i) => (

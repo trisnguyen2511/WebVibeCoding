@@ -338,6 +338,27 @@ describe('library content and live games', () => {
     expect(pool.assets.length).toBeGreaterThanOrEqual(3)
   })
 
+  it('MEME_PARTY_STARTER_CONTENT=false disables the starter fallback entirely', async () => {
+    const { applyCommand } = await import('@/lib/meme-party/engine')
+    const { lobby, makeCtx, nextCmdId } = await import('../helpers/meme-party')
+    const prev = process.env.MEME_PARTY_STARTER_CONTENT
+    try {
+      for (const off of ['false', '0', 'OFF']) {
+        process.env.MEME_PARTY_STARTER_CONTENT = off
+        expect(buildPool([])).toEqual({ prompts: [], captions: [], assets: [] })
+        const res = applyCommand(lobby(5), 'host', nextCmdId(), { type: 'START_MATCH' }, makeCtx({ content: buildPool([]) }))
+        expect(!res.ok && res.error.code).toBe('not_enough_content')
+      }
+      process.env.MEME_PARTY_STARTER_CONTENT = 'true'
+      expect(buildPool([]).prompts.length).toBeGreaterThan(0)
+      delete process.env.MEME_PARTY_STARTER_CONTENT
+      expect(buildPool([]).prompts.length).toBeGreaterThan(0)
+    } finally {
+      if (prev === undefined) delete process.env.MEME_PARTY_STARTER_CONTENT
+      else process.env.MEME_PARTY_STARTER_CONTENT = prev
+    }
+  })
+
   it('editing or deleting library content does not alter a running round snapshot', async () => {
     const { applyCommand } = await import('@/lib/meme-party/engine')
     const { lobby, makeCtx, nextCmdId } = await import('../helpers/meme-party')

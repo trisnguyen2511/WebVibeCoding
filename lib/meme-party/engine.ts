@@ -263,8 +263,8 @@ function optionsFor(content: ContentPool, mode: GameMode): Option[] {
 export function checkContent(content: ContentPool | undefined): string | null {
   if (!content) return 'Thiếu dữ liệu nội dung'
   for (const mode of GAME_MODES) {
-    if (!content.prompts.some((p) => p.mode === mode)) return `Chưa có đề bài cho ${mode}`
-    if (optionsFor(content, mode).length < 3) return `Chưa đủ lựa chọn (tối thiểu 3) cho ${mode}`
+    if (!content.prompts.some((p) => p.mode === mode)) return `Thư viện chưa có đề bài cho ${mode} — hãy thêm nội dung ở /tools/meme-party/library`
+    if (optionsFor(content, mode).length < 3) return `Thư viện chưa đủ lựa chọn (tối thiểu 3) cho ${mode} — hãy thêm nội dung ở /tools/meme-party/library`
   }
   return null
 }

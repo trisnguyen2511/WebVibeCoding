@@ -35,7 +35,16 @@ export interface ContentStore {
 
 // ── Pool building (shared) ──────────────────────────────────────────────────
 
-/** Active, non-deleted library content; any category the library lacks falls back to the starter pack. */
+/** Starter pack is on unless MEME_PARTY_STARTER_CONTENT is explicitly "false" / "0" / "off". */
+export function starterEnabled(): boolean {
+  return !['false', '0', 'off', 'no'].includes((process.env.MEME_PARTY_STARTER_CONTENT ?? '').trim().toLowerCase())
+}
+
+/**
+ * Active, non-deleted library content. While the starter pack is enabled, any
+ * category the library lacks falls back to it; when disabled, only the managed
+ * library is used.
+ */
 export function buildPool(items: LibraryItem[]): ContentPool {
   const live = items.filter((i) => i.status === 'active' && !i.deletedAt)
   const assetsById = new Map(live.filter((i) => i.kind === 'memeAsset').map((i) => [i.id, i]))
@@ -55,6 +64,7 @@ export function buildPool(items: LibraryItem[]): ContentPool {
     .map((i) => ({ id: i.id, title: i.title, imageUrl: i.imageUrl, modes: i.modes }))
 
   const pool: ContentPool = { prompts, captions, assets }
+  if (!starterEnabled()) return pool
   for (const mode of GAME_MODES) {
     if (!pool.prompts.some((p) => p.mode === mode)) pool.prompts.push(...STARTER_POOL.prompts.filter((p) => p.mode === mode))
   }

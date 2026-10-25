@@ -47,7 +47,7 @@ Decisions where the spec left room:
 * **Review is anonymous** (the Host does not see authors either); approve/reject, "approve all pending", reopen (only when < 3 valid), skip (only after one reopen).
 * **Results**: `CLOSE_VOTING` locks result + scores exactly once; `PUBLISH_RESULTS` reveals them. Host Award only on award rounds, stored separately, never affects points.
 * **Kick**: in the lobby removes the member; in a match withdraws pending work before voting, but confirmed votes stay valid.
-* **Starter pack**: `starter-content.ts` + `public/meme-party/starter/*.svg` (original face illustrations) are used per category only while the managed library has no active content for it, so a fresh install is playable.
+* **Starter pack** (toggle with `MEME_PARTY_STARTER_CONTENT`): `starter-content.ts` + `public/meme-party/starter/*.svg` (original face illustrations) are used per category only while the managed library has no active content for it, so a fresh install is playable.
 
 ## Database
 
@@ -67,6 +67,7 @@ Import jobs hold normalised records/files only until you no longer need history;
 | `MEME_ADMIN_PASSWORD` | Required to enable `/tools/meme-party/library`. Unset = library management is closed |
 | `MEME_PARTY_HOST_GRACE_SECONDS` | Host reconnection window (default 60) |
 | `MEME_IMPORT_MAX_RECORDS` / `MEME_IMPORT_MAX_FILE_KB` / `MEME_UPLOAD_MAX_MB` | Import/upload limits (2000 / 2048 / 4) |
+| `MEME_PARTY_STARTER_CONTENT` | `true` (default) lets the built-in starter pack fill categories the library lacks; `false`/`0`/`off` uses only the managed library (empty library ⇒ match cannot start) |
 | `MEME_PARTY_STORE=memory` | Force the in-memory store (tests/local). Without Supabase config the memory store is used automatically **outside production only**; in production missing config errors out |
 
 Images are stored in Supabase Storage bucket `meme-party` (public read, service-role write) at `assets/<sha256>.<ext>` — content-addressed, so the same bytes are stored once however many records use them.
