@@ -9,30 +9,34 @@ export interface StoredSession {
   roomId?: string
 }
 
-const key = (code: string) => `wv-meme-party-${code}`
-const LAST = 'wv-meme-party-last'
+export type SessionKind = 'host' | 'player'
 
-export function loadSession(code: string | null): StoredSession | null {
+// Host and player sessions live under separate keys: one browser can be the
+// Host of a room and also open the player link (e.g. to test), and the two
+// must never overwrite or be mistaken for each other.
+const key = (code: string, kind: SessionKind) => (kind === 'host' ? `wv-meme-party-host-${code}` : `wv-meme-party-${code}`)
+
+export function loadSession(code: string | null, kind: SessionKind = 'player'): StoredSession | null {
+  if (!code) return null
   try {
-    const raw = localStorage.getItem(key(code ?? localStorage.getItem(LAST) ?? ''))
+    const raw = localStorage.getItem(key(code, kind))
     return raw ? (JSON.parse(raw) as StoredSession) : null
   } catch {
     return null
   }
 }
 
-export function saveSession(session: StoredSession) {
+export function saveSession(session: StoredSession, kind: SessionKind = 'player') {
   try {
-    localStorage.setItem(key(session.code), JSON.stringify(session))
-    localStorage.setItem(LAST, session.code)
+    localStorage.setItem(key(session.code, kind), JSON.stringify(session))
   } catch {
     // storage unavailable (private mode) — the session just won't survive a reload
   }
 }
 
-export function clearSession(code: string) {
+export function clearSession(code: string, kind: SessionKind = 'player') {
   try {
-    localStorage.removeItem(key(code))
+    localStorage.removeItem(key(code, kind))
   } catch {
     // ignore
   }

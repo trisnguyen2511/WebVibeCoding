@@ -11,6 +11,11 @@ const withPWA = require('next-pwa')({
   buildExcludes: [/app-build-manifest\.json$/],
   runtimeCaching: [
     {
+      // Meme Party state depends on a per-user token header, which cache keys ignore — never cache it.
+      urlPattern: /\/api\/meme-party\//i,
+      handler: 'NetworkOnly',
+    },
+    {
       urlPattern: /^https:\/\/fonts\.(?:googleapis|gstatic)\.com\/.*/i,
       handler: 'CacheFirst',
       options: {

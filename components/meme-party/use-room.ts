@@ -42,7 +42,7 @@ export function useRoom(code: string | null, token: string | null) {
   }, [code, token])
 
   useEffect(() => {
-    if (!code) return
+    if (!code || fatal) return
     refresh()
     const id = setInterval(refresh, POLL_MS)
     const onVisible = () => document.visibilityState === 'visible' && refresh()
@@ -53,7 +53,7 @@ export function useRoom(code: string | null, token: string | null) {
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('online', refresh)
     }
-  }, [code, refresh])
+  }, [code, fatal, refresh])
 
   useEffect(() => {
     if (!code || !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return

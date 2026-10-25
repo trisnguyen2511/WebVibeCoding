@@ -259,7 +259,7 @@ function HostInner() {
   const [session, setSession] = useState<StoredSession | null>(null)
   const [ready, setReady] = useState(false)
   useEffect(() => {
-    setSession(loadSession(code))
+    setSession(loadSession(code, 'host'))
     setReady(true)
   }, [code])
   if (!ready) return null

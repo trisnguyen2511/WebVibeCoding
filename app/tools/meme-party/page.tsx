@@ -35,7 +35,7 @@ export default function MemePartyHome() {
     const res = await api<Created>('/api/meme-party/rooms', { method: 'POST', body: JSON.stringify({ hostName: hostName || 'Host' }) })
     setBusy(false)
     if (!res.ok) return setError(res.error)
-    saveSession({ code: res.result.code, token: res.result.hostToken, memberId: res.result.memberId, name: hostName || 'Host', roomId: res.result.roomId })
+    saveSession({ code: res.result.code, token: res.result.hostToken, memberId: res.result.memberId, name: hostName || 'Host', roomId: res.result.roomId }, 'host')
     router.push(`/tools/meme-party/host?code=${res.result.code}`)
   }
 

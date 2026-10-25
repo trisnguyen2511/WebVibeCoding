@@ -32,7 +32,7 @@ function JoinForm({ code, onJoined }: { code: string; onJoined: (s: StoredSessio
   )
 }
 
-function PlayerGame({ session, onLeave }: { session: StoredSession; onLeave: () => void }) {
+function PlayerGame({ session, onLeave, onRejoin }: { session: StoredSession; onLeave: () => void; onRejoin: () => void }) {
   const { view, online, fatal, pending, notice, run } = useRoom(session.code, session.token)
   const [picked, setPicked] = useState<string | null>(null)
   const [confirmVote, setConfirmVote] = useState<string | null>(null)
@@ -47,6 +47,7 @@ function PlayerGame({ session, onLeave }: { session: StoredSession; onLeave: () 
     return (
       <div className="mx-auto max-w-sm space-y-3">
         <Banner icon="🚫" tone="warn" title="Không thể vào phòng" text={fatal} />
+        <Btn tone="primary" block onClick={onRejoin}>Vào lại phòng với tên mới</Btn>
         <Btn block onClick={onLeave}>Về trang chủ Meme Party</Btn>
       </div>
     )
@@ -245,7 +246,13 @@ function PlayInner() {
     )
   }
   if (!session) return <JoinForm code={code} onJoined={setSession} />
-  return <PlayerGame session={session} onLeave={() => { clearSession(code); router.push('/tools/meme-party') }} />
+  return (
+    <PlayerGame
+      session={session}
+      onLeave={() => { clearSession(code); router.push('/tools/meme-party') }}
+      onRejoin={() => { clearSession(code); setSession(null) }}
+    />
+  )
 }
 
 export default function PlayPage() {

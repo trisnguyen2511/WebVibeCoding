@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { getMemePartyDb } from './supabase-client'
 import type { RoomState } from './types'
 
 /** A persisted room plus the compare-and-swap revision used for atomic writes. */
@@ -55,7 +55,7 @@ interface RoomRow {
 }
 
 export class SupabaseRoomStore implements RoomStore {
-  private db = getSupabaseAdmin()
+  private db = getMemePartyDb()
 
   async create(state: RoomState) {
     const { error } = await this.db.from('meme_party_rooms').insert({ id: state.id, code: state.code, state, rev: 1 })

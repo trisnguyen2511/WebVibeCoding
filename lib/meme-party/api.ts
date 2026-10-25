@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isMemeAdminRequest } from './admin-auth'
 
 /** All Meme Party routes answer `{ result, error }` (plus a machine-readable `code` on errors). */
-export const ok = <T,>(result: T, status = 200) => NextResponse.json({ result, error: null }, { status })
-export const fail = (error: string, status: number, code = 'error') => NextResponse.json({ result: null, error, code }, { status })
+const NO_STORE = { 'cache-control': 'no-store, max-age=0' }
+
+export const ok = <T,>(result: T, status = 200) => NextResponse.json({ result, error: null }, { status, headers: NO_STORE })
+export const fail = (error: string, status: number, code = 'error') => NextResponse.json({ result: null, error, code }, { status, headers: NO_STORE })
 
 export async function readJson<T>(req: NextRequest, maxBytes = 64 * 1024): Promise<T | null> {
   const declared = Number(req.headers.get('content-length') ?? 0)

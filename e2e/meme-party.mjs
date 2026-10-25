@@ -35,6 +35,14 @@ await host.waitForURL(/host\?code=\d{6}/)
 const code = new URL(host.url()).searchParams.get('code')
 log('room', code)
 
+// The Host's browser can also open the player link: it must get the join form, not the Host session.
+const sameBrowser = await host.context().newPage()
+await sameBrowser.goto(`${BASE}/tools/meme-party/play?code=${code}`)
+await waitText(sameBrowser, `Vào phòng ${code}`)
+await sameBrowser.close()
+await host.reload()
+await waitText(host, 'Mã phòng')
+
 const screen = await newPage({ viewport: { width: 1920, height: 1080 } })
 await screen.goto(`${BASE}/tools/meme-party/screen?code=${code}`)
 
@@ -113,7 +121,7 @@ await shot(players[0], '21-player-round-end')
 // ── Rounds 2-10 by sending commands directly from each page's stored session ──
 const cmd = (page, command) =>
   page.evaluate(async ({ code, command }) => {
-    const s = JSON.parse(localStorage.getItem(`wv-meme-party-${code}`))
+    const s = JSON.parse(localStorage.getItem(`wv-meme-party-host-${code}`) ?? localStorage.getItem(`wv-meme-party-${code}`))
     const r = await fetch(`/api/meme-party/rooms/${code}/command`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-mp-token': s.token },
@@ -123,7 +131,7 @@ const cmd = (page, command) =>
   }, { code, command })
 const view = (page) =>
   page.evaluate(async (code) => {
-    const s = JSON.parse(localStorage.getItem(`wv-meme-party-${code}`))
+    const s = JSON.parse(localStorage.getItem(`wv-meme-party-host-${code}`) ?? localStorage.getItem(`wv-meme-party-${code}`))
     const r = await fetch(`/api/meme-party/rooms/${code}/state`, { headers: { 'x-mp-token': s.token } })
     return (await r.json()).result.view
   }, code)

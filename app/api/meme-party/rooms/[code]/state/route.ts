@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { fail, ok } from '@/lib/meme-party/api'
+import { logEvent } from '@/lib/meme-party/log'
 import { getView } from '@/lib/meme-party/room-service'
 
 export const dynamic = 'force-dynamic'
@@ -10,7 +11,10 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   const token = req.headers.get('x-mp-token')
   try {
     const res = await getView(params.code, token)
-    if (!res.ok) return fail(res.error.message, res.error.status, res.error.code)
+    if (!res.ok) {
+      if (res.error.status === 403) logEvent('meme_party.state_forbidden', { code: params.code, hadToken: !!token })
+      return fail(res.error.message, res.error.status, res.error.code)
+    }
     const since = Number(req.nextUrl.searchParams.get('since'))
     if (Number.isFinite(since) && since === res.view.stateVersion && req.nextUrl.searchParams.get('lite') === '1') {
       return ok({ unchanged: true, stateVersion: res.view.stateVersion })

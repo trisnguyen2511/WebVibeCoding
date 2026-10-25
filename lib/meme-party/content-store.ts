@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { getMemePartyDb } from './supabase-client'
 import type {
   ContentKind,
   ContentStatus,
@@ -252,7 +252,7 @@ const toRow = (i: Partial<NewLibraryItem>): Partial<Row> => {
 const ALL_LIMIT = 5000
 
 export class SupabaseContentStore implements ContentStore {
-  private db = getSupabaseAdmin()
+  private db = getMemePartyDb()
 
   async list(f: LibraryFilter) {
     let q = this.db.from('meme_library_items').select('*', { count: 'exact' }).is('deleted_at', null)
