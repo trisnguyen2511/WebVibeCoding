@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Space_Grotesk, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import { CommandPalette } from '@/components/command-palette'
+import { NavTracker } from '@/components/nav-tracker'
 import { RegisterServiceWorker } from '@/components/register-service-worker'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Agentation } from 'agentation'
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
         <ThemeProvider>
           <RegisterServiceWorker />
+          <NavTracker />
           <CommandPalette />
           {children}
           {process.env.NEXT_PUBLIC_ENABLE_AGENTATION === 'true' && <Agentation />}

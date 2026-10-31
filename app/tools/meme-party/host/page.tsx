@@ -1,9 +1,10 @@
 'use client'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 import { Suspense, useEffect, useState } from 'react'
 import { ToolShell } from '@/components/tool-shell'
+import { useBackNavigation } from '@/hooks/use-back-navigation'
 import { Banner, Btn, MemeCard, ModeBadge, PlayerChips, ProgressBar, PromptCard, ResultPanel, Scoreboard, StatusBanner } from '@/components/meme-party/parts'
 import { useRoom } from '@/components/meme-party/use-room'
 import { loadSession, type StoredSession } from '@/lib/meme-party/client'
@@ -255,7 +256,7 @@ function HostConsole({ session }: { session: StoredSession }) {
 
 function HostInner() {
   const params = useSearchParams()
-  const router = useRouter()
+  const { goUp } = useBackNavigation()
   const code = params.get('code')
   const [session, setSession] = useState<StoredSession | null>(null)
   const [ready, setReady] = useState(false)
@@ -268,7 +269,7 @@ function HostInner() {
     return (
       <div className="mx-auto max-w-sm space-y-3">
         <Banner icon="🔑" title="Không tìm thấy phiên Host" text="Phiên Host nằm trên thiết bị đã tạo phòng. Hãy tạo phòng mới." />
-        <Btn block onClick={() => router.push('/tools/meme-party')}>Về trang chủ</Btn>
+        <Btn block onClick={() => goUp('/tools/meme-party')}>Về trang chủ</Btn>
       </div>
     )
   }

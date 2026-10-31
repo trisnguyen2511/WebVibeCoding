@@ -1,7 +1,8 @@
 'use client'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
 import { ToolShell } from '@/components/tool-shell'
+import { useBackNavigation } from '@/hooks/use-back-navigation'
 import { Banner, Btn, MemeCard, ModeBadge, PlayerChips, ProgressBar, PromptCard, ResultPanel, Scoreboard, StatusBanner } from '@/components/meme-party/parts'
 import { useRoom } from '@/components/meme-party/use-room'
 import { api, clearSession, loadSession, saveSession, type StoredSession } from '@/lib/meme-party/client'
@@ -226,7 +227,7 @@ function PlayerScreen({
 
 function PlayInner() {
   const params = useSearchParams()
-  const router = useRouter()
+  const { goUp } = useBackNavigation()
   const code = params.get('code')
   const [session, setSession] = useState<StoredSession | null>(null)
   const [ready, setReady] = useState(false)
@@ -241,7 +242,7 @@ function PlayInner() {
     return (
       <div className="mx-auto max-w-sm space-y-3">
         <Banner icon="❓" title="Thiếu mã phòng" text="Quét QR hoặc nhập mã 6 số ở trang chủ." />
-        <Btn block onClick={() => router.push('/tools/meme-party')}>Về trang chủ</Btn>
+        <Btn block onClick={() => goUp('/tools/meme-party')}>Về trang chủ</Btn>
       </div>
     )
   }
@@ -249,7 +250,7 @@ function PlayInner() {
   return (
     <PlayerGame
       session={session}
-      onLeave={() => { clearSession(code); router.push('/tools/meme-party') }}
+      onLeave={() => { clearSession(code); goUp('/tools/meme-party') }}
       onRejoin={() => { clearSession(code); setSession(null) }}
     />
   )

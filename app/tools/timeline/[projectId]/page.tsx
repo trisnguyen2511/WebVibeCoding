@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, Plus, Calendar, RefreshCw, Download, ChevronRight,
   ListTodo, Clock, Flag, Keyboard, CloudUpload, CloudDownload, CloudOff, Check,
 } from 'lucide-react'
 import { ToolShell } from '@/components/tool-shell'
+import { useBackNavigation } from '@/hooks/use-back-navigation'
 import {
   getProject, getTasks, saveProject, saveTask, deleteTask,
   upsertTimeEntry, deleteTimeEntry, exportData, importData, PROXY_TOKEN_KEY,
@@ -55,7 +55,7 @@ interface PageProps {
 
 export default function ProjectPage({ params }: PageProps) {
   const { projectId } = params
-  const router = useRouter()
+  const { goBack, goUp } = useBackNavigation()
 
   const [project,         setProject]         = useState<Project | null>(null)
   const [tasks,           setTasks]           = useState<Task[]>([])
@@ -98,9 +98,9 @@ export default function ProjectPage({ params }: PageProps) {
         const cur = loaded.sprints.find(s => s.startDate <= today && s.endDate >= today)
         if (cur) setSelectedSprintId(cur.id)
       })
-      .catch(() => router.push('/tools/timeline'))
+      .catch(() => goBack('/tools/timeline'))
       .finally(() => setCloudLoading(false))
-  }, [projectId, router])
+  }, [projectId, goBack])
 
   function reload() {
     setTasks(getTasks(projectId))
@@ -280,7 +280,7 @@ export default function ProjectPage({ params }: PageProps) {
 
           {/* Back */}
           <button
-            onClick={() => router.push('/tools/timeline')}
+            onClick={() => goUp('/tools/timeline')}
             className="flex items-center gap-1.5 text-sm text-muted hover:text-fg transition-colors mr-1"
           >
             <ArrowLeft size={14} />

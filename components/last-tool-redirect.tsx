@@ -2,6 +2,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getMostRecentTool } from '@/lib/tool-history'
+import { isEntryPage } from '@/lib/nav-history'
 
 // Opening the app once per tab session jumps straight into whichever tool
 // was last used instead of the tool picker — but only if that visit is
@@ -15,23 +16,36 @@ const AUTO_ENTER_HOURS = (() => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_AUTO_ENTER_HOURS
 })()
 
-// A session flag makes sure the explicit "Back" link inside ToolShell still
-// works — after the first redirect, returning to "/" in the same tab stays
-// on the picker.
+// A session flag makes sure the auto-enter happens at most once per tab.
 const REDIRECTED_KEY = 'wv-last-tool-redirected'
+
+// Back-button UX rules:
+//   • Only auto-enter when "/" is the FIRST page opened in this tab. If the
+//     user reached "/" from inside the app (Back from a deep-linked tool,
+//     the Settings back link, the logo…), they explicitly want the picker —
+//     redirecting them would bounce them straight back into the tool they
+//     just left (Back → "/" → tool → Back → … loop).
+//   • Use push, not replace: "/" stays in history beneath the tool, so the
+//     tool's Back button (and the browser back gesture) lands on the picker
+//     instead of leaving the app.
 
 export function LastToolRedirect() {
   const router = useRouter()
 
   useEffect(() => {
-    if (sessionStorage.getItem(REDIRECTED_KEY)) return
-    sessionStorage.setItem(REDIRECTED_KEY, '1')
+    try {
+      if (sessionStorage.getItem(REDIRECTED_KEY)) return
+      sessionStorage.setItem(REDIRECTED_KEY, '1')
+    } catch {
+      return
+    }
+    if (!isEntryPage('/')) return
 
     const mostRecent = getMostRecentTool()
     if (!mostRecent || mostRecent.path === '/') return
 
     const hoursSinceVisit = (Date.now() - mostRecent.visitedAt) / (1000 * 60 * 60)
-    if (hoursSinceVisit <= AUTO_ENTER_HOURS) router.replace(mostRecent.path)
+    if (hoursSinceVisit <= AUTO_ENTER_HOURS) router.push(mostRecent.path)
   }, [router])
 
   return null

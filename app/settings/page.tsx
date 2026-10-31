@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react'
 import { useTheme } from 'next-themes'
 import { Settings as SettingsIcon, Moon, Sun, Monitor, Trash2 } from 'lucide-react'
 import { CLEARABLE_CACHES, clearToolCache } from '@/lib/clear-cache-registry'
+import { useBackNavigation } from '@/hooks/use-back-navigation'
 
 // App-wide settings — deliberately its own page (not a tool, doesn't use
 // ToolShell) so it isn't tracked as "last tool visited" and so more setting
 // sections can be added here later without redesigning the entry point.
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
+  const { goBack } = useBackNavigation()
   const [mounted, setMounted] = useState(false)
   const [clearedSlug, setClearedSlug] = useState<string | null>(null)
   useEffect(() => setMounted(true), [])
@@ -27,7 +29,8 @@ export default function SettingsPage() {
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-2.5">
           <Link
             href="/"
-            aria-label="Back to tools"
+            onClick={(e) => { e.preventDefault(); goBack('/') }}
+            aria-label="Back"
             className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-muted transition-all hover:border-accent/50 hover:text-fg"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
