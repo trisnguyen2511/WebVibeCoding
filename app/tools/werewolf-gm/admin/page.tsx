@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ToolShell } from '@/components/tool-shell'
+import { useBackNavigation } from '@/hooks/use-back-navigation'
 
 interface PlayerGroup {
   id: string
@@ -242,6 +243,7 @@ function AdminPanel() {
 
 export default function WerewolfAdminPage() {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null)
+  const { goUp } = useBackNavigation()
 
   useEffect(() => {
     fetch('/api/werewolf/admin/check')
@@ -252,7 +254,7 @@ export default function WerewolfAdminPage() {
   return (
     <ToolShell name="Werewolf GM — Admin" icon="🛠️" description="Quản lý nhóm người chơi mặc định">
       <div className="mb-4">
-        <Link href="/tools/werewolf-gm" className="text-xs text-muted underline underline-offset-2 hover:text-fg">
+        <Link href="/tools/werewolf-gm" onClick={(e) => { e.preventDefault(); goUp('/tools/werewolf-gm') }} className="text-xs text-muted underline underline-offset-2 hover:text-fg">
           ← Quay lại Werewolf GM
         </Link>
       </div>
