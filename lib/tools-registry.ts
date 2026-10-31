@@ -108,13 +108,6 @@ export const tools: Tool[] = [
     category: 'social',
   },
   {
-    name: 'Werewolf GM',
-    slug: 'werewolf-gm',
-    icon: '🐺',
-    description: 'Công cụ quản trò Ma Sói — chia vai, điều hành đêm, kéo thả chọn mục tiêu, undo, lịch sử ván, phát thẻ vai trò online qua QR/mã phòng',
-    category: 'game',
-  },
-  {
     name: 'Games',
     slug: 'games',
     icon: '🎲',
@@ -143,10 +136,10 @@ export const tools: Tool[] = [
     category: 'productivity',
   },
   {
-    name: 'Xì Dách',
-    slug: 'xi-dach',
-    icon: '🃏',
-    description: 'Tính xác suất quắc, thắng/thua và EV để quyết định rút hay dằn khi chơi xì dách',
+    name: 'Board Games',
+    slug: 'board-games',
+    icon: '🎲',
+    description: 'Ma Sói, Xì Dách, Meme Party và các board game khác — chọn game để vào',
     category: 'game',
   },
 ]

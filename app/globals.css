@@ -121,3 +121,35 @@
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Meme Party — "Chaos Round" presentation variations (visual only) */
+@keyframes mp-shake {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  20% { transform: translateX(-4px) rotate(-1.5deg); }
+  40% { transform: translateX(4px) rotate(1.5deg); }
+  60% { transform: translateX(-3px) rotate(-1deg); }
+  80% { transform: translateX(3px) rotate(1deg); }
+}
+@keyframes mp-zoom {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+@keyframes mp-shine {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.mp-chaos-shake { animation: mp-shake 0.7s ease-in-out infinite; }
+.mp-chaos-zoom { animation: mp-zoom 2.4s ease-in-out infinite; }
+.mp-chaos-tilt { transform: rotate(-3deg); }
+.mp-chaos-rainbow {
+  background: linear-gradient(90deg, #7C3AED, #A78BFA, #FAFAFA, #A78BFA, #7C3AED);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: mp-shine 3s linear infinite;
+}
+.mp-mirror-img { transform: scaleX(-1); }
+@media (prefers-reduced-motion: reduce) {
+  .mp-chaos-shake, .mp-chaos-zoom, .mp-chaos-rainbow { animation: none; }
+}
