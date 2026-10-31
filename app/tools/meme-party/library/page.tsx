@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { ToolShell } from '@/components/tool-shell'
+import { useBackNavigation } from '@/hooks/use-back-navigation'
 import { Banner, Btn, cx } from '@/components/meme-party/parts'
 import { ImportHistory, ImportWizard } from '@/components/meme-party/import-ui'
 import { LibraryBrowser } from '@/components/meme-party/library-ui'
@@ -41,6 +42,7 @@ function Login({ configured, onDone }: { configured: boolean; onDone: () => void
 export default function LibraryPage() {
   const [state, setState] = useState<{ authed: boolean; configured: boolean } | null>(null)
   const [tab, setTab] = useState<Tab>('library')
+  const { goUp } = useBackNavigation()
 
   const check = async () => {
     const res = await api<{ authed: boolean; configured: boolean }>('/api/meme-party/admin/check')
@@ -65,7 +67,7 @@ export default function LibraryPage() {
                 {label}
               </button>
             ))}
-            <Link href="/tools/meme-party" className="ml-auto text-xs text-muted underline underline-offset-2 hover:text-fg">← Về game</Link>
+            <Link href="/tools/meme-party" onClick={(e) => { e.preventDefault(); goUp('/tools/meme-party') }} className="ml-auto text-xs text-muted underline underline-offset-2 hover:text-fg">← Về game</Link>
             <button onClick={logout} className="text-xs text-muted underline underline-offset-2 hover:text-fg">Đăng xuất</button>
           </div>
           {tab === 'library' && <LibraryBrowser />}
