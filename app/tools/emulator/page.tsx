@@ -188,6 +188,44 @@ function extractRomFilename(url: string): string {
   }
 }
 
+// FBNeo picks the driver from the archive's filename, so a duplicate-download
+// name like "orlegend_2.zip" / "orlegend (1).zip" boots nothing ("romset is
+// unknown"). No FBNeo short name ends in "_<digits>" or contains spaces/"-",
+// so stripping those suffixes is safe; names are always lowercase.
+function normalizeArcadeZipName(name: string): string {
+  const m = name.match(/^(.*)\.zip$/i)
+  if (!m) return name
+  const base = m[1]
+    .trim()
+    .replace(/\s*\(\d+\)$/, '')
+    .replace(/[_-]\d{1,2}$/, '')
+    .trim()
+    .toLowerCase()
+  return base ? `${base}.zip` : name
+}
+
+// EmulatorJS (stable 4.2.x) always *extracts* a zip passed as EJS_biosUrl and
+// writes its loose files next to the ROM — so "pgm.zip" never exists in the
+// virtual FS and FBNeo reports the BIOS files missing. FBNeo however matches
+// ROMs by CRC across every archive it opens, so a "non-merged" set (BIOS
+// files inside the game zip itself) boots fine. Merge the BIOS in here
+// instead of relying on EJS_biosUrl. STORE keeps it fast; files the game zip
+// already has (by basename) are left untouched.
+async function mergeBiosIntoRom(rom: Blob, bios: Blob): Promise<Blob> {
+  const [romZip, biosZip] = await Promise.all([JSZip.loadAsync(rom), JSZip.loadAsync(bios)])
+  const existing = new Set(
+    Object.keys(romZip.files).map((n) => (n.split('/').pop() ?? n).toLowerCase()),
+  )
+  for (const entry of Object.values(biosZip.files)) {
+    if (entry.dir) continue
+    const base = entry.name.split('/').pop() ?? entry.name
+    if (!base || existing.has(base.toLowerCase())) continue
+    romZip.file(base, await entry.async('uint8array'))
+    existing.add(base.toLowerCase())
+  }
+  return romZip.generateAsync({ type: 'blob', compression: 'STORE' })
+}
+
 // ── Arcade virtual joystick ─────────────────────────────────────
 // Circular touch area: drag in any direction to press that dpad button.
 // Supports 8 directions (including diagonals like up-left, down-right).
@@ -276,7 +314,7 @@ function EmulatorHost() {
   // FBNeo can look it up by short name — differs from romName when loading
   // from the library, where romName is a human display name.
   const [romFileName, setRomFileName] = useState<string | null>(null)
-  const [biosUrl,   setBiosUrl]   = useState<string | null>(null)
+  const [biosFile,  setBiosFile]  = useState<File | null>(null)
   const [biosName,  setBiosName]  = useState<string | null>(null)
   const [wrapZip,   setWrapZip]   = useState(false)
   // Smart TV: we block EmulatorJS from loading until the user explicitly taps
@@ -319,7 +357,10 @@ function EmulatorHost() {
   const ejsRef     = useRef<EJSManager | null>(null)
   const prevRef    = useRef<Record<string, Record<string, boolean>>>({})
   const blobRef    = useRef<string | null>(null)
-  const biosBlobRef = useRef<string | null>(null)
+  // Raw ROM bytes behind romUrl. EmulatorJS revokes the blob: URL it was
+  // given right after fetching it, so every (re)boot builds a fresh URL from
+  // this — which also lets arcade boots merge the BIOS in first.
+  const romBlobRef = useRef<Blob | null>(null)
   const scriptRef  = useRef<HTMLScriptElement | null>(null)
   const screenRef  = useRef<HTMLDivElement | null>(null)
   // Mirrors gameReady for the stall-timeout closure below, which is set up
@@ -481,6 +522,7 @@ function EmulatorHost() {
       setRomFileName(name)
       setGameReady(false)
       ejsRef.current = null
+      romBlobRef.current = blob
       const blobUrl = URL.createObjectURL(blob)
       blobRef.current = blobUrl
       setRomUrl(blobUrl)
@@ -526,6 +568,7 @@ function EmulatorHost() {
       setRomFileName(extractRomFilename(rom.url))
       setGameReady(false)
       ejsRef.current = null
+      romBlobRef.current = blob
       const blobUrl = URL.createObjectURL(blob)
       blobRef.current = blobUrl
       setRomUrl(blobUrl)
@@ -570,27 +613,17 @@ function EmulatorHost() {
   }, [playerInputs, players])
 
   // ── Handle ROM file pick ──────────────────────────────────────
-  const handleRomFile = async (file: File) => {
+  const handleRomFile = (file: File) => {
     if (blobRef.current) URL.revokeObjectURL(blobRef.current)
     setRomName(file.name)
     setRomFileName(file.name)
     setGameReady(false)
     ejsRef.current = null
 
-    // Some EmulatorJS builds auto-extract a .zip passed as EJS_gameUrl
-    // before handing it to the core, which can corrupt the archive
-    // structure FBNeo's MAME-derived loader expects to open itself.
-    // Wrapping in one more outer zip is a reported workaround for that —
-    // but it's unconfirmed for this specific build, so it's opt-in via
-    // the checkbox rather than always-on, letting you test both ways.
-    let uploadBlob: Blob = file
-    if (system === 'arcade' && wrapZip && file.name.toLowerCase().endsWith('.zip')) {
-      const wrapper = new JSZip()
-      wrapper.file(file.name, file)
-      uploadBlob = await wrapper.generateAsync({ type: 'blob', compression: 'STORE' })
-    }
-
-    const url = URL.createObjectURL(uploadBlob)
+    // Arcade BIOS merge / optional outer-zip wrap happen at boot time (see
+    // the bootstrap effect) so they apply to library/URL loads too.
+    romBlobRef.current = file
+    const url = URL.createObjectURL(file)
     blobRef.current = url
     setRomUrl(url)
   }
@@ -610,7 +643,7 @@ function EmulatorHost() {
       const blob = await res.blob()
       const nameFromUrl = decodeURIComponent(trimmed.split('/').pop()?.split(/[?#]/)[0] || '')
       const name = nameFromUrl || 'rom' + (SYSTEMS.find((s) => s.value === system)?.exts.split(' ')[0] ?? '')
-      await handleRomFile(new File([blob], name, { type: blob.type }))
+      handleRomFile(new File([blob], name, { type: blob.type }))
       setRomUrlInput('')
       afterSuccess?.()
     } catch {
@@ -622,10 +655,7 @@ function EmulatorHost() {
 
   // ── Handle BIOS file pick (arcade only, e.g. neogeo.zip) ───────
   const handleBiosFile = (file: File) => {
-    if (biosBlobRef.current) URL.revokeObjectURL(biosBlobRef.current)
-    const url = URL.createObjectURL(file)
-    biosBlobRef.current = url
-    setBiosUrl(url)
+    setBiosFile(file)
     setBiosName(file.name)
   }
 
@@ -651,47 +681,84 @@ function EmulatorHost() {
     // recognized ("dino" is a known game) but the core then reported the
     // archive "not found in your paths" — it's searching for "dino.zip"
     // specifically, not the extension-less name.
-    window.EJS_player        = '#ejs-mount'
-    window.EJS_gameUrl       = romUrl
-    window.EJS_gameName      = romFileName ?? romName ?? undefined
-    window.EJS_core          = SYSTEMS.find((s) => s.value === system)?.core ?? 'fceumm'
-    window.EJS_pathtodata    = EJS_DATA
-    // AudioContext is always unlocked before we reach this point:
-    // — non-TV: no strict autoplay policy, EJS handles it fine
-    // — Smart TV: startOnTV() already called AudioContext.resume() in the
-    //   user-gesture handler before this effect ran (tvReady gate above)
-    window.EJS_startOnLoaded = true
-    if (biosUrl) window.EJS_biosUrl = biosUrl
-    else delete window.EJS_biosUrl
-    window.EJS_onGameStart   = () => {
-      const gm = window.EJS_emulator?.gameManager ?? null
-      ejsRef.current = gm
-      // Port 0 has a joypad connected by default; ports 1-3 (players 2-4)
-      // need to be connected explicitly or the core ignores their input
-      // entirely. Harmless to connect all 3 even for 2-player-max systems
-      // like NES/SNES — the extra ports just go unused.
-      for (const port of [1, 2, 3]) {
-        try { gm?.setControllerPortDevice(port, RETRO_DEVICE_JOYPAD) } catch { /* core doesn't support this many players */ }
-      }
-      setGameReady(true)
-      setRuntimeError(false)
-      setRuntimeErrorMsg(null)
-      tryAutoFullscreen()
-    }
+    let cancelled = false
+    let bootUrl: string | null = null
+    const gameName = romFileName ?? romName
 
-    const s  = document.createElement('script')
-    // Cache-bust on retry so a "Thử lại" tap forces a fresh network request
-    // instead of reusing whatever just failed.
-    s.src         = loadAttempt > 0 ? `${EJS_LOADER}?retry=${loadAttempt}` : EJS_LOADER
-    s.async       = true
-    // crossOrigin="anonymous" exposes real error messages from cross-origin scripts,
-    // but some Smart TV browsers silently fail CORS requests (no onerror, no window
-    // error event) when the CDN doesn't return matching headers for their UA — the
-    // script just never loads and the 90s timeout fires instead. Skip on TV.
-    if (!isSmartTV()) s.crossOrigin = 'anonymous'
-    s.onerror = () => { setRuntimeError(true); setRuntimeErrorMsg('Không tải được loader.js từ CDN.') }
-    document.body.appendChild(s)
-    scriptRef.current = s
+    const boot = async () => {
+      // Fresh blob: URL every boot — EmulatorJS revokes the one it fetched,
+      // so a "Thử lại" with the old romUrl would fail to load anything.
+      let gameUrl = romUrl
+      const raw = romBlobRef.current
+      if (raw) {
+        let blob: Blob = raw
+        if (system === 'arcade' && biosFile) {
+          try {
+            blob = await mergeBiosIntoRom(raw, biosFile)
+          } catch (e) {
+            if (cancelled) return
+            setRuntimeError(true)
+            setRuntimeErrorMsg(`Không gộp được BIOS (${biosFile.name}) vào ROM — file .zip có thể bị hỏng: ${e instanceof Error ? e.message : String(e)}`)
+            return
+          }
+        }
+        // Optional outer-zip wrap (troubleshooting checkbox) — applied last
+        // so the BIOS-merged archive is what ends up inside it.
+        if (system === 'arcade' && wrapZip && gameName?.toLowerCase().endsWith('.zip')) {
+          const wrapper = new JSZip()
+          wrapper.file(normalizeArcadeZipName(gameName), blob)
+          blob = await wrapper.generateAsync({ type: 'blob', compression: 'STORE' })
+        }
+        if (cancelled) return
+        bootUrl = URL.createObjectURL(blob)
+        gameUrl = bootUrl
+      }
+      if (cancelled) return
+
+      window.EJS_player        = '#ejs-mount'
+      window.EJS_gameUrl       = gameUrl
+      window.EJS_gameName      = system === 'arcade' && gameName ? normalizeArcadeZipName(gameName) : (gameName ?? undefined)
+      window.EJS_core          = SYSTEMS.find((s) => s.value === system)?.core ?? 'fceumm'
+      window.EJS_pathtodata    = EJS_DATA
+      // AudioContext is always unlocked before we reach this point:
+      // — non-TV: no strict autoplay policy, EJS handles it fine
+      // — Smart TV: startOnTV() already called AudioContext.resume() in the
+      //   user-gesture handler before this effect ran (tvReady gate above)
+      window.EJS_startOnLoaded = true
+      // Arcade BIOS is merged into the game zip above — EJS_biosUrl would only
+      // get extracted into loose files FBNeo can't use.
+      delete window.EJS_biosUrl
+      window.EJS_onGameStart   = () => {
+        const gm = window.EJS_emulator?.gameManager ?? null
+        ejsRef.current = gm
+        // Port 0 has a joypad connected by default; ports 1-3 (players 2-4)
+        // need to be connected explicitly or the core ignores their input
+        // entirely. Harmless to connect all 3 even for 2-player-max systems
+        // like NES/SNES — the extra ports just go unused.
+        for (const port of [1, 2, 3]) {
+          try { gm?.setControllerPortDevice(port, RETRO_DEVICE_JOYPAD) } catch { /* core doesn't support this many players */ }
+        }
+        setGameReady(true)
+        setRuntimeError(false)
+        setRuntimeErrorMsg(null)
+        tryAutoFullscreen()
+      }
+
+      const s  = document.createElement('script')
+      // Cache-bust on retry so a "Thử lại" tap forces a fresh network request
+      // instead of reusing whatever just failed.
+      s.src         = loadAttempt > 0 ? `${EJS_LOADER}?retry=${loadAttempt}` : EJS_LOADER
+      s.async       = true
+      // crossOrigin="anonymous" exposes real error messages from cross-origin scripts,
+      // but some Smart TV browsers silently fail CORS requests (no onerror, no window
+      // error event) when the CDN doesn't return matching headers for their UA — the
+      // script just never loads and the 90s timeout fires instead. Skip on TV.
+      if (!isSmartTV()) s.crossOrigin = 'anonymous'
+      s.onerror = () => { setRuntimeError(true); setRuntimeErrorMsg('Không tải được loader.js từ CDN.') }
+      document.body.appendChild(s)
+      scriptRef.current = s
+    }
+    void boot()
 
     // EmulatorJS itself never reports a specific "failed to init" reason —
     // catch whatever error/rejection happens on the page while it's booting
@@ -725,6 +792,8 @@ function EmulatorHost() {
     }, stallMs)
 
     return () => {
+      cancelled = true
+      if (bootUrl) URL.revokeObjectURL(bootUrl)
       clearTimeout(timeout)
       window.removeEventListener('error', onWinError)
       window.removeEventListener('unhandledrejection', onRejection)
@@ -733,7 +802,7 @@ function EmulatorHost() {
         scriptRef.current = null
       }
     }
-  }, [romUrl, romName, romFileName, system, biosUrl, tryAutoFullscreen, loadAttempt, tvReady])
+  }, [romUrl, romName, romFileName, system, biosFile, wrapZip, tryAutoFullscreen, loadAttempt, tvReady])
 
   const retryLoad = useCallback(() => {
     setRuntimeError(false)
@@ -745,7 +814,6 @@ function EmulatorHost() {
   // Revoke blobs on unmount
   useEffect(() => () => {
     if (blobRef.current) URL.revokeObjectURL(blobRef.current)
-    if (biosBlobRef.current) URL.revokeObjectURL(biosBlobRef.current)
   }, [])
 
   // Lock page scroll behind the CSS fake-fullscreen overlay, same as a real
@@ -765,7 +833,7 @@ function EmulatorHost() {
       scriptRef.current = null
     }
     if (blobRef.current) { URL.revokeObjectURL(blobRef.current); blobRef.current = null }
-    if (biosBlobRef.current) { URL.revokeObjectURL(biosBlobRef.current); biosBlobRef.current = null }
+    romBlobRef.current = null
     delete window.EJS_player
     delete window.EJS_gameUrl
     delete window.EJS_gameName
@@ -774,7 +842,7 @@ function EmulatorHost() {
     setRomUrl(null)
     setRomName(null)
     setRomFileName(null)
-    setBiosUrl(null)
+    setBiosFile(null)
     setBiosName(null)
     setGameReady(false)
     setRuntimeError(false)
@@ -863,7 +931,7 @@ function EmulatorHost() {
                     <input
                       type="file"
                       accept=".nes,.sfc,.smc,.gba,.gbc,.gb,.n64,.z64,.v64,.zip"
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleRomFile(f) }}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRomFile(f) }}
                       className="hidden"
                     />
                   </label>
@@ -928,6 +996,9 @@ function EmulatorHost() {
                       romset FBNeo mới nhất, không tương thích với bộ MAME cũ. Tìm lại{' '}
                       <span className="font-mono">pgm.zip</span> /
                       <span className="font-mono"> neogeo.zip</span> đúng phiên bản FBNeo hiện tại.
+                      Ví dụ <span className="font-mono">pgm.zip</span> bản FBNeo có 6 file — bản MAME cũ
+                      chỉ có 4 file, thiếu <span className="font-mono text-fg">ddp3_bios.u37</span> và{' '}
+                      <span className="font-mono text-fg">bios.u42</span>.
                     </p>
                     <p className="text-xs text-muted">
                       <span className="text-fg">Vẫn lỗi sau khi đúng tên?</span> — Thử bật/tắt tùy
@@ -953,16 +1024,14 @@ function EmulatorHost() {
                     </p>
                     <p className="mb-2 text-xs text-muted">
                       Một số game cần file ROM cha riêng: PGM → <span className="font-mono text-fg">pgm.zip</span>,
-                      Neo Geo → <span className="font-mono text-fg">neogeo.zip</span>. Upload file đó vào đây trước khi chạy game.
+                      Neo Geo → <span className="font-mono text-fg">neogeo.zip</span>. Upload file đó vào đây <strong>trước</strong> khi chọn ROM game — BIOS sẽ được tự gộp vào file game khi chạy. Tên file kiểu <span className="font-mono text-fg">orlegend_2.zip</span> / <span className="font-mono text-fg">orlegend (1).zip</span> cũng được tự sửa về <span className="font-mono text-fg">orlegend.zip</span>.
                     </p>
                     {biosName ? (
                       <div className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3">
                         <span className="font-mono text-xs text-fg truncate">{biosName}</span>
                         <button
                           onClick={() => {
-                            if (biosBlobRef.current) URL.revokeObjectURL(biosBlobRef.current)
-                            biosBlobRef.current = null
-                            setBiosUrl(null)
+                            setBiosFile(null)
                             setBiosName(null)
                           }}
                           className="text-xs text-muted transition-colors hover:text-fg"
